@@ -32,7 +32,7 @@ class DotProdClassifier(object):
     def cluster_counts(self):
         return self._cluster_counts
 
-    def fit_predict(self, X, verbose = True):
+    def fit_predict(self, X, verbose = True, predict_threshold = None):
         """ Fit the data vectors X and return their cluster labels.
         """
 
@@ -42,6 +42,9 @@ class DotProdClassifier(object):
             self._featuredim = X.shape[1]
         else:
             raise RuntimeError("DotProdClassifier cannot be fitted twice!")
+
+        if predict_threshold is None:
+            predict_threshold = self._threshold
 
         # Essentially hierarchical clustering that stops when no cluster *centers*
         #  are more similar than the threshold.
@@ -77,7 +80,9 @@ class DotProdClassifier(object):
     #                     continue
 
                     cosang = np.dot(vec, sitevec)
-                    cosang /= np.linalg.norm(vec) * np.linalg.norm(sitevec)
+                    norms = np.linalg.norm(vec) * np.linalg.norm(sitevec)
+                    assert norms != 0, "Huh? %s %s" % (vec, sitevec)
+                    cosang /= norms
 
                     # Assign
                     if cosang > assigned_cosang:
@@ -92,6 +97,8 @@ class DotProdClassifier(object):
                     members.append(list())
                     members[-1].extend(old_members[i])
                     assigned_to = len(cluster_centers) - 1
+                    # By definition, confidence is 1.0
+                    assigned_cosang = 1.0
                 else:
                     # Update average center vector of assigned cluster
                     cluster_centers[assigned_to] *= n_assigned_to[assigned_to]
@@ -100,7 +107,6 @@ class DotProdClassifier(object):
                     n_assigned_to[assigned_to] += old_n_assigned[i]
                     members[assigned_to].extend(old_members[i])
                     cluster_centers[assigned_to] /= n_assigned_to[assigned_to]
-
 
             old_centers = cluster_centers
             old_n_assigned = n_assigned_to
@@ -121,28 +127,32 @@ class DotProdClassifier(object):
             warnings.warn("Clustering for site type %i did NOT converge after %i iterations" % (site_type, max_converge_iters))
 
         self._cluster_centers = np.asarray(cluster_centers)
-        self._cluster_counts = np.asarray(n_assigned_to)
 
-        # filter out low counts
+        # Run a predict now:
+        labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
+
+        # -- filter out low counts
+        self._cluster_counts = np.bincount(labels[labels >= 0])
+
         assert len(self._cluster_counts) == len(self._cluster_centers)
 
         count_mask = self._cluster_counts > self._min_samples
+
+        translation_table = np.empty(shape = len(self._cluster_counts), dtype = np.int)
+        translation_table[count_mask] = np.arange(np.sum(count_mask))
+        translation_table[~count_mask] = -1
+
         self._cluster_centers = self._cluster_centers[count_mask]
         self._cluster_counts = self._cluster_counts[count_mask]
+
+        labels = translation_table[labels]
 
         if verbose:
             print "DotProdClassifier: %i/%i assignment counts below threshold %i; %i clusters remain." % (np.sum(~count_mask), len(count_mask), self._min_samples, len(self._cluster_counts))
 
-        # construct label list
+        return labels, confs
 
-        next_label = 0
-        for clust in np.where(count_mask)[0]:
-            labels[members[clust]] = next_label
-            next_label += 1
-
-        return labels
-
-    def predict(self, X, return_confidences = False, threshold = None, verbose = True):
+    def predict(self, X, return_confidences = False, threshold = None, verbose = True, ignore_zeros = True):
         """Return a predicted cluster label for vectors X.
 
         :param float threshold: alternate threshold. Defaults to None, when self.threshold
@@ -167,25 +177,35 @@ class DotProdClassifier(object):
         if return_confidences:
             confidences = np.empty(shape = len(X), dtype = np.float)
 
+        zeros_count = 0
+
+        center_norms = np.linalg.norm(self._cluster_centers, axis = 1)
+
         for i, x in enumerate(tqdm(X) if verbose else X):
 
-            assigned_to = -1
-            assigned_cosang = threshold
+            if np.all(x == 0):
+                if ignore_zeros:
+                    labels[i] = -1
+                    zeros_count += 1
+                    continue
+                else:
+                    raise ValueError("Data %i is all zeros!" % i)
 
-            for j, sitevec in enumerate(self._cluster_centers):
+            diffs = np.sum(x * self._cluster_centers, axis = 1)
+            diffs /= np.linalg.norm(x) * center_norms
 
-                cosang = np.dot(x, sitevec)
-                cosang /= np.linalg.norm(x) * np.linalg.norm(sitevec)
+            assigned_to = np.argmax(diffs)
+            assignment_confidence = diffs[assigned_to]
 
-                # Assign
-                if cosang > assigned_cosang:
-                    assigned_to = j
-                    assigned_cosang = cosang
+            if assignment_confidence < threshold:
+                assigned_to = -1
+                assignment_confidence = 0.0
 
             labels[i] = assigned_to
+            confidences[i] = assignment_confidence
 
-            if return_confidences:
-                confidences[i] = assigned_cosang
+        if verbose and zeros_count > 0:
+            print "Encountered %i zero vectors during prediction" % zeros_count
 
         if return_confidences:
             return labels, confidences
