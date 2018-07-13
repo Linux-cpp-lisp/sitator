@@ -72,22 +72,18 @@ class DotProdClassifier(object):
             for i, vec in enumerate(tqdm(old_centers) if verbose else old_centers):
 
                 assigned_to = -1
-                assigned_cosang = self._threshold
+                assigned_cosang = 0.0
 
-                for j, sitevec in enumerate(cluster_centers):
-                    # OLD: only allowing merging into a larger/similar sized cluster
-    #                 if not old_n_assigned[j] + 10 >= old_n_assigned[i]:
-    #                     continue
+                if len(cluster_centers) > 0:
+                    diffs = np.sum(vec * cluster_centers, axis = 1)
+                    diffs /= np.linalg.norm(vec) * np.linalg.norm(cluster_centers, axis = 1)
 
-                    cosang = np.dot(vec, sitevec)
-                    norms = np.linalg.norm(vec) * np.linalg.norm(sitevec)
-                    assert norms != 0, "Huh? %s %s" % (vec, sitevec)
-                    cosang /= norms
+                    assigned_to = np.argmax(diffs)
+                    assigned_cosang = diffs[assigned_to]
 
-                    # Assign
-                    if cosang > assigned_cosang:
-                        assigned_to = j
-                        assigned_cosang = cosang
+                    if assigned_cosang < self._threshold:
+                        assigned_cosang = 0.0
+                        assigned_to = -1
 
                 # If couldn't assign, start a new cluster
                 if assigned_to == -1:
