@@ -6,6 +6,8 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import ase
 
+from samos.analysis.jumps.voronoi import collapse_into_unit_cell
+
 DEFAULT_COLORS = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'] * 2
 
 # From https://stackoverflow.com/questions/13685386/matplotlib-equal-unit-length-with-equal-aspect-ratio-z-axis-is-not-equal-to
@@ -37,7 +39,12 @@ def set_axes_equal(ax):
     ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
-def plot_atoms(atms, species, pts=None, pts_cs = None, cell = None, hide_species = (), wrap = False, pts_marker = 'x'):
+def plot_atoms(atms, species,
+               pts=None, pts_cs = None, pts_marker = 'x',
+               cell = None,
+               hide_species = (),
+               wrap = False,
+               title = ""):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
     cs = {
@@ -71,7 +78,7 @@ def plot_atoms(atms, species, pts=None, pts_cs = None, cell = None, hide_species
                    pts[:,2],
                    marker = pts_marker,
                    c = c,
-                   cmap=matplotlib.cm.Spectral)
+                   cmap=matplotlib.cm.Dark2)
 
     if not cell is None:
         for cvec in cell:
@@ -82,6 +89,8 @@ def plot_atoms(atms, species, pts=None, pts_cs = None, cell = None, hide_species
                    color = "gray",
                     alpha=0.5,
                    linestyle="--")
+
+    ax.set_title(title)
 
     set_axes_equal(ax)
 

@@ -128,20 +128,18 @@ class DotProdClassifier(object):
         labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
 
         # -- filter out low counts
-        self._cluster_counts = np.bincount(labels[labels >= 0])
+        if not self._min_samples is None:
+            self._cluster_counts = np.bincount(labels[labels >= 0])
 
-        assert len(self._cluster_counts) == len(self._cluster_centers)
+            assert len(self._cluster_counts) == len(self._cluster_centers)
 
-        count_mask = self._cluster_counts > self._min_samples
+            count_mask = self._cluster_counts > self._min_samples
 
-        translation_table = np.empty(shape = len(self._cluster_counts), dtype = np.int)
-        translation_table[count_mask] = np.arange(np.sum(count_mask))
-        translation_table[~count_mask] = -1
+            self._cluster_centers = self._cluster_centers[count_mask]
+            self._cluster_counts = self._cluster_counts[count_mask]
 
-        self._cluster_centers = self._cluster_centers[count_mask]
-        self._cluster_counts = self._cluster_counts[count_mask]
-
-        labels = translation_table[labels]
+            # Do another predict -- this could be more efficient, but who cares?
+            labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
 
         if verbose:
             print "DotProdClassifier: %i/%i assignment counts below threshold %i; %i clusters remain." % (np.sum(~count_mask), len(count_mask), self._min_samples, len(self._cluster_counts))
