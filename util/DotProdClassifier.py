@@ -2,7 +2,20 @@ import warnings
 
 import numpy as np
 
-from tqdm import tqdm
+import sys
+try:
+    ipy_str = str(type(get_ipython()))
+    if 'zmqshell' in ipy_str:
+        from tqdm import tqdm_notebook as tqdm
+    if 'terminal' in ipy_str:
+        from tqdm import tqdm
+except:
+    if sys.stderr.isatty():
+        from tqdm import tqdm
+    else:
+        def tqdm(iterable, **kwargs):
+            return iterable
+
 
 class DotProdClassifier(object):
     def __init__(self,
@@ -31,6 +44,10 @@ class DotProdClassifier(object):
     @property
     def cluster_counts(self):
         return self._cluster_counts
+
+    @property
+    def n_clusters(self):
+        return len(self._cluster_counts)
 
     def fit_predict(self, X, verbose = True, predict_threshold = None):
         """ Fit the data vectors X and return their cluster labels.
@@ -63,13 +80,13 @@ class DotProdClassifier(object):
         last_n_sites = -1
         did_converge = False
 
-        for _ in xrange(self._max_iters):
+        for iteration in xrange(self._max_iters):
             # This iterations centers
             cluster_centers = list()
             n_assigned_to = list()
             members = list()
 
-            for i, vec in enumerate(tqdm(old_centers) if verbose else old_centers):
+            for i, vec in enumerate(tqdm(old_centers, desc = "Iteration %i" % iteration)):
 
                 assigned_to = -1
                 assigned_cosang = 0.0
@@ -175,7 +192,7 @@ class DotProdClassifier(object):
 
         center_norms = np.linalg.norm(self._cluster_centers, axis = 1)
 
-        for i, x in enumerate(tqdm(X) if verbose else X):
+        for i, x in enumerate(tqdm(X, desc = "Sample")):
 
             if np.all(x == 0):
                 if ignore_zeros:
