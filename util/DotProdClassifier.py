@@ -2,6 +2,8 @@ import warnings
 
 import numpy as np
 
+import numbers
+
 import sys
 try:
     ipy_str = str(type(get_ipython()))
@@ -27,8 +29,10 @@ class DotProdClassifier(object):
             In cos-of-angle-between-vectors (i.e. 1 is exactly the same, 0 is orthogonal)
         :param int max_converge_iters: Maximum number of iterations. If the algorithm hasn't converged
             by then, it will exit with a warning.
-        :param int min_samples: any cluster with fewer samples will be filtered out before being
-            returned.
+        :param int|float min_samples: filter out clusters with low sample counts.
+            If an int, filters out clusters with fewer samples than this.
+            If a float, filters out clusters with fewer than floor(min_samples * n_assigned_samples)
+                samples assigned to them.
         """
         self._threshold = threshold
         self._max_iters = max_converge_iters
@@ -144,13 +148,23 @@ class DotProdClassifier(object):
         # Run a predict now:
         labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
 
+        total_n_assigned = np.sum(labels >= 0)
+
         # -- filter out low counts
         if not self._min_samples is None:
             self._cluster_counts = np.bincount(labels[labels >= 0])
 
             assert len(self._cluster_counts) == len(self._cluster_centers)
 
-            count_mask = self._cluster_counts > self._min_samples
+            min_samples = None
+            if isinstance(self._min_samples, numbers.Integral):
+                min_samples = self._min_samples
+            elif isinstance(self._min_samples, numbers.Real):
+                min_samples = int(np.floor(self._min_samples * total_n_assigned))
+            else:
+                raise ValueError("Invalid value `%s` for min_samples; must be integral or float." % self._min_samples)
+
+            count_mask = self._cluster_counts >= min_samples
 
             self._cluster_centers = self._cluster_centers[count_mask]
             self._cluster_counts = self._cluster_counts[count_mask]
@@ -159,7 +173,7 @@ class DotProdClassifier(object):
             labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
 
         if verbose:
-            print "DotProdClassifier: %i/%i assignment counts below threshold %i; %i clusters remain." % (np.sum(~count_mask), len(count_mask), self._min_samples, len(self._cluster_counts))
+            print "DotProdClassifier: %i/%i assignment counts below threshold %s (%s); %i clusters remain." % (np.sum(~count_mask), len(count_mask), self._min_samples, min_samples, len(self._cluster_counts))
 
         return labels, confs
 

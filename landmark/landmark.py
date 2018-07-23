@@ -1,6 +1,3 @@
-cimport cython
-from libc.math cimport sqrt, cos, M_PI, isnan
-
 import numpy as np
 
 from util import PBCCalculator, DotProdClassifier
@@ -22,11 +19,13 @@ except:
         def tqdm(iterable, **kwargs):
             return iterable
 
+import helpers
+
 
 from functools import wraps
 def analysis_result(func):
-    @wraps(func)
     @property
+    @wraps(func)
     def wrapper(self, *args, **kwargs):
         if not self._has_run:
             raise ValueError("This LandmarkAnalysis hasn't been run yet.")
@@ -134,6 +133,9 @@ class LandmarkAnalysis(object):
     def site_occupancies(self):
         return self._site_occupancies
 
+    @analysis_result
+    def n_assigned_positions_per_site(self):
+        return np.round(self._site_occupancies * self._n_frames)
 
     @analysis_result
     def site_positions(self):
@@ -175,8 +177,10 @@ class LandmarkAnalysis(object):
         if not self._has_run:
             raise ValueError("This LandmarkAnalysis hasn't been run yet.")
 
+        total_unknown = np.sum(self._lmk_lbls < 0)
+
         if self.verbose:
-            print "Assigning unassigned mobile particles to last known positions within %i frames..." % frame_threshold
+            print "%i unassigned positions (%i%%); assigning unassigned mobile particles to last known positions within %i frames..." % (total_unknown, 100.0 * (total_unknown / float(self._n_positions)), frame_threshold)
 
         last_known = np.empty(shape = self.n_mobile, dtype = np.int)
         last_known.fill(-1)
@@ -204,28 +208,37 @@ class LandmarkAnalysis(object):
 
             time_unknown[~unknown] = 0
 
-            to_correct = unknown & (time_unknown < max_last_known_age)
+            to_correct = unknown & (time_unknown < frame_threshold)
 
             self._lmk_lbls[i][to_correct] = last_known[to_correct]
             total_reassigned += np.sum(to_correct)
             time_unknown[unknown] += 1
 
+
         if avg_time_unknown_div > 0: # We corrected some unknowns
             avg_time_unknown = float(avg_time_unknown) / avg_time_unknown_div
 
-            print "  Maximum # of frames any mobile particle spent unassigned: %i" % max_time_unknown
-            print "  Avg. # of frames spent unassigned: %f" % avg_time_unknown
-            print "  Assigned %i/%i unassigned positions, leaving %i/%i (%i%%) unknown" % (total_reassigned, total_unknown, total_unknown - total_reassigned, len(indiv_site_labels), 100.0 * ((total_unknown - total_reassigned) / float(len(indiv_site_labels))))
+            if self.verbose:
+                print "  Maximum # of frames any mobile particle spent unassigned: %i" % max_time_unknown
+                print "  Avg. # of frames spent unassigned: %f" % avg_time_unknown
+                print "  Assigned %i/%i unassigned positions, leaving %i/%i (%i%%) unknown" % (total_reassigned, total_unknown, total_unknown - total_reassigned, self._n_positions, 100.0 * ((total_unknown - total_reassigned) / float(self._n_positions)))
+
+            return {
+                'max_time_unknown' : max_time_unknown,
+                'avg_time_unknown' : avg_time_unknown,
+                'total_unassigned' : total_unknown,
+                'total_reassigned' : total_reassigned
+            }
         else:
-            print "  None to correct."
+            if self.verbose:
+                print "  None to correct."
 
-        return {
-            'max_time_unknown' : max_time_unknown,
-            'avg_time_unknown' : avg_time_unknown,
-            'total_unassigned' : total_unknown,
-            'total_reassigned' : total_reassigned
-        }
-
+            return {
+                'max_time_unknown' : 0,
+                'avg_time_unknown' : 0,
+                'total_unassigned' : 0,
+                'total_reassigned' : 0
+            }
 
     def site_trajectory_for_particle(self, i, return_confidences = False):
         """Returns the site trajectory of mobile particle(s) i.
@@ -243,11 +256,16 @@ class LandmarkAnalysis(object):
             return self._lmk_lbls[:, i]
 
 
-    def all_positions_for_site(self, site):
+    def all_positions_for_site(self, site, return_confidences = False):
         """Return all positions assigned to `site`
         """
         assert 0 <= site < self.n_sites
-        return self._frames[:, self._mobile_mask][self._lmk_lbls == site]
+        msk = self._lmk_lbls == site
+        poses = self._frames[:, self._mobile_mask][msk]
+        if return_confidences:
+            return poses, self._lmk_confs[msk].flatten()
+        else:
+            return poses
 
 
     def run_analysis(self, frames,
@@ -266,7 +284,7 @@ class LandmarkAnalysis(object):
         if frames.shape[1:] != (len(self._structure), 3):
           raise ValueError("Wrong shape %s for frames." % frames.shape)
 
-        cdef Py_ssize_t n_frames = len(frames)
+        n_frames = len(frames)
 
         if self.verbose:
             print "--- Running Landmark Analysis ---"
@@ -279,18 +297,17 @@ class LandmarkAnalysis(object):
         # -- Step 2: Compute landmark vectors
         if self.verbose: print "  - computing landmark vectors -"
         # Compute landmark vectors
-        self._fill_landmark_vectors(frames, check_for_zeros = check_for_zero_landmarks)
-        lvecs = self.landmark_vectors
+        helpers._fill_landmark_vectors(self, frames, check_for_zeros = check_for_zero_landmarks, tqdm = tqdm)
 
         # -- Step 3: Cluster landmark vectors
         if self.verbose: print "  - clustering landmark vectors -"
         #  - Preprocess -
         self._do_peak_evening()
         #  - Cluster -
-        min_samples = self._minimum_site_occupancy * n_frames
+        #min_samples = self._minimum_site_occupancy * n_frames
 
         self._landmark_classifier = DotProdClassifier(threshold = self._site_clustering_threshold,
-                                                      min_samples = min_samples)
+                                                      min_samples = self._minimum_site_occupancy / float(self.n_mobile))
         self._lmk_lbls, self._lmk_confs = self._landmark_classifier.fit_predict(self._landmark_vectors,
                                                                                 predict_threshold = self._site_assignment_threshold,
                                                                                 verbose = self.verbose)
@@ -310,7 +327,8 @@ class LandmarkAnalysis(object):
 
         # Save a weakref to frames for computing other analysis properties later
         self._frames = frames
-        self._n_frames = len(frames)
+        self._n_frames = n_frames
+        self._n_positions = n_frames * self.n_mobile
 
         self._has_run = True
 
@@ -329,50 +347,6 @@ class LandmarkAnalysis(object):
         self._voronoi_vertices = np.array([v + [-1] * (longest_vert_set - len(v)) for v in self.voronoi_vertices])
 
 
-    def _fill_landmark_vectors(self, frames, check_for_zeros = True):
-        if self._voronoi_vertices is None or self._landmark_dimension is None:
-            raise ValueError("_fill_landmark_vectors called before Voronoi!")
-
-        n_frames = len(frames)
-
-        # The dimension of one landmark vector is the number of Voronoi regions
-        self._landmark_vectors = np.empty(shape = (n_frames * self.n_mobile, self._landmark_dimension))
-
-        cdef pbcc = self._pbcc
-
-        frame_shift = np.empty(shape = (self.n_static, 3))
-        temp_distbuff = np.empty(shape = self.n_static, dtype = frames.dtype)
-
-        mobile_idexes = np.where(self._mobile_mask)[0]
-
-        cdef Py_ssize_t landmark_dim = self._landmark_dimension
-        cdef Py_ssize_t current_landmark_i = 0
-        # Iterate through time
-        for i, frame in enumerate(tqdm(frames, desc = "Frame")):
-
-            for j in xrange(self.n_mobile):
-                mobile_pt = frame[mobile_idexes[j]]
-
-                # Shift the Li in question to the center of the unit cell
-                np.copyto(frame_shift, frame[self._static_mask])
-                frame_shift += (pbcc.cell_centroid - mobile_pt)
-
-                # Wrap all positions into the unit cell
-                pbcc.wrap_points(frame_shift)
-
-                # The mobile ion is now at the center of the cell --
-                # compute the landmark vector
-                fill_landmark_vec(self._landmark_vectors, i, self.n_mobile, j,
-                                  landmark_dim, frame_shift,
-                                  self._voronoi_vertices, pbcc.cell_centroid,
-                                  self._cutoff, temp_distbuff)
-
-                if check_for_zeros and (np.count_nonzero(self._landmark_vectors[current_landmark_i]) == 0):
-                    raise ValueError("Encountered a zero landmark vector for mobile ion %i at frame %i." % (j, i))
-
-                current_landmark_i += 1
-
-
     def _do_peak_evening(self):
       if self._peak_evening == 'none':
           return
@@ -382,62 +356,3 @@ class LandmarkAnalysis(object):
           lvec_clip = np.mean(lvec_peaks) - np.std(lvec_peaks)
           # Do the clipping
           self._landmark_vectors[self._landmark_vectors > lvec_clip] = lvec_clip
-
-
-ctypedef double precision
-
-@cython.boundscheck(False)
-@cython.wraparound(False)
-cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
-                  Py_ssize_t i,
-                  Py_ssize_t n_li,
-                  Py_ssize_t j,
-                  Py_ssize_t landmark_dim,
-                  const precision [:,:] lattice_positions,
-                  const Py_ssize_t [:,:] verts_np,
-                  const precision [:] li_pos,
-                  precision cutoff,
-                  precision [:] distbuff) nogil:
-
-    # Pure Python equiv:
-    #         for k in xrange(landmark_dim):
-    #             lvec = np.linalg.norm(lattice_positions[verts[k]] - cell_centroid, axis = 1)
-    #             past_cutoff = lvec > cutoff
-
-    #             # Short circut it, since the product then goes to zero too.
-    #             if np.any(past_cutoff):
-    #                 landmark_vectors[(i * n_li) + j, k] = 0
-    #             else:
-    #                 lvec = (np.cos((np.pi / cutoff) * lvec) + 1.0) / 2.0
-    #                 landmark_vectors[(i * n_li) + j, k] = np.product(lvec)
-
-    # Fill the landmark vector
-    cdef int [:] vert
-    cdef Py_ssize_t v
-    cdef precision ci
-    cdef precision temp
-    cdef const precision [:] pt
-
-    # precompute all cutoff-ed distances
-    for idex in xrange(len(lattice_positions)):
-        pt = lattice_positions[idex]
-        temp = sqrt((pt[0] - li_pos[0])**2 + (pt[1] - li_pos[1])**2 + (pt[2] - li_pos[2])**2)
-
-        if temp > cutoff:
-            distbuff[idex] = 0.0
-        else:
-            distbuff[idex] = (cos((M_PI / cutoff) * temp) + 1.0) * 0.5
-
-    # For each component
-    for k in xrange(landmark_dim):
-        ci = 1.0
-
-        for h in xrange(verts_np.shape[1]):
-            v = verts_np[k, h]
-            if v == -1:
-                break
-
-            # Multiply into accumulator
-            ci *= distbuff[v]
-
-        landmark_vectors[(i * n_li) + j, k] = ci
