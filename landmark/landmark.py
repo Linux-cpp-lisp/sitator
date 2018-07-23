@@ -1,6 +1,6 @@
 import numpy as np
 
-from util import PBCCalculator, DotProdClassifier
+from util import PBCCalculator
 
 from vorozeo import Zeopy
 
@@ -20,6 +20,8 @@ except:
             return iterable
 
 import helpers
+
+import importlib
 
 
 from functools import wraps
@@ -41,10 +43,10 @@ class LandmarkAnalysis(object):
                 structure,
                 static_mask,
                 mobile_mask,
+                clustering_algorithm = 'dotprod',
+                clustering_params = {},
                 cutoff = 3.0,
                 minimum_site_occupancy = 0.1,
-                site_clustering_threshold = 0.45,
-                site_assignment_threshold = 0.8,
                 peak_evening = 'clip',
                 weighted_site_positions = True,
                 verbose = True,
@@ -80,8 +82,9 @@ class LandmarkAnalysis(object):
 
         self._cutoff = cutoff
         self._minimum_site_occupancy = minimum_site_occupancy
-        self._site_clustering_threshold = site_clustering_threshold
-        self._site_assignment_threshold = site_assignment_threshold
+
+        self._cluster_algo = clustering_algorithm
+        self._clustering_params = clustering_params
 
         if not peak_evening in ['none', 'clip']:
           raise ValueError("Invalid value `%s` for peak_evening" % peak_evening)
@@ -161,6 +164,9 @@ class LandmarkAnalysis(object):
     def n_sites(self):
         return len(self._site_occupancies)
 
+    @analysis_result
+    def n_frames(self):
+        return self._n_frames
 
     @analysis_result
     def analysis_statistics(self):
@@ -214,31 +220,37 @@ class LandmarkAnalysis(object):
             total_reassigned += np.sum(to_correct)
             time_unknown[unknown] += 1
 
-
+        res = None
         if avg_time_unknown_div > 0: # We corrected some unknowns
             avg_time_unknown = float(avg_time_unknown) / avg_time_unknown_div
+            post_percent_unassign = 100.0 * ((total_unknown - total_reassigned) / float(self._n_positions))
 
             if self.verbose:
                 print "  Maximum # of frames any mobile particle spent unassigned: %i" % max_time_unknown
                 print "  Avg. # of frames spent unassigned: %f" % avg_time_unknown
-                print "  Assigned %i/%i unassigned positions, leaving %i/%i (%i%%) unknown" % (total_reassigned, total_unknown, total_unknown - total_reassigned, self._n_positions, 100.0 * ((total_unknown - total_reassigned) / float(self._n_positions)))
+                print "  Assigned %i/%i unassigned positions, leaving %i/%i (%i%%) unknown" % (total_reassigned, total_unknown, total_unknown - total_reassigned, self._n_positions, post_percent_unassign)
 
-            return {
+            res = {
                 'max_time_unknown' : max_time_unknown,
                 'avg_time_unknown' : avg_time_unknown,
                 'total_unassigned' : total_unknown,
-                'total_reassigned' : total_reassigned
+                'total_reassigned' : total_reassigned,
+                'post_correction_total_unassigned' : post_percent_unassign
             }
         else:
             if self.verbose:
                 print "  None to correct."
 
-            return {
+            res = {
                 'max_time_unknown' : 0,
                 'avg_time_unknown' : 0,
                 'total_unassigned' : 0,
-                'total_reassigned' : 0
+                'total_reassigned' : 0,
+                'post_correction_total_unassigned' : total_unknown
             }
+
+        self._stats.update(res)
+        return res
 
     def site_trajectory_for_particle(self, i, return_confidences = False):
         """Returns the site trajectory of mobile particle(s) i.
@@ -303,14 +315,16 @@ class LandmarkAnalysis(object):
         if self.verbose: print "  - clustering landmark vectors -"
         #  - Preprocess -
         self._do_peak_evening()
-        #  - Cluster -
-        #min_samples = self._minimum_site_occupancy * n_frames
 
-        self._landmark_classifier = DotProdClassifier(threshold = self._site_clustering_threshold,
-                                                      min_samples = self._minimum_site_occupancy / float(self.n_mobile))
-        self._lmk_lbls, self._lmk_confs = self._landmark_classifier.fit_predict(self._landmark_vectors,
-                                                                                predict_threshold = self._site_assignment_threshold,
-                                                                                verbose = self.verbose)
+        #  - Cluster -
+
+        cluster_func = importlib.import_module("..cluster." + self._cluster_algo, package = __name__).do_landmark_clustering
+
+        cluster_counts, self._lmk_lbls, self._lmk_confs = \
+            cluster_func(self._landmark_vectors,
+                         clustering_params = self._clustering_params,
+                         min_samples = self._minimum_site_occupancy / float(self.n_mobile),
+                         verbose = self.verbose)
 
         # reshape lables and confidences
         self._lmk_lbls.shape = (n_frames, self.n_mobile)
@@ -321,9 +335,9 @@ class LandmarkAnalysis(object):
 
         if self.verbose:
             print "    Failed to assign %i%% mobile particle positions to individual sites." % int(self._stats['failed_to_assign_percent'])
-            print "    Identified %i sites with assignment counts %s" % (self._landmark_classifier.n_clusters, self._landmark_classifier.cluster_counts)
+            print "    Identified %i sites with assignment counts %s" % (len(cluster_counts), cluster_counts)
 
-        self._site_occupancies = np.true_divide(self._landmark_classifier.cluster_counts, n_frames)
+        self._site_occupancies = np.true_divide(cluster_counts, n_frames)
 
         # Save a weakref to frames for computing other analysis properties later
         self._frames = frames
