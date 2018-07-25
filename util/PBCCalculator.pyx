@@ -140,6 +140,41 @@ cdef class PBCCalculator(object):
 
         pt[0] = buf[0]; pt[1] = buf[1]; pt[2] = buf[2];
 
+    cpdef bint is_in_unit_cell(self, precision [:] pt):
+        cdef cell_precision [:, :] cell = self._cell_array
+        cdef cell_precision [:, :] cell_I = self._cell_inverse_array
+
+        assert len(pt) == 3, "Points must be 3D"
+
+        cdef precision buf[3]
+        # see https://stackoverflow.com/questions/11980292/how-to-wrap-around-a-range
+        # re. fmod replacement. This gives the same behaviour as numpy's remainder.
+        for dim in xrange(3):
+            buf[dim] = (cell_I[dim, 0]*pt[0] + cell_I[dim, 1]*pt[1] + cell_I[dim, 2]*pt[2])
+
+        # buf is not crystal coords
+        return (buf[0] < 1.0) and (buf[1] < 1.0) and (buf[2] < 1.0) and \
+               (buf[0] >= 0.0) and (buf[1] >= 0.0) and (buf[2] >= 0.0)
+
+    cpdef bint is_in_image_of_cell(self, precision [:] pt, image):
+        cdef cell_precision [:, :] cell = self._cell_array
+        cdef cell_precision [:, :] cell_I = self._cell_inverse_array
+
+        assert len(pt) == 3, "Points must be 3D"
+
+        cdef precision buf[3]
+        # see https://stackoverflow.com/questions/11980292/how-to-wrap-around-a-range
+        # re. fmod replacement. This gives the same behaviour as numpy's remainder.
+        for dim in xrange(3):
+            buf[dim] = (cell_I[dim, 0]*pt[0] + cell_I[dim, 1]*pt[1] + cell_I[dim, 2]*pt[2])
+
+        # buf is not crystal coords
+        cdef bint out = True
+        for dim in xrange(3):
+            out &= (buf[dim] >= image[dim]) and (buf[dim] < (image[dim] + 1))
+
+        return out
+
     cpdef void to_cell_coords(self, precision [:, :] points):
         """Convert to cell coordinates in place."""
         assert points.shape[1] == 3, "Points must be 3D"
