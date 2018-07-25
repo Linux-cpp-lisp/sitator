@@ -171,7 +171,7 @@ class DotProdClassifier(object):
             last_n_sites = n_sites
 
         if not did_converge:
-            raise ValueError("Clustering for site type %i did NOT converge after %i iterations" % (site_type, max_converge_iters))
+            raise ValueError("Clustering did not converge after %i iterations" % (self._max_iters))
 
         self._cluster_centers = np.asarray(cluster_centers[:n_clusters])
 
@@ -232,7 +232,7 @@ class DotProdClassifier(object):
         assert len(X.shape) == 2, "Data must be 2D."
 
         if not X.shape[1] == (self._featuredim):
-            raise TypeError("x has wrong dimension %s; should be (%i)" % (x.shape, self._featuredim))
+            raise TypeError("X has wrong dimension %s; should be (%i)" % (X.shape, self._featuredim))
 
         labels = np.empty(shape = len(X), dtype = np.int)
 
