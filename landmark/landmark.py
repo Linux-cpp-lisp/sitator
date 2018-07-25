@@ -380,8 +380,6 @@ class LandmarkAnalysis(object):
             vvcd[i, :len(polyhedron)] = self._pbcc.distances(voronoi_nodes[i], verts_poses)
             assert np.std(vvcd[i, :len(polyhedron)]) < 0.0001
 
-        print vvcd
-
         self._voronoi_vert_centroid_dists = vvcd
 
     def _do_peak_evening(self):

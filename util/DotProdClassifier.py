@@ -18,6 +18,7 @@ except:
         def tqdm(iterable, **kwargs):
             return iterable
 
+N_SITES_ALLOC_INCREMENT = 100
 
 class DotProdClassifier(object):
     def __init__(self,
@@ -74,9 +75,11 @@ class DotProdClassifier(object):
         labels.fill(-1)
 
         # Start with each sample as a cluster
-        old_centers = X
-        old_n_assigned = [1] * len(X)
-        old_members = [[i] for i in xrange(len(X))]
+        old_centers = np.copy(X)
+        #old_n_assigned = [1] * len(X)
+        old_n_assigned = np.ones(shape = len(X), dtype = np.int)
+        old_n_clusters = len(X)
+        #old_members = [[i] for i in xrange(len(X))]
 
         # -- Classification loop
 
@@ -84,54 +87,98 @@ class DotProdClassifier(object):
         last_n_sites = -1
         did_converge = False
 
-        for iteration in xrange(self._max_iters):
-            # This iterations centers
-            cluster_centers = list()
-            n_assigned_to = list()
-            members = list()
+        # preallocate buffers
+        assert N_SITES_ALLOC_INCREMENT > 10
+        diffs = np.empty(shape = N_SITES_ALLOC_INCREMENT, dtype = np.float)
+        cluster_center_norms = np.empty(shape = N_SITES_ALLOC_INCREMENT, dtype = np.float)
+        cluster_centers = np.empty(shape = (N_SITES_ALLOC_INCREMENT, X.shape[1]), dtype = X.dtype)
+        n_assigned_to = np.empty(shape = N_SITES_ALLOC_INCREMENT, dtype = np.int)
 
-            for i, vec in enumerate(tqdm(old_centers, desc = "Iteration %i" % iteration)):
+        for iteration in xrange(self._max_iters):
+            # This iteration's centers
+            # The first sample is always its own cluster
+            cluster_centers[0] = old_centers[0]
+            cluster_center_norms[0] = np.linalg.norm(cluster_centers[0])
+            n_assigned_to[0] = old_n_assigned[0]
+            n_clusters = 1
+            # skip the first sample which has already been accounted for
+            for i, vec in tqdm(zip(xrange(1, old_n_clusters), old_centers[1:old_n_clusters]), desc = "Iteration %i" % iteration):
 
                 assigned_to = -1
                 assigned_cosang = 0.0
 
-                if len(cluster_centers) > 0:
-                    diffs = np.sum(vec * cluster_centers, axis = 1)
-                    diffs /= np.linalg.norm(vec) * np.linalg.norm(cluster_centers, axis = 1)
+                #if len(cluster_centers) > 0:
+                    # diffs = np.sum(vec * cluster_centers, axis = 1)
+                    # diffs /= np.linalg.norm(vec) * np.linalg.norm(cluster_centers, axis = 1)
+                    #np.sum(vec * cluster_centers, axis = 1, out = diffs[:n_clusters])
 
-                    assigned_to = np.argmax(diffs)
-                    assigned_cosang = diffs[assigned_to]
+                    # assert np.all((cluster_center_norms[:n_clusters] - np.linalg.norm(cluster_centers, axis = 1)) < 0.000001)
 
-                    if assigned_cosang < self._threshold:
-                        assigned_cosang = 0.0
-                        assigned_to = -1
+                np.dot(cluster_centers[:n_clusters], vec, out = diffs[:n_clusters])
+                diffs[:n_clusters] /= cluster_center_norms[:n_clusters]
+                diffs[:n_clusters] /= np.linalg.norm(vec)
+
+                assigned_to = np.argmax(diffs[:n_clusters])
+                assigned_cosang = diffs[:n_clusters][assigned_to]
+
+                if assigned_cosang < self._threshold:
+                    assigned_cosang = 0.0
+                    assigned_to = -1
 
                 # If couldn't assign, start a new cluster
                 if assigned_to == -1:
                     # New cluster!
-                    cluster_centers.append(vec)
-                    n_assigned_to.append(old_n_assigned[i])
-                    members.append(list())
-                    members[-1].extend(old_members[i])
-                    assigned_to = len(cluster_centers) - 1
+                    cluster_centers[n_clusters] = vec
+                    n_assigned_to[n_clusters] = old_n_assigned[i]
+                    #members.append(list())
+                    #members[-1].extend(old_members[i])
+                    assigned_to = n_clusters
                     # By definition, confidence is 1.0
                     assigned_cosang = 1.0
+                    # Maintainance of norms
+                    cluster_center_norms[n_clusters] = np.linalg.norm(vec)
+
+                    n_clusters += 1
+
+                    # Handle expansion
+                    if n_clusters == len(diffs):
+                        assert len(diffs) == len(cluster_center_norms)
+
+                        diffs = np.empty(shape = len(diffs) + N_SITES_ALLOC_INCREMENT, dtype = diffs.dtype)
+
+                        tmp_norms = np.empty(shape = len(cluster_center_norms) + N_SITES_ALLOC_INCREMENT, dtype = cluster_center_norms.dtype)
+                        tmp_norms[:len(cluster_center_norms)] = cluster_center_norms
+                        cluster_center_norms = tmp_norms
+
+                        tmp_centers = np.empty(shape = (len(cluster_centers) + N_SITES_ALLOC_INCREMENT, cluster_centers.shape[1]), dtype = cluster_centers.dtype)
+                        tmp_centers[:len(cluster_centers)] = cluster_centers
+                        cluster_centers = tmp_centers
+
+                        tmp_n_assigned = np.empty(shape = len(n_assigned_to) + N_SITES_ALLOC_INCREMENT, dtype = n_assigned_to.dtype)
+                        tmp_n_assigned[:len(n_assigned_to)] = n_assigned_to
+                        n_assigned_to = tmp_n_assigned
+
                 else:
                     # Update average center vector of assigned cluster
+                    assert assigned_to < n_clusters
                     cluster_centers[assigned_to] *= n_assigned_to[assigned_to]
                     cluster_centers[assigned_to] += vec
-                    #cluster_centers[assigned_to] = np.maximum(cluster_centers[assigned_to], vec)
                     n_assigned_to[assigned_to] += old_n_assigned[i]
-                    members[assigned_to].extend(old_members[i])
                     cluster_centers[assigned_to] /= n_assigned_to[assigned_to]
+                    # Update memberships
+                    #members[assigned_to].extend(old_members[i])
+                    # Update center norm
+                    cluster_center_norms[assigned_to] = np.linalg.norm(cluster_centers[assigned_to])
 
-            old_centers = cluster_centers
-            old_n_assigned = n_assigned_to
-            old_members = members
+            old_centers[:n_clusters] = cluster_centers[:n_clusters]
+            old_n_assigned[:n_clusters] = n_assigned_to[:n_clusters]
+            old_n_clusters = n_clusters
 
-            assert [len(m) for m in members] == n_assigned_to, "%s\n%s" % (members, n_assigned_to)
+            #old_members = members
 
-            n_sites = len(n_assigned_to)
+            #assert [len(m) for m in members] == n_assigned_to, "%s\n%s" % (members, n_assigned_to)
+
+            n_sites = n_clusters
 
             # Check converged
             if last_n_sites == n_sites:
@@ -141,9 +188,9 @@ class DotProdClassifier(object):
             last_n_sites = n_sites
 
         if not did_converge:
-            warnings.warn("Clustering for site type %i did NOT converge after %i iterations" % (site_type, max_converge_iters))
+            raise ValueError("Clustering for site type %i did NOT converge after %i iterations" % (site_type, max_converge_iters))
 
-        self._cluster_centers = np.asarray(cluster_centers)
+        self._cluster_centers = np.asarray(cluster_centers[:n_clusters])
 
         # Run a predict now:
         labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
@@ -217,6 +264,9 @@ class DotProdClassifier(object):
 
         center_norms = np.linalg.norm(self._cluster_centers, axis = 1)
 
+        # preallocate buffers
+        diffs = np.empty(shape = len(center_norms), dtype = np.float)
+
         for i, x in enumerate(tqdm(X, desc = "Sample")):
 
             if np.all(x == 0):
@@ -227,8 +277,11 @@ class DotProdClassifier(object):
                 else:
                     raise ValueError("Data %i is all zeros!" % i)
 
-            diffs = np.sum(x * self._cluster_centers, axis = 1)
-            diffs /= np.linalg.norm(x) * center_norms
+            # diffs = np.sum(x * self._cluster_centers, axis = 1)
+            # diffs /= np.linalg.norm(x) * center_norms
+            np.dot(self._cluster_centers, x, out = diffs)
+            diffs /= np.linalg.norm(x)
+            diffs /= center_norms
 
             assigned_to = np.argmax(diffs)
             assignment_confidence = diffs[assigned_to]
