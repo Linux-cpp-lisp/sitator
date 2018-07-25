@@ -76,10 +76,8 @@ class DotProdClassifier(object):
 
         # Start with each sample as a cluster
         old_centers = np.copy(X)
-        #old_n_assigned = [1] * len(X)
         old_n_assigned = np.ones(shape = len(X), dtype = np.int)
         old_n_clusters = len(X)
-        #old_members = [[i] for i in xrange(len(X))]
 
         # -- Classification loop
 
@@ -107,13 +105,6 @@ class DotProdClassifier(object):
                 assigned_to = -1
                 assigned_cosang = 0.0
 
-                #if len(cluster_centers) > 0:
-                    # diffs = np.sum(vec * cluster_centers, axis = 1)
-                    # diffs /= np.linalg.norm(vec) * np.linalg.norm(cluster_centers, axis = 1)
-                    #np.sum(vec * cluster_centers, axis = 1, out = diffs[:n_clusters])
-
-                    # assert np.all((cluster_center_norms[:n_clusters] - np.linalg.norm(cluster_centers, axis = 1)) < 0.000001)
-
                 np.dot(cluster_centers[:n_clusters], vec, out = diffs[:n_clusters])
                 diffs[:n_clusters] /= cluster_center_norms[:n_clusters]
                 diffs[:n_clusters] /= np.linalg.norm(vec)
@@ -130,8 +121,6 @@ class DotProdClassifier(object):
                     # New cluster!
                     cluster_centers[n_clusters] = vec
                     n_assigned_to[n_clusters] = old_n_assigned[i]
-                    #members.append(list())
-                    #members[-1].extend(old_members[i])
                     assigned_to = n_clusters
                     # By definition, confidence is 1.0
                     assigned_cosang = 1.0
@@ -165,18 +154,12 @@ class DotProdClassifier(object):
                     cluster_centers[assigned_to] += vec
                     n_assigned_to[assigned_to] += old_n_assigned[i]
                     cluster_centers[assigned_to] /= n_assigned_to[assigned_to]
-                    # Update memberships
-                    #members[assigned_to].extend(old_members[i])
                     # Update center norm
                     cluster_center_norms[assigned_to] = np.linalg.norm(cluster_centers[assigned_to])
 
             old_centers[:n_clusters] = cluster_centers[:n_clusters]
             old_n_assigned[:n_clusters] = n_assigned_to[:n_clusters]
             old_n_clusters = n_clusters
-
-            #old_members = members
-
-            #assert [len(m) for m in members] == n_assigned_to, "%s\n%s" % (members, n_assigned_to)
 
             n_sites = n_clusters
 
