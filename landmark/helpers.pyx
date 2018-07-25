@@ -60,7 +60,7 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
                   Py_ssize_t landmark_dim,
                   const precision [:,:] lattice_positions,
                   const Py_ssize_t [:,:] verts_np,
-                  const precision [:,:] verts_centroid_dists,
+                  const precision [:] verts_centroid_dists,
                   const precision [:] li_pos,
                   precision cutoff,
                   precision [:] distbuff) nogil:
@@ -109,10 +109,13 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
             n_verts += 1
 
             # normalize to centroid distance
-            temp = distbuff[v] / verts_centroid_dists[k, h]
+            temp = distbuff[v] / verts_centroid_dists[k]
 
             if temp > cutoff:
                 temp = 0.0
+                # Short circut
+                ci = 0.0
+                break
             elif temp < 1.0:
                 temp = 1.0
             else:

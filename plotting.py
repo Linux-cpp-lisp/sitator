@@ -63,7 +63,7 @@ def plot_atoms(atms, species,
     ax.scatter(atms[:,0],
                atms[:,1],
                atms[:,2],
-               c = [cs[e] for e in species],
+               c = [cs.get(e, 'gray') for e in species],
                s = [10.0*(ase.data.atomic_numbers[s])**0.5 for s in species])
 
 

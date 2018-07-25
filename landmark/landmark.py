@@ -372,13 +372,15 @@ class LandmarkAnalysis(object):
         # self._voronoi_vertices = np.array([v + [-1] * (longest_vert_set - len(v)) for v in self.voronoi_vertices])
 
         # Compute centroid distances
-        vvcd = np.empty(shape = self._voronoi_vertices.shape, dtype = np.float)
+        vvcd = np.empty(shape = len(self._voronoi_vertices), dtype = np.float)
         vvcd.fill(np.nan)
 
         for i, polyhedron in enumerate(self.voronoi_vertices):
             verts_poses = self._static_structure.get_positions()[polyhedron]
-            vvcd[i, :len(polyhedron)] = self._pbcc.distances(voronoi_nodes[i], verts_poses)
-            assert np.std(vvcd[i, :len(polyhedron)]) < 0.0001
+            dists = self._pbcc.distances(voronoi_nodes[i], verts_poses)
+            assert np.std(dists) < 0.0001
+
+            vvcd[i] = dists[0]
 
         self._voronoi_vert_centroid_dists = vvcd
 
