@@ -1,5 +1,5 @@
 cimport cython
-from libc.math cimport sqrt, cos, M_PI, isnan
+from libc.math cimport sqrt, cos, M_PI, isnan, pow
 
 import numpy as np
 
@@ -42,7 +42,8 @@ def _fill_landmark_vectors(self, frames, check_for_zeros = True, tqdm = lambda i
             # compute the landmark vector
             fill_landmark_vec(self._landmark_vectors, i, self.n_mobile, j,
                               landmark_dim, frame_shift,
-                              self._voronoi_vertices, pbcc.cell_centroid,
+                              self._voronoi_vertices, self._voronoi_vert_centroid_dists,
+                              pbcc.cell_centroid,
                               self._cutoff, temp_distbuff)
 
             if check_for_zeros and (np.count_nonzero(self._landmark_vectors[current_landmark_i]) == 0):
@@ -59,6 +60,7 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
                   Py_ssize_t landmark_dim,
                   const precision [:,:] lattice_positions,
                   const Py_ssize_t [:,:] verts_np,
+                  const precision [:,:] verts_centroid_dists,
                   const precision [:] li_pos,
                   precision cutoff,
                   precision [:] distbuff) nogil:
@@ -81,27 +83,44 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
     cdef precision ci
     cdef precision temp
     cdef const precision [:] pt
+    cdef int n_verts
 
-    # precompute all cutoff-ed distances
+    # precompute all distances
     for idex in xrange(len(lattice_positions)):
         pt = lattice_positions[idex]
         temp = sqrt((pt[0] - li_pos[0])**2 + (pt[1] - li_pos[1])**2 + (pt[2] - li_pos[2])**2)
 
-        if temp > cutoff:
-            distbuff[idex] = 0.0
-        else:
-            distbuff[idex] = (cos((M_PI / cutoff) * temp) + 1.0) * 0.5
+        distbuff[idex] = temp
+
+        # if temp > cutoff:
+        #     distbuff[idex] = 0.0
+        # else:
+        #     distbuff[idex] = (cos((M_PI / cutoff) * temp) + 1.0) * 0.5
 
     # For each component
     for k in xrange(landmark_dim):
         ci = 1.0
 
+        n_verts = 0
         for h in xrange(verts_np.shape[1]):
             v = verts_np[k, h]
             if v == -1:
                 break
+            n_verts += 1
+
+            # normalize to centroid distance
+            temp = distbuff[v] / verts_centroid_dists[k, h]
+
+            if temp > cutoff:
+                temp = 0.0
+            elif temp < 1.0:
+                temp = 1.0
+            else:
+                temp = (cos((M_PI / (cutoff - 1.0)) * (temp - 1.0)) + 1.0) * 0.5
 
             # Multiply into accumulator
-            ci *= distbuff[v]
+            #ci *= distbuff[v]
+            ci *= temp
 
-        landmark_vectors[(i * n_li) + j, k] = ci
+        # "Normalize" to number of vertices
+        landmark_vectors[(i * n_li) + j, k] = pow(ci, 1.0 / n_verts)

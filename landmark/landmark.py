@@ -173,7 +173,6 @@ class LandmarkAnalysis(object):
         """Get a dictionary of various information on how well the analysis went."""
         return self._stats
 
-
     def assign_to_last_known_site(self, frame_threshold = 1):
         """Assign unassigned mobile particles to their last known site within
             `frame_threshold` frames.
@@ -351,15 +350,39 @@ class LandmarkAnalysis(object):
     def _do_voronoi(self):
         # Run Zeo++
         assert not self._static_structure is None
-        zeoverts, edges = self._zeopy.voronoi(self._static_structure, radial = False, verbose = self.verbose)
 
-        # For the outside world, the pretty list of lists
-        self.voronoi_vertices = [v['region-atom-indexes'] for v in zeoverts]
+        from samos.analysis.jumps.voronoi import VoronoiNetwork
 
-        # For the inside world, a numpy array for the sake of cython performance
-        longest_vert_set = np.max([len(v) for v in self.voronoi_vertices])
-        self._voronoi_vertices = np.array([v + [-1] * (longest_vert_set - len(v)) for v in self.voronoi_vertices])
+        vn = VoronoiNetwork()
+        vn.set_atoms(self._static_structure, self._static_structure.get_chemical_symbols())
+        vn.decompose_qhull()
 
+        voronoi_nodes = np.asarray([node._center for node in vn.nodes])
+        self.voronoi_vertices = [node._vertices for node in vn.nodes]
+        self._voronoi_vertices = np.asarray(self.voronoi_vertices)
+
+        # zeoverts, edges = self._zeopy.voronoi(self._static_structure, radial = False, verbose = self.verbose)
+        #
+        # # For the outside world, the pretty list of lists
+        # self.voronoi_vertices = [v['region-atom-indexes'] for v in zeoverts]
+        # nodes = [v['coords'] for v in zeoverts]
+        #
+        # # For the inside world, a numpy array for the sake of cython performance
+        # longest_vert_set = np.max([len(v) for v in self.voronoi_vertices])
+        # self._voronoi_vertices = np.array([v + [-1] * (longest_vert_set - len(v)) for v in self.voronoi_vertices])
+
+        # Compute centroid distances
+        vvcd = np.empty(shape = self._voronoi_vertices.shape, dtype = np.float)
+        vvcd.fill(np.nan)
+
+        for i, polyhedron in enumerate(self.voronoi_vertices):
+            verts_poses = self._static_structure.get_positions()[polyhedron]
+            vvcd[i, :len(polyhedron)] = self._pbcc.distances(voronoi_nodes[i], verts_poses)
+            assert np.std(vvcd[i, :len(polyhedron)]) < 0.0001
+
+        print vvcd
+
+        self._voronoi_vert_centroid_dists = vvcd
 
     def _do_peak_evening(self):
       if self._peak_evening == 'none':

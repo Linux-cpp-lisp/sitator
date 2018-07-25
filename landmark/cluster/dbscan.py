@@ -15,7 +15,9 @@ def do_landmark_clustering(landmark_vectors,
                            min_samples,
                            verbose):
 
-    clustering_params.update(DEFAULT_PARAMS)
+    tmp = DEFAULT_PARAMS.copy()
+    tmp.update(clustering_params)
+    clustering_params = tmp
 
     landmark_classifier = \
         DBSCAN(eps = clustering_params['eps'],

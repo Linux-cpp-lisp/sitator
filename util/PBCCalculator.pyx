@@ -10,8 +10,7 @@ ctypedef double precision
 ctypedef double cell_precision
 
 cdef class PBCCalculator(object):
-    """Performs calculations on collections of 3D points inside
-    """
+    """Performs calculations on collections of 3D points under PBC"""
 
     cdef cell_precision [:, :] _cell_array
     cdef cell_precision [:, :] _cell_inverse_array
@@ -34,14 +33,39 @@ cdef class PBCCalculator(object):
     def cell_centroid(self):
       return self._cell_centroid
 
+    cpdef distances(self, pt1, pts2, in_place = False):
+        """Compute the Euclidean distances from pt1 to all points in pts2, using
+        shift-and-wrap.
+
+        Makes a copy of pts2 unless in_place == True.
+
+        :returns ndarray len(pts2): distances
+        """
+        pt1 = np.asarray(pt1)
+        pts2 = np.asarray(pts2)
+
+        assert pt1.ndim == 1
+        assert pts2.ndim == 2
+        assert pt1.shape[0] == pts2.shape[1]
+
+        if not in_place:
+            pts2 = np.copy(pts2)
+
+        # Wrap
+        offset = self._cell_centroid - pt1
+        pts2 += offset
+        self.wrap_points(pts2)
+
+        return np.linalg.norm(self._cell_centroid - pts2, axis = 1)
+
     cpdef average(self, points, weights = None):
         """Average position of a "cloud" of points using the shift-and-wrap hack.
 
         Copies the points.
 
-        Assumes that they points are relatively close (within a half unit cell)
+        Assumes that the points are relatively close (within a half unit cell)
         together, and that the first point is not a particular outsider (the
-        cell is centered at the first point).
+        cell is centered at that point).
 
         Can be a weighted average with the semantics of :func:numpy.average.
         """
@@ -115,6 +139,28 @@ cdef class PBCCalculator(object):
             buf[dim] = (cell[dim, 0]*pt[0] + cell[dim, 1]*pt[1] + cell[dim, 2]*pt[2])
 
         pt[0] = buf[0]; pt[1] = buf[1]; pt[2] = buf[2];
+
+    cpdef void to_cell_coords(self, precision [:, :] points):
+        """Convert to cell coordinates in place."""
+        assert points.shape[1] == 3, "Points must be 3D"
+
+        cdef precision buf[3]
+        cdef precision pt[3]
+
+        cdef cell_precision [:, :] cell = self._cell_array
+        cdef cell_precision [:, :] cell_I = self._cell_inverse_array
+
+        # Iterates over points
+        for i in xrange(len(points)):
+            # Load into pt
+            pt[0] = points[i, 0]; pt[1] = points[i, 1]; pt[2] = points[i, 2];
+
+            # Row by row, do the matrix multiplication
+            for dim in xrange(3):
+                buf[dim] = (cell_I[dim, 0]*pt[0] + cell_I[dim, 1]*pt[1] + cell_I[dim, 2]*pt[2])
+
+            # Store into points
+            points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
 
     cpdef void wrap_points(self, precision [:, :] points):
         """Wrap `points` into a unit cell, IN PLACE. 3D only.

@@ -53,7 +53,7 @@ class DotProdClassifier(object):
     def n_clusters(self):
         return len(self._cluster_counts)
 
-    def fit_predict(self, X, verbose = True, predict_threshold = None):
+    def fit_predict(self, X, verbose = True, predict_threshold = None, return_info = False):
         """ Fit the data vectors X and return their cluster labels.
         """
 
@@ -169,13 +169,24 @@ class DotProdClassifier(object):
             self._cluster_centers = self._cluster_centers[count_mask]
             self._cluster_counts = self._cluster_counts[count_mask]
 
+            if len(self._cluster_centers) == 0:
+                # Then we removed everything...
+                raise ValueError("`min_samples` too large; all %i clusters under threshold." % len(count_mask))
+
+            if verbose:
+                print "DotProdClassifier: %i/%i assignment counts below threshold %s (%s); %i clusters remain." % \
+                    (np.sum(~count_mask), len(count_mask), self._min_samples, min_samples, len(self._cluster_counts))
+
             # Do another predict -- this could be more efficient, but who cares?
             labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
 
-        if verbose:
-            print "DotProdClassifier: %i/%i assignment counts below threshold %s (%s); %i clusters remain." % (np.sum(~count_mask), len(count_mask), self._min_samples, min_samples, len(self._cluster_counts))
-
-        return labels, confs
+        if return_info:
+            info = {
+                'clusters_below_min_samples' : np.sum(~count_mask)
+            }
+            return labels, confs, info
+        else:
+            return labels, confs
 
     def predict(self, X, return_confidences = False, threshold = None, verbose = True, ignore_zeros = True):
         """Return a predicted cluster label for vectors X.
