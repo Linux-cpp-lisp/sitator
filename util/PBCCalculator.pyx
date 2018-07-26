@@ -156,6 +156,12 @@ cdef class PBCCalculator(object):
         return (buf[0] < 1.0) and (buf[1] < 1.0) and (buf[2] < 1.0) and \
                (buf[0] >= 0.0) and (buf[1] >= 0.0) and (buf[2] >= 0.0)
 
+    cpdef bint all_in_unit_cell(self, precision [:, :] pts):
+        for pt in pts:
+            if not self.is_in_unit_cell(pt):
+                return False
+        return True
+
     cpdef bint is_in_image_of_cell(self, precision [:] pt, image):
         cdef cell_precision [:, :] cell = self._cell_array
         cdef cell_precision [:, :] cell_I = self._cell_inverse_array
@@ -182,7 +188,6 @@ cdef class PBCCalculator(object):
         cdef precision buf[3]
         cdef precision pt[3]
 
-        cdef cell_precision [:, :] cell = self._cell_array
         cdef cell_precision [:, :] cell_I = self._cell_inverse_array
 
         # Iterates over points
@@ -193,6 +198,27 @@ cdef class PBCCalculator(object):
             # Row by row, do the matrix multiplication
             for dim in xrange(3):
                 buf[dim] = (cell_I[dim, 0]*pt[0] + cell_I[dim, 1]*pt[1] + cell_I[dim, 2]*pt[2])
+
+            # Store into points
+            points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
+
+    cpdef void to_real_coords(self, precision [:, :] points):
+        """Convert to real coords from crystal coords in place."""
+        assert points.shape[1] == 3, "Points must be 3D"
+
+        cdef precision buf[3]
+        cdef precision pt[3]
+
+        cdef cell_precision [:, :] cell = self._cell_array
+
+        # Iterates over points
+        for i in xrange(len(points)):
+            # Load into pt
+            pt[0] = points[i, 0]; pt[1] = points[i, 1]; pt[2] = points[i, 2];
+
+            # Row by row, do the matrix multiplication
+            for dim in xrange(3):
+                buf[dim] = (cell[dim, 0]*pt[0] + cell[dim, 1]*pt[1] + cell[dim, 2]*pt[2])
 
             # Store into points
             points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
