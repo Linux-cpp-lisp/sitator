@@ -351,25 +351,24 @@ class LandmarkAnalysis(object):
         # Run Zeo++
         assert not self._static_structure is None
 
-        from samos.analysis.jumps.voronoi import VoronoiNetwork
-
-        vn = VoronoiNetwork()
-        vn.set_atoms(self._static_structure, self._static_structure.get_chemical_symbols())
-        vn.decompose_qhull()
-
-        voronoi_nodes = np.asarray([node._center for node in vn.nodes])
-        self.voronoi_vertices = [node._vertices for node in vn.nodes]
-        self._voronoi_vertices = np.asarray(self.voronoi_vertices)
-
-        # zeoverts, edges = self._zeopy.voronoi(self._static_structure, radial = False, verbose = self.verbose)
+        # from samos.analysis.jumps.voronoi import VoronoiNetwork
         #
-        # # For the outside world, the pretty list of lists
-        # self.voronoi_vertices = [v['region-atom-indexes'] for v in zeoverts]
-        # nodes = [v['coords'] for v in zeoverts]
+        # vn = VoronoiNetwork()
+        # vn.set_atoms(self._static_structure, self._static_structure.get_chemical_symbols())
+        # vn.decompose_qhull()
         #
-        # # For the inside world, a numpy array for the sake of cython performance
-        # longest_vert_set = np.max([len(v) for v in self.voronoi_vertices])
-        # self._voronoi_vertices = np.array([v + [-1] * (longest_vert_set - len(v)) for v in self.voronoi_vertices])
+        # voronoi_nodes = np.asarray([node._center for node in vn.nodes])
+        # self.voronoi_vertices = [node._vertices for node in vn.nodes]
+        # self._voronoi_vertices = np.asarray(self.voronoi_vertices)
+
+        nodes, verts, edges, _ = self._zeopy.voronoi(self._static_structure, radial = False, verbose = self.verbose)
+
+        # For the outside world, the pretty list of lists
+        self.voronoi_vertices = verts
+
+        # For the inside world, a numpy array for the sake of cython performance
+        longest_vert_set = np.max([len(v) for v in self.voronoi_vertices])
+        self._voronoi_vertices = np.array([v + [-1] * (longest_vert_set - len(v)) for v in self.voronoi_vertices])
 
         # Compute centroid distances
         vvcd = np.empty(shape = len(self._voronoi_vertices), dtype = np.float)
@@ -377,10 +376,19 @@ class LandmarkAnalysis(object):
 
         for i, polyhedron in enumerate(self.voronoi_vertices):
             verts_poses = self._static_structure.get_positions()[polyhedron]
-            dists = self._pbcc.distances(voronoi_nodes[i], verts_poses)
-            assert np.std(dists) < 0.0001
+            dists = self._pbcc.distances(nodes[i], verts_poses)
 
-            vvcd[i] = dists[0]
+            if len(dists) == 4:
+                stdthresh = 0.0001
+            else:
+                # Be pretty generous with the std threshold, since Zeo's merging
+                # *can* give nodes that aren't strictly equidistant.
+                stdthresh = 0.05
+            assert np.std(dists) < stdthresh, "Bad node distances %s (stdev. %f)" % (dists, np.std(dists))
+
+            # if they're all the same, mean is same as dists[0]
+            # if they're slightly not (Zeo++ merge), accounts for that.
+            vvcd[i] = np.mean(dists)
 
         self._voronoi_vert_centroid_dists = vvcd
 

@@ -12,7 +12,7 @@ from sklearn.neighbors import KDTree
 
 from . import PBCCalculator
 
-def periodic_voronoi(structure, logfile = sys.stderr):
+def periodic_voronoi(structure, logfile = sys.stdout):
     """
     :param ASE.Atoms structure:
     """
@@ -119,13 +119,26 @@ def periodic_voronoi(structure, logfile = sys.stderr):
     nearest_center = KDTree(centers)
 
     ridges_in_main_cell = set()
+    threw_out = 0
     for r in ridges:
         ridge_centers = np.asarray([all_facets_centers[f] for f in r if f < len(all_facets_centers)])
+        if not pbcc.all_in_unit_cell(ridge_centers):
+            continue
+
         pbcc.wrap_points(ridge_centers)
-        ridge_centers_in_main = nearest_center.query(ridge_centers, return_distance = False)
+        dists, ridge_centers_in_main = nearest_center.query(ridge_centers, return_distance = True)
+
+        if np.any(dists > 0.00001):
+            threw_out += 1
+            continue
+
         assert ridge_centers_in_main.shape == (len(ridge_centers), 1), "%s" % ridge_centers_in_main.shape
         ridge_centers_in_main = ridge_centers_in_main[:,0]
 
         ridges_in_main_cell.add(frozenset(ridge_centers_in_main))
+
+    logfile.write("  Threw out %i ridges" % threw_out)
+
+    logfile.flush()
 
     return centers, vertices, ridges_in_main_cell

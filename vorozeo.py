@@ -8,8 +8,14 @@ import os
 import tempfile
 import subprocess
 
+import re
+
+import numpy as np
+
 import ase
 import ase.io
+
+from util import PBCCalculator
 
 # TODO: benchmark CUC vs CIF
 
@@ -32,26 +38,57 @@ class Zeopy(object):
         :param Atoms structure: The ASE Atoms to compute the Voronoi decomposition of.
         """
 
-        inp = os.path.join(self._tmpdir, "in.cuc")
+        inp = os.path.join(self._tmpdir, "in.cif")
         outp = os.path.join(self._tmpdir, "out.nt2")
+        v1out = os.path.join(self._tmpdir, "out.v1")
 
-        #ase.io.write(inp, structure)
+        ase.io.write(inp, structure)
 
-        with open(inp, "w") as inf:
-            inf.write(self.ase2cuc(structure))
+        # with open(inp, "w") as inf:
+        #     inf.write(self.ase2cuc(structure))
 
         args = []
 
         if not radial:
             args = ["-nor"]
 
-        output = subprocess.check_output([self._exe] + args + ["-nt2", outp, inp])
+        output = subprocess.check_output([self._exe] + args + ["-v1", v1out, "-nt2", outp, inp])
 
         if verbose:
             print(output)
 
         with open(outp, "r") as outf:
-            return self.parse_nt2(outf.readlines())
+            verts, edges = self.parse_nt2(outf.readlines())
+        with open(v1out, "r") as outf:
+            zeocell = self.parse_v1_cell(outf.readlines())
+
+        # Confirm things really are in order -- sort of
+        # Looking at the Zeo code, I don't think it reorders cell vectors --
+        # it just rotates them.
+        assert np.all(np.linalg.norm(zeocell, axis = 1) - np.linalg.norm(structure.cell, axis = 1) < 0.0001)
+
+        vert_coords = np.asarray([v['coords'] for v in verts])
+
+        zeopbcc = PBCCalculator(zeocell)
+        real_pbcc = PBCCalculator(structure.cell)
+
+        # Bring into Zeo crystal coordinates
+        zeopbcc.to_cell_coords(vert_coords)
+        # Bring into our real coords
+        real_pbcc.to_real_coords(vert_coords)
+
+        edges_np = np.empty(shape = (len(edges), 2), dtype = np.int)
+        edge_radius = np.empty(shape = len(edges), dtype = np.float)
+        for i, edge in enumerate(edges):
+            edges_np[i, 0] = edge['from']
+            edges_np[i, 1] = edge['to']
+            edge_radius[i] = edge['radius']
+
+        return (vert_coords,
+               [v['region-atom-indexes'] for v in verts],
+               edges_np,
+               edge_radius)
+
 
     @staticmethod
     def ase2cuc(at):
@@ -68,6 +105,22 @@ class Zeopy(object):
             ls.append("{} {:0.16f} {:0.16f} {:0.16f}".format(sym, *pos))
 
         return "\n".join(ls)
+
+    @staticmethod
+    def parse_v1_cell(v1lines):
+        # remove blank lines:
+        v1lines = iter(filter(None, v1lines))
+        # First line is just "Unit cell vectors:"
+        assert v1lines.next().strip() == "Unit cell vectors:"
+        # Unit cell:
+        cell = np.empty(shape = (3, 3), dtype = np.float)
+        cellvec_re = re.compile('v[abc]=')
+        for i in xrange(3):
+            cellvec = v1lines.next().strip().split()
+            assert cellvec_re.match(cellvec[0])
+            cell[i] = [float(e) for e in cellvec[1:]]
+        # number of atoms, etc.
+        return cell
 
     @staticmethod
     def parse_nt2(nt2lines):
@@ -90,7 +143,7 @@ class Zeopy(object):
                 e = l.split()
                 vertices.append({
                     'number' : int(e[0]),
-                    'coords' : [float(f) for f in e[1:4]],
+                    'coords' : np.asarray([float(f) for f in e[1:4]]),
                     'radius' : float(e[4]),
                     'region-atom-indexes' : [int(i) for i in e[5:]]
                 })
@@ -102,7 +155,8 @@ class Zeopy(object):
                 e = l.split()
                 edges.append({
                     'from' : int(e[0]),
-                    'to' : int(e[2])
+                    'to' : int(e[2]),
+                    'radius' : float(e[3])
                 })
             else:
                 raise RuntimeError("Huh?")
