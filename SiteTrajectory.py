@@ -59,6 +59,10 @@ class SiteTrajectory(object):
     def site_network(self):
         return self._sn
 
+    @property
+    def real_trajectory(self):
+        return self._real_traj
+
     def set_real_points(self, real_traj):
         """Assocaite this SiteTrajectory with a trajectory of points in real space.
 
