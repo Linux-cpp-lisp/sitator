@@ -10,7 +10,7 @@ import numpy as np
 
 from sklearn.neighbors import KDTree
 
-from . import PBCCalculator
+from analysis.util import PBCCalculator
 
 def periodic_voronoi(structure, logfile = sys.stdout):
     """

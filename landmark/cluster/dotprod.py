@@ -1,5 +1,5 @@
 
-from util import DotProdClassifier
+from analysis.util import DotProdClassifier
 
 DEFAULT_PARAMS = {
     'clustering_threshold' : 0.45,
