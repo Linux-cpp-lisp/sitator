@@ -184,7 +184,7 @@ class LandmarkAnalysis(object):
         assert out_sn.vertices is None
 
         out_st = SiteTrajectory(out_sn, lmk_lbls, lmk_confs)
-
+        out_st.set_real_traj(frames)
         self._has_run = True
 
         return out_st
