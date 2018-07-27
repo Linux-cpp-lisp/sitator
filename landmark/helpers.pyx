@@ -8,7 +8,7 @@ import numpy as np
 ctypedef double precision
 
 def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_for_zeros = True, tqdm = lambda i: i):
-    if self._voronoi_vertices is None or self._landmark_dimension is None:
+    if self._landmark_dimension is None:
         raise ValueError("_fill_landmark_vectors called before Voronoi!")
 
     n_frames = len(frames)
@@ -21,7 +21,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
     frame_shift = np.empty(shape = (sn.n_static, 3))
     temp_distbuff = np.empty(shape = sn.n_static, dtype = frames.dtype)
 
-    mobile_idexes = np.where(sn._mobile_mask)[0]
+    mobile_idexes = np.where(sn.mobile_mask)[0]
 
     cdef Py_ssize_t landmark_dim = self._landmark_dimension
     cdef Py_ssize_t current_landmark_i = 0
@@ -32,7 +32,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
             mobile_pt = frame[mobile_idexes[j]]
 
             # Shift the Li in question to the center of the unit cell
-            np.copyto(frame_shift, frame[sn._static_mask])
+            np.copyto(frame_shift, frame[sn.static_mask])
             frame_shift += (pbcc.cell_centroid - mobile_pt)
 
             # Wrap all positions into the unit cell
