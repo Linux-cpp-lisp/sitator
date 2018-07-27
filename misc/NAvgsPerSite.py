@@ -18,15 +18,17 @@ class NAvgsPerSite(object):
         :
         """
         self.n = n
-        assert n % 2 == 0, "n must be even"
         self.error_on_insufficient = error_on_insufficient
         self.weighted = weighted
 
     def run(self, st):
+        if st.real_trajectory is None:
+            raise ValueError("SiteTrajectory must have associated real trajectory.")
+
         pbcc = PBCCalculator(st.site_network.structure.cell)
         # Maximum length
         centers = np.empty(shape = (self.n * st.site_network.n_sites, 3), dtype = st.real_trajectory.dtype)
-        types = np.empty(shape = centers.shape, dtype = np.int)
+        types = np.empty(shape = centers.shape[0], dtype = np.int)
 
         current_idex = 0
         for site in xrange(st.site_network.n_sites):
@@ -45,17 +47,22 @@ class NAvgsPerSite(object):
             else:
                 # Actually do averages
                 avg_len = int(np.floor(len(pts) / self.n))
+                if avg_len % 2 != 0: avg_len -= 1
                 n_avg, n_take = np.divmod(len(pts), avg_len)
-                half = self.n / 2
+                half = avg_len / 2
 
                 buf = np.empty(shape = (avg_len, 3), dtype = st.real_trajectory.dtype)
-                confbuf = np.ones(shape = avg_len, dtype = confs.dtype)
+                buf.fill(np.nan)
+
+                confbuf = np.ones(shape = avg_len, dtype = np.float)
                 for i in xrange(n_avg):
-                    buf[:half] = pts[i * self.n:i * self.n + half]
-                    buf[half:] = pts[-(i * self.n + half):-(i * self.n)]
+                    buf[:half] = pts[i * avg_len:i * avg_len + half]
+                    half2end = -(i * avg_len)
+                    if half2end == 0: half2end = None
+                    buf[half:] = pts[-(i * avg_len + half):half2end]
                     if self.weighted:
-                        confbuf[:half] = confs[i * self.n:i * self.n + half]
-                        confbuf[half:] = confs[-(i * self.n + half):-(i * self.n)]
+                        confbuf[:half] = confs[i * avg_len:i * avg_len + half]
+                        confbuf[half:] = confs[-(i * avg_len + half):half2end]
                     centers[current_idex] = pbcc.average(buf, weights = confbuf)
                     current_idex += 1
 
