@@ -45,7 +45,8 @@ class SiteNetwork(object):
         sn = type(self)(self._structure,
                         self._static_mask,
                         self._mobile_mask)
-        sn.set_sites(self._centers, self._vertices)
+        if not self._centers is None:
+            sn.set_sites(self._centers, self._vertices)
         if not self._particle_assignments is None:
             sn._particle_assignments = self._particle_assignments.copy()
         return sn
@@ -63,6 +64,9 @@ class SiteNetwork(object):
         if assignments.ndim != 2 or assignments.shape[1] != self._n_mobile:
             raise ValueError("Assignments must be of shape (n_frames, n_mobile)")
         self._particle_assignments = assignments
+
+    def __len__(self):
+        return self.n_sites
 
     @property
     def n_sites(self):
@@ -82,6 +86,9 @@ class SiteNetwork(object):
     @property
     def static_mask(self):
         return self._static_mask
+    @property
+    def static_structure(self):
+        return self._static_structure
     @property
     def centers(self):
         return self._centers
