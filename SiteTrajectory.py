@@ -34,6 +34,31 @@ class SiteTrajectory(object):
 
         self._real_traj = None
 
+    @property
+    def traj(self):
+        """The underlying trajectory."""
+        return self._traj
+
+    @property
+    def n_frames(self):
+        return len(self._traj)
+
+    @property
+    def n_unassigned(self):
+        return np.sum(self._traj < 0)
+
+    @property
+    def n_assigned(self):
+        return self._sn.n_total - self.n_unassigned
+
+    @property
+    def percent_unassigned(self):
+        return float(self.n_unassigned) / (self._sn.n_total * self.n_frames)
+
+    @property
+    def site_network(self):
+        return self._sn
+
     def set_real_points(self, real_traj):
         """Assocaite this SiteTrajectory with a trajectory of points in real space.
 
@@ -77,25 +102,6 @@ class SiteTrajectory(object):
 
     def get_site_occupancies(self):
         return np.true_divide(np.bincount(self._traj[self._traj >= 0]), self.n_frames)
-
-    @property
-    def traj(self):
-        """The underlying trajectory."""
-        return self._traj
-
-    @property
-    def n_frames(self):
-        return len(self._traj)
-
-    @property
-    def n_unassigned(self):
-        return np.sum(self._traj < 0)
-    @property
-    def n_assigned(self):
-        return self._sn.n_total - self.n_unassigned
-    @property
-    def percent_unassigned(self):
-        return float(self.n_unassigned) / (self._sn.n_total * self.n_frames)
 
     def assign_to_last_known_site(self, frame_threshold = 1, verbose = True):
         """Assign unassigned mobile particles to their last known site within
