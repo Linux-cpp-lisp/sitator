@@ -13,7 +13,7 @@ DEFAULT_SOAP_PARAMS = {
     'atom_sigma' : 0.4
 }
 
-class TracerSOAP(object):
+class SOAP(object):
     """Compute the SOAP vectors of a tracer particle in a system over time."""
 
     def __init__(self, structure, tracer_species, soap_params = {}):
@@ -50,7 +50,7 @@ class TracerSOAP(object):
     def n_dim(self):
         return self._soaper.n_dim
 
-    def soaps_for_tracer_positions(self, pts, out = None):
+    def get_descriptors(self, pts, out = None):
         assert pts.ndim == 2 and pts.shape[1] == 3
 
         if out is None:

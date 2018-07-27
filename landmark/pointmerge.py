@@ -26,7 +26,7 @@ def merge_points_soap_paths(tsoap,
                             verbose = True):
     """Merge points using SOAP paths method.
 
-    :param TracerSOAP tsoap: to compute SOAPs with.
+    :param SOAP tsoap: to compute SOAPs with.
     :param dict connectivity_dict: Maps a point index to a set of point indexes
         it is connected to, however defined.
     :param threshold: Similarity threshold, 0 < threshold <= 1
