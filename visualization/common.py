@@ -47,7 +47,7 @@ def plotter(is3D = True, **outer):
                 ax_is_3D = ax.name == '3d'
                 if not ax_is_3D == is3D:
                     raise TypeError("Tryed to compose 2D and 3D plotting functions.")
-                    
+
             if not ('i' in kwargs):
                 kwargs['i'] = 0
 
@@ -64,6 +64,32 @@ def layers(*args, **fax):
         p(fig = fax['fig'], ax = fax['ax'], i = i, **kwargs)
         i += 1
 
+def grid(*args, **kwargs):
+    defaults = {
+        'is3D' : True,
+        'figsize' : (10, 8)
+    }
+
+    defaults.update(kwargs)
+
+    is3D = defaults['is3D']
+    del defaults['is3D']
+
+    fig = plt.figure(**defaults)
+    if is3D:
+        axargs = {'projection' : '3d'}
+    else:
+        axargs = {}
+
+    nrows = len(args)
+    ncols = max(len(row) for row in args)
+
+    for i, row in enumerate(args):
+        for j, p in enumerate(row):
+            ax = fig.add_subplot(nrows, ncols, i * ncols + j + 1, aspect='equal', **axargs)
+            p[0](fig = fig, ax = ax, i = 0, **p[1])
+
+    return fig
 
 # From https://stackoverflow.com/questions/13685386/matplotlib-equal-unit-length-with-equal-aspect-ratio-z-axis-is-not-equal-to
 def set_axes_equal(ax):
