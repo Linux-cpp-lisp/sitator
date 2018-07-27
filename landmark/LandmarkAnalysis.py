@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..util import PBCCalculator
+from analysis.util import PBCCalculator
 
 # From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
 import sys
@@ -20,7 +20,7 @@ except:
 import importlib
 
 import helpers
-from .. import SiteNetwork, SiteTrajectory
+from analysis import SiteNetwork, SiteTrajectory
 
 
 from functools import wraps
@@ -120,13 +120,13 @@ class LandmarkAnalysis(object):
             print "--- Running Landmark Analysis ---"
 
         # Create PBCCalculator
-        self._pbcc = PBCCalculator(structure.cell)
+        self._pbcc = PBCCalculator(sn.structure.cell)
 
         # -- Step 1: Compute site-to-vertex distances
         self._landmark_dimension = sn.n_sites
 
         longest_vert_set = np.max([len(v) for v in sn.vertices])
-        verts_np = np.array([v + [-1] * (longest_vert_set - len(v)) for v in sn.verts])
+        verts_np = np.array([v + [-1] * (longest_vert_set - len(v)) for v in sn.vertices])
         site_vert_dists = np.empty(shape = verts_np.shape, dtype = np.float)
         site_vert_dists.fill(np.nan)
 
@@ -139,7 +139,7 @@ class LandmarkAnalysis(object):
         if self.verbose: print "  - computing landmark vectors -"
         # Compute landmark vectors
         helpers._fill_landmark_vectors(self, sn, verts_np, site_vert_dists,
-                                        frames, check_for_zeros = check_for_zero_landmarks,
+                                        frames, check_for_zeros = self.check_for_zero_landmarks,
                                         tqdm = tqdm)
 
         # -- Step 3: Cluster landmark vectors
@@ -153,7 +153,7 @@ class LandmarkAnalysis(object):
         cluster_counts, lmk_lbls, lmk_confs = \
             cluster_func(self._landmark_vectors,
                          clustering_params = self._clustering_params,
-                         min_samples = self._minimum_occupancy / float(sn.n_mobile),
+                         min_samples = self._minimum_site_occupancy / float(sn.n_mobile),
                          verbose = self.verbose)
 
         # reshape lables and confidences
@@ -173,15 +173,15 @@ class LandmarkAnalysis(object):
             mask = lmk_lbls == site
             pts = frames[:, sn.mobile_mask][mask]
             if self.weighted_site_positions:
-                site_centers[site] = pbcc.average(pts, weights = lmk_confs[mask])
+                site_centers[site] = self._pbcc.average(pts, weights = lmk_confs[mask])
             else:
-                site_centers[site] = pbcc.average(pts)
+                site_centers[site] = self._pbcc.average(pts)
 
         # Build output obejcts
         out_sn = sn.copy()
 
-        out_sn._centers = site_centers
-        out_sn._vertices = None
+        out_sn.centers = site_centers
+        assert out_sn.vertices is None
 
         out_st = SiteTrajectory(out_sn, lmk_lbls, lmk_confs)
 
@@ -190,23 +190,6 @@ class LandmarkAnalysis(object):
         return out_st
 
     # -------- "private" methods --------
-
-    def _get_site_positions(self, ):
-        """Returns the "position" of each site.
-        Actually the mean of all positions assigned to it.
-        """
-
-        site_averages = np.empty(shape = (self.n_sites, 3), dtype = self._frames.dtype)
-
-        if self.weighted_site_positions:
-            for site in xrange(self.n_sites):
-                pos, confs = self.all_positions_for_site(site, return_confidences = True)
-                self._site_averages[site] = self._pbcc.average(pos, weights = confs)
-        else:
-            for site in xrange(self.n_sites):
-                self._site_averages[site] = self._pbcc.average(self.all_positions_for_site(site))
-
-        return site_averages
 
     def _do_peak_evening(self):
       if self._peak_evening == 'none':
