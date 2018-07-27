@@ -22,6 +22,7 @@ class NAvgsPerSite(object):
         self.weighted = weighted
 
     def run(self, st):
+        assert isinstance(st, SiteTrajectory)
         if st.real_trajectory is None:
             raise ValueError("SiteTrajectory must have associated real trajectory.")
 

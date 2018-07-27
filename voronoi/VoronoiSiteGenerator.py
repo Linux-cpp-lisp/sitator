@@ -15,6 +15,7 @@ class VoronoiSiteGenerator(object):
 
     def run(self, sn):
         """SiteNetwork -> SiteNetwork"""
+        assert isinstance(sn, SiteNetwork)
 
         nodes, verts, edges, _ = self._zeopy.voronoi(sn.static_structure,
                                                     radial = self._radial,

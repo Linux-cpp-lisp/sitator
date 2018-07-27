@@ -104,6 +104,7 @@ class LandmarkAnalysis(object):
 
         Takes a SiteNetwork and returns a SiteTrajectory.
         """
+        assert isinstance(sn, SiteNetwork)
 
         if self._has_run:
             raise ValueError("Cannot rerun LandmarkAnalysis!")
