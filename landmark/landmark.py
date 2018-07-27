@@ -47,7 +47,7 @@ class LandmarkAnalysis(object):
                 clustering_params = {},
                 cutoff = 3.0,
                 minimum_site_occupancy = 0.1,
-                peak_evening = 'clip',
+                peak_evening = 'none',
                 weighted_site_positions = True,
                 verbose = True,
                 zeopp_path = DEFAULT_ZEOPP):
@@ -363,6 +363,8 @@ class LandmarkAnalysis(object):
 
         nodes, verts, edges, _ = self._zeopy.voronoi(self._static_structure, radial = False, verbose = self.verbose)
 
+        # -- Vertices
+
         # For the outside world, the pretty list of lists
         self.voronoi_vertices = verts
 
@@ -370,7 +372,7 @@ class LandmarkAnalysis(object):
         longest_vert_set = np.max([len(v) for v in self.voronoi_vertices])
         self._voronoi_vertices = np.array([v + [-1] * (longest_vert_set - len(v)) for v in self.voronoi_vertices])
 
-        # Compute centroid distances
+        # ------ Compute centroid distances
         vvcd = np.empty(shape = len(self._voronoi_vertices), dtype = np.float)
         vvcd.fill(np.nan)
 
