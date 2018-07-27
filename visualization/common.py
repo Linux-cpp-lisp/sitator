@@ -14,7 +14,7 @@ ELEMENT_COLORS = {
     'N' : 'b',
     'O' : 'r',
     'F' : 'g',
-    'Cl' : 'g'
+    'Cl' : 'g',
     'Br' : 'darkred',
     'I' : 'purple',
     'P' : 'orange',
@@ -25,15 +25,15 @@ OTHER_ELEMENT_COLOR = 'gray'
 def color_for_species(species):
     return ELEMENT_COLORS.get(species, OTHER_ELEMENT_COLOR)
 
-def plotter(is3D = True):
+def plotter(is3D = True, **outer):
     def plotter_wrapper(func):
-        @wraps(func):
+        @wraps(func)
         def plotter_wraped(*args, **kwargs):
             fig = None
             ax = None
             if not ('ax' in kwargs and 'fig' in kwargs):
                 # No existing axis/figure
-                fig = plt.figure()
+                fig = plt.figure(**outer)
                 if is3D:
                     ax = fig.add_subplot(111, projection = '3d')
                 else:
@@ -41,19 +41,28 @@ def plotter(is3D = True):
             else:
                 fig = kwargs['fig']
                 ax = kwargs['ax']
+                del kwargs['fig']
+                del kwargs['ax']
 
                 ax_is_3D = ax.name == '3d'
                 if not ax_is_3D == is3D:
                     raise TypeError("Tryed to compose 2D and 3D plotting functions.")
+                    
+            if not ('i' in kwargs):
+                kwargs['i'] = 0
 
-            func(*args, **kwargs, fig = fig, ax = ax)
+            func(*args, fig = fig, ax = ax, **kwargs)
             return fig, ax
         return plotter_wraped
+    return plotter_wrapper
 
-@plotter
-def layers(*plotters, fig, ax):
-    for plotter, kwargs in plotters:
-        plotter(**kwargs, fig = fig, ax = ax)
+@plotter(is3D = True)
+def layers(*args, **fax):
+    i = fax['i']
+    print i
+    for p, kwargs in args:
+        p(fig = fax['fig'], ax = fax['ax'], i = i, **kwargs)
+        i += 1
 
 
 # From https://stackoverflow.com/questions/13685386/matplotlib-equal-unit-length-with-equal-aspect-ratio-z-axis-is-not-equal-to
