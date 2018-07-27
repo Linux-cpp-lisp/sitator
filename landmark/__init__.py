@@ -1,2 +1,2 @@
 
-from landmark import LandmarkAnalysis
+from LandmarkAnalysis import LandmarkAnalysis
