@@ -43,7 +43,8 @@ def plot_atoms(atoms, hide_species = (), wrap = False, fig = None, ax = None, i 
 
 @plotter(is3D = True)
 def plot_points(points, marker = 'x', fig = None, ax = None, i = None, **kwargs):
-    assert len(points)
+    if (type(points) is np.ndarray) and (points.ndim == 2):
+        points = [points]
 
     for j, pts in enumerate(points):
         ax.scatter(pts[:,0], pts[:,1], pts[:,2],
