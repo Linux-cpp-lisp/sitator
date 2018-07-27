@@ -7,8 +7,7 @@ import numpy as np
 class SiteNetwork(object):
     """A network of sites for some diffusive/mobile particle in a static lattice.
 
-    Stores the locations of sites, their defining static atoms. Can also store
-    information assigning mobile particles to sites over time.
+    Stores the locations of sites, their defining static atoms, and their "types".
     """
 
     def __init__(self,
@@ -25,45 +24,36 @@ class SiteNetwork(object):
         assert static_mask.ndim == mobile_mask.ndim == 1, "The masks must be one-dimensional"
         assert len(structure) == len(static_mask) == len(mobile_mask), "The masks must have the same length as the # of atoms in the strucutre."
 
-        self._structure = structure
-        self._static_mask = static_mask
-        self._n_static = np.sum(static_mask)
-        self._mobile_mask = mobile_mask
-        self._n_mobile = np.sum(mobile_mask)
+        self.structure = structure
+        self.static_mask = static_mask
+        self.n_static = np.sum(static_mask)
+        self.mobile_mask = mobile_mask
+        self.n_mobile = np.sum(mobile_mask)
 
         # Create static structure
-        self._static_structure = structure.copy()
-        del self._static_structure[(~static_mask) & mobile_mask]
-        assert len(self._static_structure) == self.n_static
+        self.static_structure = structure.copy()
+        del self.static_structure[(~static_mask) & mobile_mask]
+        assert len(self.static_structure) == self.n_static
 
         # Set variables
         self._centers = None
         self._vertices = None # Internally, keep vertices in
+        self._types = None
 
     def copy(self):
-        """Returns a (deep) copy of self."""
-        sn = type(self)(self._structure,
-                        self._static_mask,
-                        self._mobile_mask)
+        """Returns a (shallowish) copy of self."""
+        sn = type(self)(self.structure,
+                        self.static_mask,
+                        self.mobile_mask)
+        
         if not self._centers is None:
-            sn.set_sites(self._centers, self._vertices)
-        if not self._particle_assignments is None:
-            sn._particle_assignments = self._particle_assignments.copy()
+            sn.centers = self._centers.copy()
+            if not self._vertices is None:
+                sn.vertices = list(self._vertices)
+            if not self._types is None:
+                sn.types = self._types.copy()
+
         return sn
-
-    def set_sites(centers, vertices = None):
-        """Set centers (and vertices). Copies both arrays."""
-        self._centers = centers.copy()
-        if not vertices is None:
-            self._vertices = vertices.copy()
-
-    def set_particle_assignments(self, assignments):
-        """Set the SiteNetwork's particle assignments. Does NOT copy `assignments`."""
-        if self._centers is None:
-            raise ValueError("SiteNetwork must have sites before particle assignments!")
-        if assignments.ndim != 2 or assignments.shape[1] != self._n_mobile:
-            raise ValueError("Assignments must be of shape (n_frames, n_mobile)")
-        self._particle_assignments = assignments
 
     def __len__(self):
         return self.n_sites
@@ -71,27 +61,37 @@ class SiteNetwork(object):
     @property
     def n_sites(self):
         return len(self._centers)
-    @property
-    def n_static(self):
-        return self._n_static
-    @property
-    def n_mobile(self):
-        return self._n_mobile
+
     @property
     def n_total(self):
-        return len(self._static_mask)
-    @property
-    def mobile_mask(self):
-        return self._mobile_mask
-    @property
-    def static_mask(self):
-        return self._static_mask
-    @property
-    def static_structure(self):
-        return self._static_structure
+        return len(self.static_mask)
+
     @property
     def centers(self):
         return self._centers
+
+    @centers.setter
+    def centers(self, value):
+        self._centers = value
+        self._vertices = None
+        self._types = None
+
     @property
     def vertices(self):
         return self._vertices
+
+    @vertices.setter
+    def vertices(self, value):
+        if not len(value) == len(self._centers):
+            raise ValueError("Wrong # of vertices %i; expected %i" % (len(value), len(self._centers)))
+        self._vertices = value
+
+    @property
+    def site_types(self):
+        return self._types
+
+    @site_types.setter
+    def site_types(self, value):
+        if not len(value) == len(self._centers):
+            raise ValueError("Wrong # of types %i; expected %i" % (len(value), len(self._centers)))
+        self._types = value
