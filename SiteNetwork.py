@@ -45,7 +45,7 @@ class SiteNetwork(object):
         sn = type(self)(self.structure,
                         self.static_mask,
                         self.mobile_mask)
-        
+
         if not self._centers is None:
             sn.centers = self._centers.copy()
             if not self._vertices is None:
@@ -92,6 +92,6 @@ class SiteNetwork(object):
 
     @site_types.setter
     def site_types(self, value):
-        if not len(value) == len(self._centers):
-            raise ValueError("Wrong # of types %i; expected %i" % (len(value), len(self._centers)))
+        if not value.shape == (len(self._centers),):
+            raise ValueError("Wrong # of types %i; expected %i" % (value.shape, len(self._centers)))
         self._types = value

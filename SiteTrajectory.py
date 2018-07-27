@@ -63,12 +63,12 @@ class SiteTrajectory(object):
     def real_trajectory(self):
         return self._real_traj
 
-    def set_real_points(self, real_traj):
+    def set_real_traj(self, real_traj):
         """Assocaite this SiteTrajectory with a trajectory of points in real space.
 
         The trajectory is not copied, and should have shape (n_frames, n_total)
         """
-        expected_shape = (self.n_frames, self._sn.n_total)
+        expected_shape = (self.n_frames, self._sn.n_total, 3)
         if not real_traj.shape == expected_shape:
             raise ValueError("real_traj of shape %s does not have expected shape %s" % (real_traj.shape, expected_shape))
         self._real_traj = real_traj
