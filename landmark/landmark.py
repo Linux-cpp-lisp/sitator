@@ -2,7 +2,7 @@ import numpy as np
 
 from util import PBCCalculator
 
-from vorozeo import Zeopy
+from util import Zeopy
 
 # From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
 import sys
