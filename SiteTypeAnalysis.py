@@ -103,7 +103,9 @@ class SiteTypeAnalysis(object):
         # but, hopefully, that should never happen?
         decision_curve = self.dpc.density * self.dpc.delta
         decision_curve_sort = np.argsort(decision_curve)[::-1]
-        decision_curve = decision_curve[decision_curve_sort[:self.n_site_types_max * 2]]
+        # 1.5 times seems to be enough to resolve the maxium. And the hope here is that we
+        # never actually reach the maximum.
+        decision_curve = decision_curve[decision_curve_sort[:int(self.n_site_types_max * 1.5)]]
         elbow = index_of_elbow(decision_curve)
         self._decision_curve = decision_curve
         self._decision_elbow = elbow
