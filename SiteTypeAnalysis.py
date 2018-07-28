@@ -7,6 +7,7 @@ import numpy as np
 from analysis.misc import GenerateAroundSites
 from analysis import SiteNetwork, SiteTrajectory
 from analysis.visualization import plotter, DEFAULT_COLORS
+from analysis.util.elbow import index_of_elbow
 
 from sklearn.decomposition import PCA
 
@@ -39,13 +40,13 @@ class SiteTypeAnalysis(object):
     """
     def __init__(self, sampling_transform, descriptor,
                 min_pca_variance = 0.9, min_pca_dimensions = 2,
-                verbose = True, dpc_thresh = (-0.5, 20.0)):
+                verbose = True, n_site_types_max = 20):
         self.sampling_transform = sampling_transform
         self.descriptor = descriptor
         self.min_pca_variance = min_pca_variance
         self.min_pca_dimensions = min_pca_dimensions
         self.verbose = verbose
-        self.dpc_thresh = dpc_thresh
+        self.n_site_types_max = n_site_types_max
 
         self._n_dvecs = None
 
@@ -92,9 +93,28 @@ class SiteTypeAnalysis(object):
         # pydpc requires a C-contiguous array
         self.dvecs = np.ascontiguousarray(self.dvecs)
         self.dpc = pydpc.Cluster(self.dvecs, autoplot = False)
-        density_threshold = self.dpc_thresh[0] * np.std(self.dpc.density) + np.mean(self.dpc.density)
-        delta_threshold = self.dpc_thresh[1] * np.std(self.dpc.delta) + np.mean(self.dpc.delta)
+
+        # Estimate the right assignment parameters using the sorted density*delta
+        # product plot (Fig. 4 of the paper). The elbow in this plot gives us the
+        # number of clusters -- more or less -- and is estimated using the simple
+        # elbow finding algorithm of https://stackoverflow.com/questions/2018178/finding-the-best-trade-off-point-on-a-curve
+        #
+        # This will fail *badly* if there are more than n_site_types_max clusters,
+        # but, hopefully, that should never happen?
+        decision_curve = self.dpc.density * self.dpc.delta
+        decision_curve_sort = np.argsort(decision_curve)[::-1]
+        decision_curve = decision_curve[decision_curve_sort[:self.n_site_types_max * 2]]
+        elbow = index_of_elbow(decision_curve)
+        self._decision_curve = decision_curve
+        self._decision_elbow = elbow
+
+        # a little less than the minimum in both cases. If that lets any more
+        # clusters in, they probably deserved to be anyway.
+        density_threshold = np.min(self.dpc.density[decision_curve_sort[:elbow]]) - 0.001
+        delta_threshold = np.min(self.dpc.delta[decision_curve_sort[:elbow]]) - 0.001
+
         self._real_dpc_thresh = (density_threshold, delta_threshold)
+
         self.dpc.assign(density_threshold, delta_threshold)
         assignments = self.dpc.membership
         unassigned = assignments < 0
@@ -129,8 +149,8 @@ class SiteTypeAnalysis(object):
         sn.site_types = types
 
         if self.verbose:
-            print(("             " + "Type {:<2}" * self.n_types).format(*xrange(1, self.n_types + 1)))
-            print(("# of sites   " + "{:<7}" * self.n_types).format(*n_sites_of_each_type))
+            print(("             " + "Type {:<2} " * self.n_types).format(*xrange(1, self.n_types + 1)))
+            print(("# of sites   " + "{:<8}" * self.n_types).format(*n_sites_of_each_type))
 
             if np.any(n_sites_of_each_type == 0):
                 print("WARNING: Had site types with no sites; check clustering settings/voting!")
@@ -169,9 +189,15 @@ class SiteTypeAnalysis(object):
         ax.legend()
 
     @plotter(is3D = False)
-    def plot_dpc_decision_graph(self, ax = None, **kwargs):
+    def plot_dpc_decision_plot(self, ax = None, **kwargs):
+        ax.plot(self._decision_curve, linestyle = '', marker = 'x', label='$\rho_i\delta_i$')
+        ax.axvline(self._decision_elbow, color = 'darkgray', label = "Elbow")
+        ax.set_title("DPCLUS Decision Curve")
+
+    @plotter(is3D = False)
+    def plot_dpc_delta_density(self, ax = None, **kwargs):
         ax.scatter(self.dpc.density, self.dpc.delta)
-        ax.set_title("DPCLUS Decision Plot")
+        ax.set_title("DPCLUS")
         ax.set_xlabel("Density")
         ax.set_ylabel("Delta / a.u.")
 
