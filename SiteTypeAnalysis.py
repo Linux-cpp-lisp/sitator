@@ -125,11 +125,15 @@ class SiteTypeAnalysis(object):
             self.winning_vote_percentages[site] = float(votes[winner]) / n_votes
             types[site] = winner
 
+        n_sites_of_each_type = np.bincount(types)
         sn.site_types = types
 
         if self.verbose:
             print(("             " + "Type {:<2}" * self.n_types).format(*xrange(1, self.n_types + 1)))
-            print(("# of sites   " + "{:<7}" * self.n_types).format(*np.bincount(types)))
+            print(("# of sites   " + "{:<7}" * self.n_types).format(*n_sites_of_each_type))
+
+            if np.any(n_sites_of_each_type == 0):
+                print("WARNING: Had site types with no sites; check clustering settings/voting!")
 
         return sn
 
