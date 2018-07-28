@@ -32,10 +32,14 @@ class SiteTypeAnalysis(object):
          - n_dim: the number of components in a descriptor vector
          - get_descriptors(pts, out = None): fills and returns out (len(pts), n_dim) with the descriptor
             vectors for the points in pts.
+
+    :param (density, delta) dpc_thresh: The minimum z-score for a point to be
+        considered an outlier in the DPCLUS decision plot -- in other words to become
+        a cluster. Default (-0.5, 20.0).
     """
     def __init__(self, sampling_transform, descriptor,
                 min_pca_variance = 0.9, min_pca_dimensions = 2,
-                verbose = True, dpc_thresh = (20, 0.15)):
+                verbose = True, dpc_thresh = (-0.5, 20.0)):
         self.sampling_transform = sampling_transform
         self.descriptor = descriptor
         self.min_pca_variance = min_pca_variance
@@ -88,7 +92,10 @@ class SiteTypeAnalysis(object):
         # pydpc requires a C-contiguous array
         self.dvecs = np.ascontiguousarray(self.dvecs)
         self.dpc = pydpc.Cluster(self.dvecs, autoplot = False)
-        self.dpc.assign(*self.dpc_thresh)
+        density_threshold = self.dpc_thresh[0] * np.std(self.dpc.density) + np.mean(self.dpc.density)
+        delta_threshold = self.dpc_thresh[1] * np.std(self.dpc.delta) + np.mean(self.dpc.delta)
+        self._real_dpc_thresh = (density_threshold, delta_threshold)
+        self.dpc.assign(density_threshold, delta_threshold)
         assignments = self.dpc.membership
         unassigned = assignments < 0
         self._n_unassigned = np.sum(unassigned)
@@ -122,7 +129,7 @@ class SiteTypeAnalysis(object):
 
         if self.verbose:
             print(("             " + "Type {:<2}" * self.n_types).format(*xrange(1, self.n_types + 1)))
-            print(("# of sites   " + "{:<7}" * self.n_types).format(*site_type_counts))
+            print(("# of sites   " + "{:<7}" * self.n_types).format(*np.bincount(types)))
 
         return sn
 
@@ -164,5 +171,7 @@ class SiteTypeAnalysis(object):
         ax.set_xlabel("Density")
         ax.set_ylabel("Delta / a.u.")
 
-        ax.plot([self.dpc_thresh[0], self.dpc.density.max()], [self.dpc_thresh[1], self.dpc_thresh[1]], linestyle='--', color = 'darkgray')
-        ax.plot([self.dpc_thresh[0], self.dpc_thresh[0]], [self.dpc_thresh[1], self.dpc.delta.max()], linestyle='--', color = 'darkgray')
+        thresh = self._real_dpc_thresh
+
+        ax.plot([thresh[0], self.dpc.density.max()], [thresh[1], thresh[1]], linestyle='--', color = 'darkgray')
+        ax.plot([thresh[0], thresh[0]], [thresh[1], self.dpc.delta.max()], linestyle='--', color = 'darkgray')
