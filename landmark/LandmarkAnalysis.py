@@ -44,6 +44,7 @@ class LandmarkAnalysis(object):
                  peak_evening = 'none',
                  weighted_site_positions = True,
                  check_for_zero_landmarks = True,
+                 static_movement_threshold = 0.5,
                  verbose = True):
         """
         :param double cutoff: The distance cutoff for the landmark vectors. (unitless)
@@ -78,6 +79,8 @@ class LandmarkAnalysis(object):
 
         self._landmark_vectors = None
         self._landmark_dimension = None
+
+        self.static_movement_threshold = static_movement_threshold
 
         self._has_run = False
 

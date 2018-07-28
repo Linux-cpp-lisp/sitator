@@ -23,10 +23,36 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
     mobile_idexes = np.where(sn.mobile_mask)[0]
 
+    lattice_map = np.empty(shape = sn.n_static, dtype = np.int)
+    lattice_pt = np.empty(shape = 3, dtype = sn.static_structure.positions.dtype)
+    lattice_pt_dists = np.empty(shape = sn.n_static, dtype = np.float)
+    static_positions_seen = np.empty(shape = sn.n_static, dtype = np.bool)
+
     cdef Py_ssize_t landmark_dim = self._landmark_dimension
     cdef Py_ssize_t current_landmark_i = 0
     # Iterate through time
     for i, frame in enumerate(tqdm(frames, desc = "Frame")):
+
+        static_positions = frame[sn.static_mask]
+        static_positions_seen.fill(False)
+        # Every frame, update the lattice map
+        for lattice_index in xrange(sn.n_static):
+            lattice_pt = sn.static_structure.positions[lattice_index]
+            pbcc.distances(lattice_pt, static_positions, out = lattice_pt_dists)
+            nearest_static_position = np.argmin(lattice_pt_dists)
+
+            if static_positions_seen[nearest_static_position]:
+                # We've already seen this one... error
+                print "Static atom %i is the closest to more than one static lattice position" % nearest_static_position
+                #raise ValueError("Static atom %i is the closest to more than one static lattice position" % nearest_static_position)
+
+            static_positions_seen[nearest_static_position] = True
+
+            if lattice_pt_dists[nearest_static_position] > self.static_movement_threshold:
+                raise ValueError("No static atom position within %f A threshold of static lattice position %i" % (self.static_movement_threshold, lattice_index))
+
+            lattice_map[lattice_index] = nearest_static_position
+
 
         for j in xrange(sn.n_mobile):
             mobile_pt = frame[mobile_idexes[j]]
@@ -41,7 +67,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
             # The mobile ion is now at the center of the cell --
             # compute the landmark vector
             fill_landmark_vec(self._landmark_vectors, i, sn.n_mobile, j,
-                              landmark_dim, frame_shift,
+                              landmark_dim, frame_shift, lattice_map,
                               verts_np, site_vert_dists,
                               pbcc.cell_centroid,
                               self._cutoff, temp_distbuff)
@@ -59,6 +85,7 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
                   Py_ssize_t j,
                   Py_ssize_t landmark_dim,
                   const precision [:,:] lattice_positions,
+                  const Py_ssize_t [:] lattice_map,
                   const Py_ssize_t [:,:] verts_np,
                   const precision [:, :] verts_centroid_dists,
                   const precision [:] li_pos,
@@ -86,8 +113,10 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
     cdef int n_verts
 
     # precompute all distances
+    # lattice_map maps an original static lattice index to an index in the current
+    # frames lattice positions
     for idex in xrange(len(lattice_positions)):
-        pt = lattice_positions[idex]
+        pt = lattice_positions[lattice_map[idex]]
         temp = sqrt((pt[0] - li_pos[0])**2 + (pt[1] - li_pos[1])**2 + (pt[2] - li_pos[2])**2)
 
         distbuff[idex] = temp
