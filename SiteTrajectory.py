@@ -34,6 +34,16 @@ class SiteTrajectory(object):
 
         self._real_traj = None
 
+    def __len__(self):
+        return self.n_frames
+
+    def __getitem__(self, key):
+        st = type(self)(self._sn,
+                        self._traj[key],
+                        confidences = None if self._confs is None else self._confs[key])
+        if not self._real_traj is None:
+            st.set_real_traj(self._real_traj[key])
+
     @property
     def traj(self):
         """The underlying trajectory."""
