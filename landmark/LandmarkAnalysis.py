@@ -157,14 +157,30 @@ class LandmarkAnalysis(object):
                          min_samples = self._minimum_site_occupancy / float(sn.n_mobile),
                          verbose = self.verbose)
 
+        if self.verbose:
+            print "    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls)))
+
         # reshape lables and confidences
         lmk_lbls.shape = (n_frames, sn.n_mobile)
         lmk_confs.shape = (n_frames, sn.n_mobile)
 
-        if self.verbose:
-            print "    Identified %i sites with assignment counts %s" % (len(cluster_counts), cluster_counts)
+
 
         n_sites = len(cluster_counts)
+
+        if n_sites < sn.n_mobile:
+            raise ValueError("There are %i mobile particles, but only identified %i sites. Check clustering_params." % (sn.n_mobile, n_sites))
+
+        if self.verbose:
+            print "    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts)
+
+        # Check that multiple particles are never assigned to one site at the
+        # same time, cause that would be wrong.
+        for frame_i, site_frame in enumerate(lmk_lbls):
+            _, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
+            count_msk = counts > 1
+            if np.any(count_msk):
+                raise ValueError("%i mobile particles were assigned to only %i site(s) (%s) at frame %i." % (np.sum(counts[count_msk]), np.sum(count_msk), np.where(count_msk)[0], frame_i))
 
         # -- Do output
         # - Compute site centers
