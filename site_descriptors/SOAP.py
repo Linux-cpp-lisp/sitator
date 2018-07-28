@@ -14,23 +14,25 @@ DEFAULT_SOAP_PARAMS = {
 }
 
 class SOAP(object):
-    """Compute the SOAP vectors of a tracer particle in a system over time."""
+    """Compute the SOAP vectors in a SiteNetwork
 
-    def __init__(self, structure, tracer_species, soap_params = {}):
-        """
-        :param ASE.Atoms/Quippy Atoms structure: The surroundings in which to compute
-            the SOAPs.
-        :param int/str tracer_species: The species of the tracer atom.
-        """
-        if isinstance(tracer_species, str):
-            tracer_species = atomic_numbers[tracer_species]
+    :param SiteNetwork sn:
+    :param int tracer_atomic_number = None: The type of tracer atom to add. If None,
+        defaults to the type of the first mobile atom in the SiteNetwork.
+    :param dict soap_params = {}: Any custom SOAP params.
+    """
 
-        self._tracer_species = tracer_species
+    def __init__(self, sn, tracer_atomic_number = None, soap_params = {}):
 
         # Make a copy of the structure
-        self._structure = qp.Atoms(structure)
+        self._structure = qp.Atoms(sn.static_structure)
         # Add a tracer
-        self._structure.add_atoms((0.0, 0.0, 0.0), tracer_species)
+        if tracer_atomic_number is None:
+            tracer_atomic_number = sn.structure.get_atomic_numbers()[sn.mobile_mask][0]
+
+        self.tracer_atomic_number = tracer_atomic_number
+
+        self._structure.add_atoms((0.0, 0.0, 0.0), tracer_atomic_number)
         self._tracer_index = len(self._structure) - 1
 
         # Create the descriptor
@@ -42,7 +44,7 @@ class SOAP(object):
             soap_cmd_line.append("{}={}".format(opt, soap_opts[opt]))
         # Stuff that's the same no matter what
         soap_cmd_line.append("n_Z=1") #always one tracer
-        soap_cmd_line.append("Z={{{}}}".format(self._tracer_species))
+        soap_cmd_line.append("Z={{{}}}".format(self.tracer_atomic_number))
 
         self._soaper = descriptors.Descriptor(" ".join(soap_cmd_line))
 
@@ -103,6 +105,3 @@ class SOAP(object):
                     return False
 
         return True
-
-
-        return out
