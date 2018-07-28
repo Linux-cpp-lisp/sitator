@@ -47,5 +47,9 @@ def plot_points(points, marker = 'x', fig = None, ax = None, i = None, **kwargs)
         points = [points]
 
     for j, pts in enumerate(points):
-        ax.scatter(pts[:,0], pts[:,1], pts[:,2],
-                   color = matplotlib.cm.get_cmap('Dark2')(j + i), marker = marker, **kwargs)
+        if 'c' in kwargs or 'color' in kwargs:
+            ax.scatter(pts[:,0], pts[:,1], pts[:,2],
+                       marker = marker, **kwargs)
+        else:
+            ax.scatter(pts[:,0], pts[:,1], pts[:,2],
+                       color = matplotlib.cm.get_cmap('Dark2')(j + i), marker = marker, **kwargs)

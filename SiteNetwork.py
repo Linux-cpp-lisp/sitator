@@ -4,6 +4,9 @@ from builtins import *
 
 import numpy as np
 
+import matplotlib
+from analysis.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
+
 class SiteNetwork(object):
     """A network of sites for some diffusive/mobile particle in a static lattice.
 
@@ -51,12 +54,48 @@ class SiteNetwork(object):
             if not self._vertices is None:
                 sn.vertices = list(self._vertices)
             if not self._types is None:
-                sn.types = self._types.copy()
+                sn.site_types = self._types.copy()
 
         return sn
 
     def __len__(self):
         return self.n_sites
+
+    def __getitem__(self, key):
+        if self._centers is None:
+            raise ValueError("This SiteNetwork has no sites; can't slice.")
+
+        mask = np.zeros(shape = len(self), dtype = np.bool)
+        mask[key] = True # This will deal with wrong shapes and all kinds of fancy indexing
+
+        sn = type(self)(self.structure,
+                        self.static_mask,
+                        self.mobile_mask)
+
+        view = self._centers[mask]
+        view.flags.writeable = False
+        sn.centers = view
+
+        if not self._vertices is None:
+            sn.vertices = [v for i, v in enumerate(self._vertices) if mask[i]]
+
+        if not self._types is None:
+            view = self._types[mask]
+            view.flags.writeable = False
+            sn.site_types = view
+
+        return sn
+
+    def of_type(self, stype):
+        """Returns a "view" to this SiteNetwork with only sites of a certain type."""
+        if self._types is None:
+            raise ValueError("This SiteNetwork has no type information.")
+
+        if not stype in self._types:
+            raise ValueError("This SiteNetwork has no sites of type %i" % stype)
+
+        return self[self._types == stype]
+
 
     @property
     def n_sites(self):
@@ -68,7 +107,9 @@ class SiteNetwork(object):
 
     @property
     def centers(self):
-        return self._centers
+        view = self._centers.view()
+        view.flags.writeable = False
+        return view
 
     @centers.setter
     def centers(self, value):
@@ -88,10 +129,24 @@ class SiteNetwork(object):
 
     @property
     def site_types(self):
-        return self._types
+        if self._types is None:
+            return None
+        view = self._types.view()
+        view.flags.writeable = False
+        return view
 
     @site_types.setter
     def site_types(self, value):
         if not value.shape == (len(self._centers),):
             raise ValueError("Wrong # of types %i; expected %i" % (value.shape, len(self._centers)))
         self._types = value
+
+    @plotter(is3D = True)
+    def plot(self, **kwargs):
+        pts_params = {'points' : self.centers}
+        if not self._types is None:
+            pts_params['color'] = [DEFAULT_COLORS[t] for t in self._types]
+        else:
+            pts_params['color'] = 'k'
+        layers((plot_atoms,  {'atoms' : self.static_structure}),
+               (plot_points, pts_params), **kwargs)

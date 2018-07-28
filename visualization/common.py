@@ -6,7 +6,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from functools import wraps
 
-DEFAULT_COLORS = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
+DEFAULT_COLORS = ['tab:blue', 'tab:orange', 'tab:green', 'tab:pink', 'tab:purple', 'tab:brown', 'tab:cyan', 'tab:red', 'tab:gray', 'tab:olive']
 
 ELEMENT_COLORS = {
     'H' : 'white',
@@ -67,7 +67,7 @@ def layers(*args, **fax):
 def grid(*args, **kwargs):
     defaults = {
         'is3D' : True,
-        'figsize' : (10, 8)
+        'figsize' : (8, 6)
     }
 
     defaults.update(kwargs)
@@ -77,7 +77,7 @@ def grid(*args, **kwargs):
 
     fig = plt.figure(**defaults)
     if is3D:
-        axargs = {'projection' : '3d'}
+        axargs = {'projection' : '3d', aspect : 'equal'}
     else:
         axargs = {}
 
@@ -86,8 +86,13 @@ def grid(*args, **kwargs):
 
     for i, row in enumerate(args):
         for j, p in enumerate(row):
-            ax = fig.add_subplot(nrows, ncols, i * ncols + j + 1, aspect='equal', **axargs)
-            p[0](fig = fig, ax = ax, i = 0, **p[1])
+            ax = fig.add_subplot(nrows, ncols, i * ncols + j + 1, **axargs)
+            if isinstance(p, tuple):
+                p[0](fig = fig, ax = ax, i = 0, **p[1])
+            else:
+                p(fig = fig, ax = ax, i = 0)
+
+    fig.tight_layout()
 
     return fig
 
