@@ -4,6 +4,7 @@ from builtins import *
 
 import numpy as np
 
+from analysis.util import PBCCalculator
 from analysis.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
 
 SITE_UNKNOWN = -1
@@ -201,3 +202,32 @@ class SiteTrajectory(object):
 
             mobile_atoms.positions[:] = self._real_traj[frame, self._sn.mobile_mask]
             plot_atoms(atoms = mobile_atoms, **kwargs)
+
+        kwargs['ax'].set_title("Frame %i/%i" % (frame, self.n_frames))
+
+    @plotter(is3D = True)
+    def plot_site(self, site, **kwargs):
+        pbcc = PBCCalculator(self._sn.structure.cell)
+        pts = self.real_positions_for_site(site).copy()
+        offset = pbcc.cell_centroid - pts[3]
+        pts += offset
+        pbcc.wrap_points(pts)
+        lattice_pos = self._sn.static_structure.positions.copy()
+        lattice_pos += offset
+        pbcc.wrap_points(lattice_pos)
+        site_pos = self._sn.centers[site:site+1].copy()
+        site_pos += offset
+        pbcc.wrap_points(site_pos)
+        # Plot point cloud
+        plot_points(points = pts, alpha = 0.3, marker = '.', color = 'k', **kwargs)
+        # Plot site
+        plot_points(points = site_pos, color = 'cyan', **kwargs)
+        # Plot everything else
+        plot_atoms(self._sn.static_structure, positions = lattice_pos, **kwargs)
+
+        title = "Site %i/%i" % (site, len(self._sn))
+
+        if not self._sn.site_types is None:
+            title += " (type %i)" % self._sn.site_types[site]
+
+        kwargs['ax'].set_title(title)
