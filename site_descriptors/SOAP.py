@@ -13,6 +13,21 @@ DEFAULT_SOAP_PARAMS = {
     'atom_sigma' : 0.4
 }
 
+# From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
+import sys
+try:
+    ipy_str = str(type(get_ipython()))
+    if 'zmqshell' in ipy_str:
+        from tqdm import tqdm_notebook as tqdm
+    if 'terminal' in ipy_str:
+        from tqdm import tqdm
+except:
+    if sys.stderr.isatty():
+        from tqdm import tqdm
+    else:
+        def tqdm(iterable, **kwargs):
+            return iterable
+
 class SOAP(object):
     """Compute the SOAP vectors in a SiteNetwork
 
@@ -22,7 +37,7 @@ class SOAP(object):
     :param dict soap_params = {}: Any custom SOAP params.
     """
 
-    def __init__(self, sn, tracer_atomic_number = None, soap_params = {}):
+    def __init__(self, sn, tracer_atomic_number = None, soap_params = {}, verbose = True):
 
         # Make a copy of the structure
         self._structure = qp.Atoms(sn.static_structure)
@@ -48,6 +63,8 @@ class SOAP(object):
 
         self._soaper = descriptors.Descriptor(" ".join(soap_cmd_line))
 
+        self.verbose = verbose
+
     @property
     def n_dim(self):
         return self._soaper.n_dim
@@ -62,7 +79,7 @@ class SOAP(object):
 
         self._structure.set_cutoff(self._soaper.cutoff())
 
-        for i, pt in enumerate(pts):
+        for i, pt in enumerate(tqdm(pts, desc = "SOAP") if self.verbose else pts):
             # Move tracer
             self._structure.positions[self._tracer_index] = pt
 
@@ -83,7 +100,7 @@ class SOAP(object):
         initial_soap = None
         initial_soap_norm = None
 
-        for i, pt in enumerate(pts):
+        for i, pt in enumerate(tqdm(pts, desc = "SOAP") if self.verbose else pts):
             # Move tracer
             self._structure.positions[self._tracer_index] = pt
 
