@@ -34,13 +34,24 @@ def plot_atoms(atoms, positions = None, hide_species = (), wrap = False, fig = N
                c = [color_for_species(s) for s in species],
                s = [20.0 * ase.data.covalent_radii[ase.data.atomic_numbers[s]] for s in species])
 
-    for cvec in atoms.cell:
-        cvec = np.array([[0, 0, 0], cvec])
+
+    all_cvecs = []
+    whos_left = set(xrange(len(atoms.cell)))
+    for i, cvec1 in enumerate(atoms.cell):
+        all_cvecs.append(np.array([[0.0, 0.0, 0.0], cvec1]))
+        for j, cvec2 in enumerate(atoms.cell[list(whos_left - {i})]):
+            all_cvecs.append(np.array([cvec1, cvec1 + cvec2]))
+    for i, cvec1 in enumerate(atoms.cell):
+        start = np.sum(atoms.cell[list(whos_left - {i})], axis = 0)
+        all_cvecs.append(np.array([start, start + cvec1]))
+
+    for cvec in all_cvecs:
         ax.plot(cvec[:,0],
                 cvec[:,1],
                 cvec[:,2],
                 color = "gray",
                 alpha=0.5,
+                linewidth = 0.5,
                 linestyle="--")
 
     set_axes_equal(ax)
