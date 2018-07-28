@@ -14,11 +14,15 @@ from analysis.util import PBCCalculator
 from analysis.visualization.common import plotter, DEFAULT_COLORS, set_axes_equal, color_for_species
 
 @plotter(is3D = True)
-def plot_atoms(atoms, hide_species = (), wrap = False, fig = None, ax = None, i = None):
+def plot_atoms(atoms, positions = None, hide_species = (), wrap = False, fig = None, ax = None, i = None):
 
     mask = [not (e in hide_species) for e in atoms.get_chemical_symbols()]
 
-    pts = atoms.get_positions()[mask]
+    if positions is None:
+        pts = atoms.get_positions()
+    else:
+        pts = positions
+    pts = pts[mask]
     species = [s for i, s in enumerate(atoms.get_chemical_symbols()) if mask[i]]
 
     if wrap:

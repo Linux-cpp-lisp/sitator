@@ -4,6 +4,8 @@ from builtins import *
 
 import numpy as np
 
+from analysis.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
+
 SITE_UNKNOWN = -1
 
 class SiteTrajectory(object):
@@ -185,3 +187,17 @@ class SiteTrajectory(object):
             }
 
         return res
+
+    @plotter(is3D = True)
+    def plot_frame(self, frame, **kwargs):
+        sites_of_frame = np.unique(self._traj[frame])
+        frame_sn = self._sn[sites_of_frame]
+
+        frame_sn.plot(**kwargs)
+
+        if not self._real_traj is None:
+            mobile_atoms = self._sn.structure.copy()
+            del mobile_atoms[self._sn.static_mask]
+
+            mobile_atoms.positions[:] = self._real_traj[frame, self._sn.mobile_mask]
+            plot_atoms(atoms = mobile_atoms, **kwargs)
