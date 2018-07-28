@@ -33,7 +33,7 @@ cdef class PBCCalculator(object):
     def cell_centroid(self):
       return self._cell_centroid
 
-    cpdef distances(self, pt1, pts2, in_place = False):
+    cpdef distances(self, pt1, pts2, in_place = False, out = None):
         """Compute the Euclidean distances from pt1 to all points in pts2, using
         shift-and-wrap.
 
@@ -56,7 +56,22 @@ cdef class PBCCalculator(object):
         pts2 += offset
         self.wrap_points(pts2)
 
-        return np.linalg.norm(self._cell_centroid - pts2, axis = 1)
+        # Put distance vectors in pts2
+
+        pts2 = -pts2
+        pts2 += self._cell_centroid
+
+        # Square in place
+        pts2 *= pts2
+
+        if out is None:
+            out = np.empty(shape = len(pts2), dtype = pts2.dtype)
+
+        # Sum
+        np.sum(pts2, axis = 1, out = out)
+
+        #return np.linalg.norm(self._cell_centroid - pts2, axis = 1)
+        return np.sqrt(out, out = out)
 
     cpdef average(self, points, weights = None):
         """Average position of a "cloud" of points using the shift-and-wrap hack.
