@@ -110,6 +110,9 @@ class SiteTypeAnalysis(object):
         self._decision_curve = decision_curve
         self._decision_elbow = elbow
 
+        if elbow == 0:
+            raise ValueError("Something went wrong with the decision curve (elbow == 0); try more data.")
+
         # a little less than the minimum in both cases. If that lets any more
         # clusters in, they probably deserved to be anyway.
         density_threshold = np.min(self.dpc.density[decision_curve_sort[:elbow]]) - 0.001
