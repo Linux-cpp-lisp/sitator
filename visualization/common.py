@@ -77,7 +77,7 @@ def grid(*args, **kwargs):
 
     fig = plt.figure(**defaults)
     if is3D:
-        axargs = {'projection' : '3d', aspect : 'equal'}
+        axargs = {'projection' : '3d', 'aspect' : 'equal'}
     else:
         axargs = {}
 

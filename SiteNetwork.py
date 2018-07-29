@@ -141,6 +141,10 @@ class SiteNetwork(object):
             raise ValueError("Wrong # of types %i; expected %i" % (value.shape, len(self._centers)))
         self._types = value
 
+    @property
+    def n_types(self):
+        return len(np.unique(self.site_types))
+
     @plotter(is3D = True)
     def plot(self, **kwargs):
         pts_params = {'points' : self.centers}

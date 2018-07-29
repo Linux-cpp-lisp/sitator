@@ -7,6 +7,9 @@ import numpy as np
 from analysis.util import PBCCalculator
 from analysis.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
 
+import matplotlib
+from matplotlib.collections import LineCollection
+
 SITE_UNKNOWN = -1
 
 class SiteTrajectory(object):
@@ -47,6 +50,8 @@ class SiteTrajectory(object):
         if not self._real_traj is None:
             st.set_real_traj(self._real_traj[key])
 
+        return st
+
     @property
     def traj(self):
         """The underlying trajectory."""
@@ -71,6 +76,13 @@ class SiteTrajectory(object):
     @property
     def site_network(self):
         return self._sn
+
+    @site_network.setter
+    def site_network(self, value):
+        # Captures len, #, and dist.
+        assert np.all(value.mobile_mask == self._sn.mobile_mask)
+        assert np.all(value.static_mask == self._sn.static_mask)
+        self._sn = value
 
     @property
     def real_trajectory(self):
@@ -231,3 +243,66 @@ class SiteTrajectory(object):
             title += " (type %i)" % self._sn.site_types[site]
 
         kwargs['ax'].set_title(title)
+
+    @plotter(is3D = False)
+    def plot_particle_trajectory(self, particle, ax = None, fig = None, **kwargs):
+        types = not self._sn.site_types is None
+        if types:
+            type_height_percent = 0.1
+            type_height = int(type_height_percent * self._sn.n_sites)
+            if type_height == 0:
+                type_height = 1
+            type_offset = int(type_height * 0.5)
+            type_y = -type_offset - type_height
+        # Draw trajectory
+        segments = []
+        linestyles = []
+        colors = []
+
+        traj = self._traj[:, particle]
+        current_value = traj[0]
+        last_value = traj[0]
+        if types:
+            last_type = None
+        current_segment_start = 0
+        puttext = False
+
+        for i, f in enumerate(traj):
+            if f != current_value or i == len(traj) - 1:
+                val = last_value if current_value == -1 else current_value
+                segments.append([[current_segment_start, last_value], [current_segment_start, val], [i, val]])
+                linestyles.append(':' if current_value == -1 else '-')
+                colors.append('lightgray' if current_value == -1 else 'k')
+
+                if types:
+                    rxy = (current_segment_start, type_y)
+                    this_type = self._sn.site_types[val]
+                    typerect = matplotlib.patches.Rectangle(rxy, i - current_segment_start, type_height,
+                                                            color = DEFAULT_COLORS[this_type], linewidth = 0)
+                    ax.add_patch(typerect)
+                    if this_type != last_type:
+                        ax.annotate("T%i" % this_type,
+                                    xy = (rxy[0], rxy[1] + 0.5 * typerect.get_height()),
+                                    xytext = (3, 0),
+                                    textcoords = 'offset points',
+                                    fontsize = 'xx-small',
+                                    va = 'center')
+                    last_type = this_type
+
+                last_value = val
+                current_segment_start = i
+                current_value = f
+
+        lc = LineCollection(segments, linestyles = linestyles, colors = colors, linewidth=1.0)
+        ax.add_collection(lc)
+
+        ax.set_xlabel("Frame")
+        ax.set_ylabel("Atom %i's site" % particle)
+
+        ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+        ax.grid()
+
+        ax.set_xlim((0, self.n_frames - 1))
+        ax.set_ylim(((type_y if types else -0.5), self._sn.n_sites + 1.0))
+
+        ax.axhline(-type_offset, linewidth = 1, color = 'darkgray')
