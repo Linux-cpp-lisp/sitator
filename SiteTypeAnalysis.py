@@ -147,7 +147,7 @@ class SiteTypeAnalysis(object):
             self.winning_vote_percentages[site] = float(votes[winner]) / n_votes
             types[site] = winner
 
-        n_sites_of_each_type = np.bincount(types)
+        n_sites_of_each_type = np.bincount(types, minlength = self.n_types)
         sn.site_types = types
 
         if self.verbose:
