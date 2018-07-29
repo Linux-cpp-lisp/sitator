@@ -53,6 +53,11 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
             lattice_map[lattice_index] = nearest_static_position
 
+        # In normal circumstances, every current static position should be assigned.
+        # Just a sanity check
+        if not np.all(static_positions_seen):
+            raise ValueError("At frame %i, static positions of atoms %s not assigned to lattice positions" % (i, np.where(~static_positions_seen)[0]))
+
 
         for j in xrange(sn.n_mobile):
             mobile_pt = frame[mobile_idexes[j]]
