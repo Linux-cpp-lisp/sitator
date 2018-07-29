@@ -40,7 +40,7 @@ class SiteNetwork(object):
 
         # Set variables
         self._centers = None
-        self._vertices = None # Internally, keep vertices in
+        self._vertices = None
         self._types = None
 
     def copy(self):
@@ -144,6 +144,10 @@ class SiteNetwork(object):
     @property
     def n_types(self):
         return len(np.unique(self.site_types))
+
+    @property
+    def types(self):
+        return np.unique(self.site_types)
 
     @plotter(is3D = True)
     def plot(self, **kwargs):

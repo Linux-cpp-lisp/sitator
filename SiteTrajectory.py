@@ -10,10 +10,10 @@ from analysis.visualization import plotter, plot_atoms, plot_points, layers, DEF
 import matplotlib
 from matplotlib.collections import LineCollection
 
-SITE_UNKNOWN = -1
-
 class SiteTrajectory(object):
     """A trajectory capturing the dynamics of particles through a SiteNetwork."""
+
+    SITE_UNKNOWN = -1
 
     def __init__(self,
                  site_network,
