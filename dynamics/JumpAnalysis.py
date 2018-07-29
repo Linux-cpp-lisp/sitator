@@ -3,7 +3,7 @@ import numpy as np
 import itertools
 
 from analysis import SiteNetwork, SiteTrajectory
-from analysis.visualization import plotter
+from analysis.visualization import plotter, plot_atoms, layers
 
 class JumpAnalysis(object):
     """Given a SiteTrajectory, compute various statistics about the jumps it contains.
@@ -22,7 +22,7 @@ class JumpAnalysis(object):
         np.copyto(last_known, st.traj[0])
         # Everything is at it's first position for at least one frame by definition
         time_at_current = np.ones(shape = n_mobile, dtype = np.int)
-        total_time_spent_at_site = np.empty(shape = st.site_network.n_sites, dtype = np.int)
+        total_time_spent_at_site = np.zeros(shape = st.site_network.n_sites, dtype = np.int)
 
         avg_time_before_jump = np.zeros(shape = (n_sites, n_sites), dtype = np.float)
         avg_time_before_jump_n = np.zeros(shape = avg_time_before_jump.shape, dtype = np.int)
@@ -103,6 +103,19 @@ class JumpAnalysis(object):
 
         return outmat
 
+    def p_ij(self, i, j):
+        p = self.jump_lag[i, j]
+        p /= float(self.total_time_spent_at_site[i])
+        # p is now probability of i->j given i occupied
+        p *= self._st.get_site_occupancies()[i]
+        return p
+
+    def get_P_ij(self):
+        P = self.jump_lag.copy()
+        P /= self.total_time_spent_at_site[:, np.newaxis]
+        P *= self._st.get_site_occupancies()[:, np.newaxis]
+        return P
+
     @plotter(is3D = False)
     def plot_jump_lag(self, mode = 'site', ax = None, fig = None, **kwargs):
         if mode == 'site':
@@ -117,8 +130,8 @@ class JumpAnalysis(object):
         ax.grid()
 
         im = ax.matshow(mat, zorder = 10, cmap = 'plasma')
-        ax.set_xlabel("Site A (from)")
-        ax.set_ylabel("Site B (to)")
+        ax.set_xlabel("Site B (to)")
+        ax.set_ylabel("Site A (from)")
 
         if mode == 'type':
             # Hack from https://stackoverflow.com/questions/3529666/matplotlib-matshow-labels
