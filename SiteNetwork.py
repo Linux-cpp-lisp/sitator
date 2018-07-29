@@ -27,6 +27,9 @@ class SiteNetwork(object):
         assert static_mask.ndim == mobile_mask.ndim == 1, "The masks must be one-dimensional"
         assert len(structure) == len(static_mask) == len(mobile_mask), "The masks must have the same length as the # of atoms in the strucutre."
 
+        # No overlap
+        assert not np.any(static_mask & mobile_mask), "static_mask and mobile_mask cannot overlap."
+
         self.structure = structure
         self.static_mask = static_mask
         self.n_static = np.sum(static_mask)
@@ -35,7 +38,7 @@ class SiteNetwork(object):
 
         # Create static structure
         self.static_structure = structure.copy()
-        del self.static_structure[(~static_mask) & mobile_mask]
+        del self.static_structure[(~static_mask) | mobile_mask]
         assert len(self.static_structure) == self.n_static
 
         # Set variables

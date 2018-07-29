@@ -37,6 +37,8 @@ class SiteTrajectory(object):
             if confidences.shape != particle_assignments.shape:
                 raise ValueError("confidences has wrong shape %s; should be %s" % (confidences.shape, particle_assignments.shape))
             self._confs = confidences
+        else:
+            self._confs = None
 
         self._real_traj = None
 
@@ -210,7 +212,7 @@ class SiteTrajectory(object):
 
         if not self._real_traj is None:
             mobile_atoms = self._sn.structure.copy()
-            del mobile_atoms[self._sn.static_mask]
+            del mobile_atoms[~self._sn.mobile_mask]
 
             mobile_atoms.positions[:] = self._real_traj[frame, self._sn.mobile_mask]
             plot_atoms(atoms = mobile_atoms, **kwargs)
@@ -282,11 +284,12 @@ class SiteTrajectory(object):
                     typeax.add_patch(typerect)
                     if this_type != last_type:
                         typeax.annotate("T%i" % this_type,
-                                    xy = (rxy[0], rxy[1] + 0.5 * typerect.get_height()),
-                                    xytext = (3, 0),
+                                    xy = (rxy[0], rxy[1] + 0.5 * type_height),
+                                    xytext = (3, -1),
                                     textcoords = 'offset points',
                                     fontsize = 'xx-small',
-                                    va = 'center')
+                                    va = 'center',
+                                    fontweight = 'bold')
                     last_type = this_type
 
                 last_value = val
@@ -300,7 +303,7 @@ class SiteTrajectory(object):
             typeax.set_xlabel("Frame")
             ax.tick_params(axis = 'x', which = 'both', bottom = False, top = False, labelbottom = False)
             typeax.tick_params(axis = 'y', which = 'both', left = False, right = False, labelleft = False)
-            typeax.annotate("Type", xy = (0, 0.5), xytext = (-25, 0), xycoords = 'axes fraction', textcoords = 'offset points', va = 'center', fontsize = 'smaller')
+            typeax.annotate("Type", xy = (0, 0.5), xytext = (-25, 0), xycoords = 'axes fraction', textcoords = 'offset points', va = 'center', fontsize = 'x-small')
         else:
             ax.set_xlabel("Frame")
         ax.set_ylabel("Atom %i's site" % particle)
