@@ -67,13 +67,20 @@ def layers(*args, **fax):
 def grid(*args, **kwargs):
     defaults = {
         'is3D' : True,
-        'figsize' : (8, 6)
+        'figsize' : (8, 6),
+        'sharex' : False,
+        'sharey' : False
     }
 
     defaults.update(kwargs)
 
     is3D = defaults['is3D']
     del defaults['is3D']
+
+    sharex = defaults['sharex']
+    sharey = defaults['sharey']
+    del defaults['sharex']
+    del defaults['sharey']
 
     fig = plt.figure(**defaults)
     if is3D:
@@ -84,15 +91,18 @@ def grid(*args, **kwargs):
     nrows = len(args)
     ncols = max(len(row) for row in args)
 
+    ax = None
+    xax = None
+    yax = None
     for i, row in enumerate(args):
         for j, p in enumerate(row):
-            ax = fig.add_subplot(nrows, ncols, i * ncols + j + 1, **axargs)
+            if sharex: xax = ax
+            if sharey: yax = ax
+            ax = fig.add_subplot(nrows, ncols, i * ncols + j + 1, sharex = xax, sharey = yax, **axargs)
             if isinstance(p, tuple):
                 p[0](fig = fig, ax = ax, i = 0, **p[1])
             else:
                 p(fig = fig, ax = ax, i = 0)
-
-    fig.tight_layout()
 
     return fig
 

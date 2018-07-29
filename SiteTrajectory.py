@@ -249,11 +249,11 @@ class SiteTrajectory(object):
         types = not self._sn.site_types is None
         if types:
             type_height_percent = 0.1
-            type_height = int(type_height_percent * self._sn.n_sites)
-            if type_height == 0:
-                type_height = 1
-            type_offset = int(type_height * 0.5)
-            type_y = -type_offset - type_height
+            axpos = ax.get_position()
+            typeax_height = type_height_percent * axpos.height
+            typeax = fig.add_axes([axpos.x0, axpos.y0, axpos.width, typeax_height], sharex = ax)
+            ax.set_position([axpos.x0, axpos.y0 + typeax_height, axpos.width, axpos.height - typeax_height])
+            type_height = 1
         # Draw trajectory
         segments = []
         linestyles = []
@@ -275,13 +275,13 @@ class SiteTrajectory(object):
                 colors.append('lightgray' if current_value == -1 else 'k')
 
                 if types:
-                    rxy = (current_segment_start, type_y)
+                    rxy = (current_segment_start, 0)
                     this_type = self._sn.site_types[val]
                     typerect = matplotlib.patches.Rectangle(rxy, i - current_segment_start, type_height,
                                                             color = DEFAULT_COLORS[this_type], linewidth = 0)
-                    ax.add_patch(typerect)
+                    typeax.add_patch(typerect)
                     if this_type != last_type:
-                        ax.annotate("T%i" % this_type,
+                        typeax.annotate("T%i" % this_type,
                                     xy = (rxy[0], rxy[1] + 0.5 * typerect.get_height()),
                                     xytext = (3, 0),
                                     textcoords = 'offset points',
@@ -293,16 +293,26 @@ class SiteTrajectory(object):
                 current_segment_start = i
                 current_value = f
 
-        lc = LineCollection(segments, linestyles = linestyles, colors = colors, linewidth=1.0)
+        lc = LineCollection(segments, linestyles = linestyles, colors = colors, linewidth=1.5)
         ax.add_collection(lc)
 
-        ax.set_xlabel("Frame")
+        if types:
+            typeax.set_xlabel("Frame")
+            ax.tick_params(axis = 'x', which = 'both', bottom = False, top = False, labelbottom = False)
+            typeax.tick_params(axis = 'y', which = 'both', left = False, right = False, labelleft = False)
+            typeax.annotate("Type", xy = (0, 0.5), xytext = (-25, 0), xycoords = 'axes fraction', textcoords = 'offset points', va = 'center', fontsize = 'smaller')
+        else:
+            ax.set_xlabel("Frame")
         ax.set_ylabel("Atom %i's site" % particle)
 
         ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
         ax.grid()
 
         ax.set_xlim((0, self.n_frames - 1))
-        ax.set_ylim(((type_y if types else -0.5), self._sn.n_sites + 1.0))
+        margin_percent = 0.04
+        ymargin = (margin_percent * self._sn.n_sites)
+        ax.set_ylim((-ymargin, self._sn.n_sites - 1.0 + ymargin))
 
-        ax.axhline(-type_offset, linewidth = 1, color = 'darkgray')
+        if types:
+            typeax.set_xlim((0, self.n_frames - 1))
+            typeax.set_ylim((0, type_height))
