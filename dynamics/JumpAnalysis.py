@@ -12,6 +12,8 @@ class JumpAnalysis(object):
         self.verbose = verbose
 
     def run(self, st):
+        assert isinstance(st, SiteTrajectory)
+
         self._st = st
 
         n_mobile = st.site_network.n_mobile
