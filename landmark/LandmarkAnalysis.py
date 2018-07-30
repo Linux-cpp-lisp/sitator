@@ -44,7 +44,8 @@ class LandmarkAnalysis(object):
                  peak_evening = 'none',
                  weighted_site_positions = True,
                  check_for_zero_landmarks = True,
-                 static_movement_threshold = 0.5,
+                 static_movement_threshold = 1.0,
+                 max_mobile_per_site = 1,
                  verbose = True):
         """
         :param double cutoff: The distance cutoff for the landmark vectors. (unitless)
@@ -60,6 +61,18 @@ class LandmarkAnalysis(object):
             to weight the average by assignment confidence.
         :param bool check_for_zero_landmarks: Whether to check for and raise exceptions
             when all-zero landmark vectors are computed.
+        :param float static_movement_threshold: (Angstrom) the maximum allowed
+            distance between an instantanous static atom position and it's ideal position.
+        :param int max_mobile_per_site: The maximum number of mobile atoms that can
+            be assigned to a single site without throwing an error. Regardless of the
+            value, assignments of more than one mobile atom to a single site will
+            be recorded and reported.
+
+            Setting this to 2 can be necessary for very diffusive, liquid-like
+            materials at high temperatures.
+
+            Statistics related to this are reported in self.avg_mobile_per_site
+            and self.n_multiple_assignments.
         :param bool verbose: If `True`, progress bars and messages will be printed to stdout.
         """
 
@@ -81,6 +94,7 @@ class LandmarkAnalysis(object):
         self._landmark_dimension = None
 
         self.static_movement_threshold = static_movement_threshold
+        self.max_mobile_per_site = max_mobile_per_site
 
         self._has_run = False
 
@@ -179,11 +193,20 @@ class LandmarkAnalysis(object):
 
         # Check that multiple particles are never assigned to one site at the
         # same time, cause that would be wrong.
+        n_more_than_ones = 0
+        avg_mobile_per_site = 0
+        divisor = 0
         for frame_i, site_frame in enumerate(lmk_lbls):
             _, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
-            count_msk = counts > 1
+            count_msk = counts > self.max_mobile_per_site
             if np.any(count_msk):
                 raise ValueError("%i mobile particles were assigned to only %i site(s) (%s) at frame %i." % (np.sum(counts[count_msk]), np.sum(count_msk), np.where(count_msk)[0], frame_i))
+            n_more_than_ones += np.sum(counts > 1)
+            avg_mobile_per_site += np.sum(counts)
+            divisor += len(counts)
+
+        self.n_multiple_assignments = n_more_than_ones
+        self.avg_mobile_per_site = avg_mobile_per_site / float(divisor)
 
         # -- Do output
         # - Compute site centers
