@@ -18,9 +18,10 @@ class VoronoiSiteGenerator(object):
         """SiteNetwork -> SiteNetwork"""
         assert isinstance(sn, SiteNetwork)
 
-        nodes, verts, edges, _ = self._zeopy.voronoi(sn.static_structure,
-                                                    radial = self._radial,
-                                                    verbose = self._verbose)
+        with self._zeopy:
+            nodes, verts, edges, _ = self._zeopy.voronoi(sn.static_structure,
+                                                        radial = self._radial,
+                                                        verbose = self._verbose)
 
         out = sn.copy()
         out.centers = nodes

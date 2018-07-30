@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division,
 import os
 import tempfile
 import subprocess
+import shutil
 
 import re
 
@@ -31,12 +32,21 @@ class Zeopy(object):
         :param str path_to_zeo: Path to the `network` executable.
         """
         self._exe = path_to_zeo
+        self._tmpdir = None
+
+    def __enter__(self):
         self._tmpdir = tempfile.mkdtemp()
+
+    def __exit__(self, *args):
+        shutil.rmtree(self._tmpdir)
 
     def voronoi(self, structure, radial = False, verbose=True):
         """
         :param Atoms structure: The ASE Atoms to compute the Voronoi decomposition of.
         """
+
+        if self._tmpdir is None:
+            raise ValueError("Cannot use Zeopy outside with statement")
 
         inp = os.path.join(self._tmpdir, "in.cif")
         outp = os.path.join(self._tmpdir, "out.nt2")
