@@ -91,10 +91,11 @@ class JumpAnalysis(object):
 
         n_types = self._st.site_network.n_types
         site_types = self._st.site_network.site_types
+        all_types = self._st.site_network.types
         outmat = np.empty(shape = (n_types, n_types), dtype = self.jump_lag.dtype)
 
-        for stype_from, stype_to in itertools.product(self._st.site_network.types, repeat = 2):
-            lags = self.jump_lag[site_types == stype_from][:, site_types == stype_to]
+        for stype_from, stype_to in itertools.product(xrange(len(all_types)), repeat = 2):
+            lags = self.jump_lag[site_types == all_types[stype_from]][:, site_types == all_types[stype_to]]
             # Only take things that aren't inf
             lags = lags[lags < np.inf]
             # If there aren't any, then avg is inf
