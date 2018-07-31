@@ -45,6 +45,7 @@ class LandmarkAnalysis(object):
                  weighted_site_positions = True,
                  check_for_zero_landmarks = True,
                  static_movement_threshold = 1.0,
+                 dynamic_lattice_mapping = False,
                  max_mobile_per_site = 1,
                  verbose = True):
         """
@@ -63,6 +64,15 @@ class LandmarkAnalysis(object):
             when all-zero landmark vectors are computed.
         :param float static_movement_threshold: (Angstrom) the maximum allowed
             distance between an instantanous static atom position and it's ideal position.
+        :param bool dynamic_lattice_mapping: Whether to dynamically decide each
+            frame which static atom represents each average lattice position;
+            this allows the LandmarkAnalysis to deal with, say, a rare exchage of
+            two static atoms that does not change the structure of the lattice.
+
+            It does NOT allow LandmarkAnalysis to deal with lattices whose structures
+            actually change over the course of the trajectory.
+
+            In certain cases this is better delt with by MergeSitesByDynamics.
         :param int max_mobile_per_site: The maximum number of mobile atoms that can
             be assigned to a single site without throwing an error. Regardless of the
             value, assignments of more than one mobile atom to a single site will
@@ -89,6 +99,7 @@ class LandmarkAnalysis(object):
         self.verbose = verbose
         self.check_for_zero_landmarks = check_for_zero_landmarks
         self.weighted_site_positions = weighted_site_positions
+        self.dynamic_lattice_mapping = dynamic_lattice_mapping
 
         self._landmark_vectors = None
         self._landmark_dimension = None

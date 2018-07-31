@@ -23,7 +23,12 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
     mobile_idexes = np.where(sn.mobile_mask)[0]
 
-    lattice_map = np.empty(shape = sn.n_static, dtype = np.int)
+    if self.dynamic_lattice_mapping:
+        lattice_map = np.empty(shape = sn.n_static, dtype = np.int)
+    else:
+        # Otherwise just map to themselves
+        lattice_map = np.arange(sn.n_static, dtype = np.int)
+
     lattice_pt = np.empty(shape = 3, dtype = sn.static_structure.positions.dtype)
     lattice_pt_dists = np.empty(shape = sn.n_static, dtype = np.float)
     static_positions_seen = np.empty(shape = sn.n_static, dtype = np.bool)
@@ -34,12 +39,17 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
     for i, frame in enumerate(tqdm(frames, desc = "Frame")):
 
         static_positions = frame[sn.static_mask]
-        static_positions_seen.fill(False)
+
         # Every frame, update the lattice map
+        static_positions_seen.fill(False)
+
         for lattice_index in xrange(sn.n_static):
             lattice_pt = sn.static_structure.positions[lattice_index]
             pbcc.distances(lattice_pt, static_positions, out = lattice_pt_dists)
-            nearest_static_position = np.argmin(lattice_pt_dists)
+            if self.dynamic_lattice_mapping:
+                nearest_static_position = np.argmin(lattice_pt_dists)
+            else:
+                nearest_static_position = lattice_index
 
             if static_positions_seen[nearest_static_position]:
                 # We've already seen this one... error
@@ -51,7 +61,8 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
             if lattice_pt_dists[nearest_static_position] > self.static_movement_threshold:
                 raise ValueError("No static atom position within %f A threshold of static lattice position %i" % (self.static_movement_threshold, lattice_index))
 
-            lattice_map[lattice_index] = nearest_static_position
+            if self.dynamic_lattice_mapping:
+                lattice_map[lattice_index] = nearest_static_position
 
         # In normal circumstances, every current static position should be assigned.
         # Just a sanity check
