@@ -16,6 +16,9 @@ class JumpAnalysis(object):
 
         self._st = st
 
+        if self.verbose:
+            print "Running JumpAnalysis..."
+
         n_mobile = st.site_network.n_mobile
         n_frames = st.n_frames
         n_sites = st.site_network.n_sites
@@ -30,6 +33,8 @@ class JumpAnalysis(object):
         avg_time_before_jump_n = np.zeros(shape = avg_time_before_jump.shape, dtype = np.int)
         total_jumps_frame = np.empty(shape = n_frames, dtype = np.int)
 
+        n_ij = np.zeros(shape = (n_sites, n_sites), dtype = np.float)
+
         framebuf = np.empty(shape = st.traj.shape[1:], dtype = st.traj.dtype)
 
         n_problems = 0
@@ -43,14 +48,19 @@ class JumpAnalysis(object):
             unassigned = frame == SiteTrajectory.SITE_UNKNOWN
             # Reassign unassigned
             frame[unassigned] = last_known[unassigned]
+            fknown = frame >= 0
 
+            if np.any(~fknown) and self.verbose:
+                print "  at frame %i, %i uncorrectable unassigned particles" % (i, np.sum(~fknown))
             # -- Update stats
-            total_time_spent_at_site[frame] += 1
+            total_time_spent_at_site[frame[fknown]] += 1
 
-            jumped = frame != last_known
+            jumped = (frame != last_known) & fknown
             problems = last_known[jumped] == -1
             jumped[np.where(jumped)[0][problems]] = False
             n_problems += np.sum(problems)
+
+            n_ij[frame[fknown], last_known[fknown]] += 1
 
             # Record number of jumps this frame
             total_jumps_frame[i] = np.sum(jumped)
@@ -83,6 +93,7 @@ class JumpAnalysis(object):
 
         self.jump_lag = avg_time_before_jump
         self.total_time_spent_at_site = total_time_spent_at_site
+        self.n_ij = n_ij
 
     @property
     def jump_lag_by_type(self):
@@ -105,19 +116,6 @@ class JumpAnalysis(object):
                 outmat[stype_from, stype_to] = np.mean(lags)
 
         return outmat
-
-    def p_ij(self, i, j):
-        p = self.jump_lag[i, j]
-        p /= float(self.total_time_spent_at_site[i])
-        # p is now probability of i->j given i occupied
-        p *= self._st.get_site_occupancies()[i]
-        return p
-
-    def get_P_ij(self):
-        P = self.jump_lag.copy()
-        P /= self.total_time_spent_at_site[:, np.newaxis]
-        P *= self._st.get_site_occupancies()[:, np.newaxis]
-        return P
 
     @plotter(is3D = False)
     def plot_jump_lag(self, mode = 'site', ax = None, fig = None, **kwargs):
