@@ -69,7 +69,7 @@ class MergeSitesByDynamics(object):
 
             # Check distances
             dists = pbcc.distances(to_merge[0], to_merge[1:])
-            assert np.all(dists < self.distance_threshold), "Markov clustering tried to merge sites more than %f apart" % self.distance_threshold
+            assert np.all(dists < self.distance_threshold), "Markov clustering tried to merge sites more than %f apart -- this may be valid, and the distance threshold may need to be increased." % self.distance_threshold
 
             # New site center
             new_centers[newsite] = pbcc.average(to_merge)
