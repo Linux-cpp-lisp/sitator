@@ -4,23 +4,20 @@ from analysis import SiteNetwork, SiteTrajectory
 from analysis.dynamics import JumpAnalysis
 from analysis.util import PBCCalculator
 
-from scipy.sparse.csgraph import connected_components
+import markov_clustering
 
 class MergeSitesByDynamics(object):
     """Merges sites using dynamical data.
 
-    Given a SiteTrajectory, merges groups sites between which jumps happen
-    "faster" than some threshold.
+    Given a SiteTrajectory, merges sites using Markov Clustering.
 
-    :params int threshold: in frames.
     :param float distance_threshold: Will never merge sites further than this
         in real space. Angstrom.
     :param bool check_types: If True, only sites of the same type are candidates to
         be merged; if false, type information is ignored. Merged sites will only
         be assigned types if this is True.
     """
-    def __init__(self, threshold, distance_threshold = 1.0, check_types = True, verbose = True):
-        self.threshold = threshold
+    def __init__(self, distance_threshold = 1.0, check_types = True, verbose = True):
         self.verbose = verbose
         self.distance_threshold = distance_threshold
         self.check_types = check_types
@@ -35,49 +32,49 @@ class MergeSitesByDynamics(object):
         ja = JumpAnalysis(verbose = self.verbose)
         ja.run(st)
 
-        # Construct thresholded connectivity matrix
         pbcc = PBCCalculator(st.site_network.structure.cell)
-
         site_centers = st.site_network.centers
         if self.check_types:
             site_types = st.site_network.site_types
 
-        connectivity_matrix = ja.jump_lag < self.threshold
-        from_sites, to_sites = np.where(connectivity_matrix)
+        #connectivity_matrix = ja.n_ij
+        connectivity_matrix = ja.n_ij / ja.total_time_spent_at_site
+        assert st.site_network.n_sites == connectivity_matrix.shape[0]
 
-        distbuf = np.empty(shape = 1, dtype = np.float)
+        m1 = markov_clustering.run_mcl(connectivity_matrix,
+                                       loop_value = 0) # Don't set new loop values
+        clusters = markov_clustering.get_clusters(m1)
+        new_n_sites = len(clusters)
 
-        for from_site, to_site in zip(from_sites, to_sites):
-            if self.check_types and site_types[from_site] != site_types[to_site]:
-                connectivity_matrix[from_site, to_site] = False
-                continue # short circut around the distance computation for a little performance
-
-            pbcc.distances(site_centers[from_site], site_centers[to_site:to_site + 1], out = distbuf)
-            if distbuf[0] >= self.distance_threshold:
-                connectivity_matrix[from_site, to_site] = False
-
-        # Get strongly connected components
-        # If the jump rates aren't symmetric -- i.e. components aren't strongly
-        # connected -- they are perhaps physically distinct, but one is simply
-        # very unfavorable compared to the other.
-        new_n_sites, merge_membership = connected_components(connectivity_matrix,
-                                                            directed = True,
-                                                            connection = 'strong')
         if self.verbose:
             print "After merge there will be %i sites" % new_n_sites
-
 
         if self.check_types:
             new_types = np.empty(shape = new_n_sites, dtype = np.int)
 
-        assert st.site_network.n_sites == len(merge_membership) == connectivity_matrix.shape[0]
-
         new_centers = np.empty(shape = (new_n_sites, 3), dtype = st.site_network.centers.dtype)
+        translation = np.empty(shape = st.site_network.n_sites, dtype = np.int)
+        translation.fill(-1)
 
         for newsite in xrange(new_n_sites):
-            mask = merge_membership == newsite
-            new_centers[newsite] = pbcc.average(site_centers[mask])
+            mask = list(clusters[newsite])
+            # Update translation table
+            if np.any(translation[mask] != -1):
+                # We've assigned a different cluster for this before... weird
+                # degeneracy
+                raise ValueError("Markov clustering tried to merge site(s) into more than one new site")
+            translation[mask] = newsite
+
+            to_merge = site_centers[mask]
+
+            # Check distances
+            dists = pbcc.distances(to_merge[0], to_merge[1:])
+            assert np.all(dists < self.distance_threshold), "Markov clustering tried to merge sites more than %f apart" % self.distance_threshold
+
+            # New site center
+            new_centers[newsite] = pbcc.average(to_merge)
             if self.check_types:
+                assert np.all(site_types[mask] == site_types[mask][0])
                 new_types[newsite] = site_types[mask][0]
 
         newsn = st.site_network.copy()
@@ -85,7 +82,7 @@ class MergeSitesByDynamics(object):
         if self.check_types:
             newsn.site_types = new_types
 
-        newtraj = merge_membership[st._traj]
+        newtraj = translation[st._traj]
         newtraj[st._traj == SiteTrajectory.SITE_UNKNOWN] = SiteTrajectory.SITE_UNKNOWN
 
         # It doesn't make sense to propagate confidence information through a
