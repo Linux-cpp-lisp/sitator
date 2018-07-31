@@ -79,7 +79,7 @@ class SiteTypeAnalysis(object):
 
         if pca_dvecs.shape[1] < self.min_pca_dimensions:
             if self.verbose:
-                print("     PCA accounted for %i%% variance in only %i dimensions; less than minimum of %i." % (100.0 * np.sum(self.pca.explained_variance_ratio_), pca_dvecs.shape[1], self.min_pca_dimensions))
+                print("     PCA accounted for %.0f%% variance in only %i dimensions; less than minimum of %.0f." % (100.0 * np.sum(self.pca.explained_variance_ratio_), pca_dvecs.shape[1], self.min_pca_dimensions))
                 print("     Forcing PCA to use %i dimensions." % self.min_pca_dimensions)
                 self.pca = PCA(n_components = self.min_pca_dimensions)
                 pca_dvecs = self.pca.fit_transform(self.dvecs)
@@ -87,7 +87,7 @@ class SiteTypeAnalysis(object):
         self.dvecs = pca_dvecs
 
         if self.verbose:
-            print("     Accounted for %i%% of variance in %i dimensions" % (100.0 * np.sum(self.pca.explained_variance_ratio_), self.dvecs.shape[1]))
+            print("     Accounted for %.0f%% of variance in %i dimensions" % (100.0 * np.sum(self.pca.explained_variance_ratio_), self.dvecs.shape[1]))
 
         # -- Do clustering
         # pydpc requires a C-contiguous array
