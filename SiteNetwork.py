@@ -179,6 +179,9 @@ class SiteNetwork(object):
     def edge_attributes(self):
         return self._edge_attrs.keys()
 
+    def has_attribute(self, attr):
+        return (attr in self._site_attrs) or (attr in self._edge_attrs)
+
     def __getattr__(self, attrkey):
         if attrkey in self._site_attrs:
             return self._site_attrs[attrkey]
