@@ -88,8 +88,8 @@ class SiteNetwork(object):
             view = self._site_attrs[site_attr][key]
             sn.add_site_attribute(site_attr, view)
 
-        for edge_attr in self._site_attrs:
-            oldmat = self._site_attrs[site_attr]
+        for edge_attr in self._edge_attrs:
+            oldmat = self._edge_attrs[edge_attr]
             newmat = oldmat[key][:, key]
             sn.add_edge_attribute(edge_attr, newmat)
 
@@ -123,9 +123,21 @@ class SiteNetwork(object):
 
     @centers.setter
     def centers(self, value):
-        self._centers = value
+        if value.shape[1] != 3:
+            raise ValueError("`centers` must be a list of points")
+        # We reset everything else too, since new centers imply everything changed
         self._vertices = None
         self._types = None
+        self._site_attrs = {}
+        self._edge_attrs = {}
+        # Set centers
+        self._centers = value
+
+    def update_centers(self, newcenters):
+        """Update the SiteNetwork's centers *without* reseting all other information."""
+        if newcenters.shape != self._centers.shape:
+            raise ValueError("New `centers` must have same shape as old; try using the setter `.centers = ...`")
+        self._centers = newcenters
 
     @property
     def vertices(self):

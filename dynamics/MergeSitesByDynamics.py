@@ -37,8 +37,7 @@ class MergeSitesByDynamics(object):
         if self.check_types:
             site_types = st.site_network.site_types
 
-        #connectivity_matrix = ja.n_ij
-        connectivity_matrix = ja.n_ij / ja.total_time_spent_at_site
+        connectivity_matrix = st.site_network.p_ij
         assert st.site_network.n_sites == connectivity_matrix.shape[0]
 
         m1 = markov_clustering.run_mcl(connectivity_matrix,

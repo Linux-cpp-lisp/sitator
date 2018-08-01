@@ -7,14 +7,24 @@ from analysis.visualization import plotter, plot_atoms, layers
 
 class JumpAnalysis(object):
     """Given a SiteTrajectory, compute various statistics about the jumps it contains.
+
+    Adds these edge attributes to the SiteTrajectory's SiteNetwork:
+     - `n_ij`: total number of jumps from i to j.
+     - `p_ij`: being at i, the probability of jumping to j.
+     - `jump_lag`: The average number of frames a particle spends at i before jumping
+        to j. Can be +inf if no such jumps every occur.
+    And these site attributes:
+     - `residence_times`: Avg. number of frames a particle spends at a site before jumping.
     """
     def __init__(self, verbose = True):
         self.verbose = verbose
 
     def run(self, st):
-        assert isinstance(st, SiteTrajectory)
+        """Run the analysis.
 
-        self._st = st
+        Adds edge attributes to st's SiteNetwork and returns st.
+        """
+        assert isinstance(st, SiteTrajectory)
 
         if self.verbose:
             print "Running JumpAnalysis..."
@@ -91,22 +101,35 @@ class JumpAnalysis(object):
         # Do mean
         avg_time_before_jump[msk] /= avg_time_before_jump_n[msk]
 
-        self.jump_lag = avg_time_before_jump
-        self.total_time_spent_at_site = total_time_spent_at_site
-        self.n_ij = n_ij
+        st.site_network.add_edge_attribute('jump_lag', avg_time_before_jump)
+        st.site_network.add_edge_attribute('n_ij', n_ij)
+        st.site_network.add_edge_attribute('p_ij', n_ij / total_time_spent_at_site)
 
-    @property
-    def jump_lag_by_type(self):
-        if self._st.site_network.site_types is None:
-            raise ValueError("Associated SiteTrajectory's SiteNetwork has no type information.")
+        res_times = np.empty(shape = n_sites, dtype = np.float)
+        for site in xrange(n_sites):
+            times = avg_time_before_jump[site]
+            noninf = times < np.inf
+            if np.any(noninf):
+                res_times[site] = np.mean(times[noninf])
+            else:
+                res_times[site] = np.inf
+        st.site_network.add_site_attribute('residence_times', res_times)
 
-        n_types = self._st.site_network.n_types
-        site_types = self._st.site_network.site_types
-        all_types = self._st.site_network.types
-        outmat = np.empty(shape = (n_types, n_types), dtype = self.jump_lag.dtype)
+        return st
+
+    def jump_lag_by_type(self, sn):
+        """Given a SiteNetwork with jump_lag info, compute it's jump_lag_by_type"""
+
+        if sn.site_types is None:
+            raise ValueError("SiteNetwork has no type information.")
+
+        n_types = sn.n_types
+        site_types = sn.site_types
+        all_types = sn.types
+        outmat = np.empty(shape = (n_types, n_types), dtype = sn.jump_lag.dtype)
 
         for stype_from, stype_to in itertools.product(xrange(len(all_types)), repeat = 2):
-            lags = self.jump_lag[site_types == all_types[stype_from]][:, site_types == all_types[stype_to]]
+            lags = sn.jump_lag[site_types == all_types[stype_from]][:, site_types == all_types[stype_to]]
             # Only take things that aren't inf
             lags = lags[lags < np.inf]
             # If there aren't any, then avg is inf
@@ -118,11 +141,11 @@ class JumpAnalysis(object):
         return outmat
 
     @plotter(is3D = False)
-    def plot_jump_lag(self, mode = 'site', ax = None, fig = None, **kwargs):
+    def plot_jump_lag(self, sn, mode = 'site', ax = None, fig = None, **kwargs):
         if mode == 'site':
-            mat = self.jump_lag
+            mat = sn.jump_lag
         elif mode == 'type':
-            mat = self.jump_lag_by_type
+            mat = self.jump_lag_by_type(sn)
         else:
             raise ValueError("`%s` is invalid mode" % mode)
 
@@ -136,7 +159,7 @@ class JumpAnalysis(object):
 
         if mode == 'type':
             # Hack from https://stackoverflow.com/questions/3529666/matplotlib-matshow-labels
-            lbls = [''] + ["Type %i" % t for t in self._st.site_network.types]
+            lbls = [''] + ["Type %i" % t for t in sn.types]
             ax.set_xticklabels(lbls)
             ax.set_yticklabels(lbls)
 

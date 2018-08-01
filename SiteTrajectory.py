@@ -131,8 +131,11 @@ class SiteTrajectory(object):
         else:
             return pts
 
-    def get_site_occupancies(self):
-        return np.true_divide(np.bincount(self._traj[self._traj >= 0]), self.n_frames)
+    def compute_site_occupancies(self):
+        """Computes site occupancies and adds site attribute `occupancies` to site_network."""
+        occ = np.true_divide(np.bincount(self._traj[self._traj >= 0]), self.n_frames)
+        self.site_network.add_site_attribute('occupancies', occ)
+        return occ
 
     def assign_to_last_known_site(self, frame_threshold = 1, verbose = True):
         """Assign unassigned mobile particles to their last known site within

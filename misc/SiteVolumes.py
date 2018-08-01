@@ -7,11 +7,14 @@ from analysis import SiteTrajectory
 from analysis.util import PBCCalculator
 
 class SiteVolumes(object):
-    """Computes the volumes of convex hulls around all positions associated with a site."""
+    """Computes the volumes of convex hulls around all positions associated with a site.
+
+    Adds the `site_volumes` and `site_surface_areas` attributes to the SiteNetwork.
+    """
     def __init__(self, n_recenterings = 8):
         self.n_recenterings = n_recenterings
 
-    def compute(self, st):
+    def run(self, st):
         vols = np.empty(shape = st.site_network.n_sites, dtype = np.float)
         areas = np.empty(shape = st.site_network.n_sites, dtype = np.float)
 
@@ -45,4 +48,5 @@ class SiteVolumes(object):
             vols[site] = vol
             areas[site] = area
 
-        return vols, areas
+        st.site_network.add_site_attribute('site_volumes', vols)
+        st.site_network.add_site_attribute('site_surface_areas', areas)
