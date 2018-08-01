@@ -39,8 +39,9 @@ class SiteNetworkPlotter(object):
                 edge_mappings = {},
                 markers = DEFAULT_MARKERS,
                 plot_points_params = {},
-                max_linewidth = 4,
-                max_edge_alpha = 0.75,
+                minmax_linewidth = (1, 6),
+                minmax_edge_alpha = (0.1, 0.75),
+                minmax_markersize = (1.0, 2.0),
                 min_color_threshold = 0.01,
                 min_width_threshold = 0.01,
                 title = ""):
@@ -49,8 +50,10 @@ class SiteNetworkPlotter(object):
         self.markers = markers
         self.plot_points_params = plot_points_params
 
-        self.max_linewidth = max_linewidth
-        self.max_edge_alpha = max_edge_alpha
+        self.minmax_linewidth = minmax_linewidth
+        self.minmax_edge_alpha = minmax_edge_alpha
+        self.minmax_markersize = minmax_markersize
+
         self.min_color_threshold = min_color_threshold
         self.min_width_threshold = min_width_threshold
 
@@ -69,7 +72,7 @@ class SiteNetworkPlotter(object):
 
     def _site_layers(self, sn, plot_points_params):
         pts_arrays = {'points' : sn.centers}
-        pts_params = {}
+        pts_params = {'cmap' : 'YlOrRd'}
 
         # -- Apply mapping
         # - other mappings
@@ -81,8 +84,14 @@ class SiteNetworkPlotter(object):
                 markers = val
             elif key == 'color':
                 pts_arrays['c'] = val
+                pts_params['norm'] = matplotlib.colors.Normalize(vmin = np.min(val), vmax = np.max(val))
             elif key == 'size':
-                pts_arrays['s'] = val
+                s = val.copy()
+                s += np.min(s)
+                s /= np.max(s)
+                s *= self.minmax_markersize[1]
+                s += self.minmax_markersize[0]
+                pts_arrays['s'] = s
             else:
                 raise KeyError("Unknown mapping `%s`" % key)
         # - markers first
@@ -148,12 +157,10 @@ class SiteNetworkPlotter(object):
         diag_mask = np.ones(shape = all_cs.shape, dtype = np.bool)
         np.fill_diagonal(diag_mask, False)
 
-        all_cs += np.min(all_cs[diag_mask])
-        all_cs /= np.max(all_cs[diag_mask])
+        self._normalize(all_cs, diag_mask)
 
         if do_widths:
-            all_linewidths += np.min(all_linewidths[diag_mask])
-            all_linewidths /= np.max(all_linewidths[diag_mask])
+            self._normalize(all_linewidths, diag_mask)
 
         # -- Construct Line3DCollection segments
 
@@ -210,28 +217,43 @@ class SiteNetworkPlotter(object):
 
         # -- Construct final Line3DCollection
         assert len(cs) == len(segments)
-        print(np.max(cs))
-        print(np.max(linewidths))
-        lccolors = np.empty(shape = (len(cs), 4), dtype = np.float)
-        lccolors[:] = [0.0, 0.1, 1.0, 0.0]
-        lccolors[:,3] = np.array(cs) * self.max_edge_alpha
+        if len(cs) > 0:
+            lccolors = np.empty(shape = (len(cs), 4), dtype = np.float)
+            lccolors[:] = [0.0, 0.1, 1.0, 0.0]
+            lccolors[:,3] = np.array(cs) * self.minmax_edge_alpha[1]
+            lccolors[:,3] += self.minmax_edge_alpha[0]
 
-        if do_widths:
-            linewidths = np.asarray(linewidths)
-            linewidths *= self.max_linewidth
+            if do_widths:
+                linewidths = np.asarray(linewidths)
+                linewidths *= self.minmax_linewidth[1]
+                linewidths += self.minmax_linewidth[0]
+            else:
+                linewidths = self.minmax_linewidth[1] * 0.5
+
+            lc = Line3DCollection(segments, linewidths = linewidths, colors = lccolors, zorder = -20)
+            ax.add_collection(lc)
+
+            # -- Plot new sites
+            sn2 = sn[sites_to_plot]
+            sn2.update_centers(np.asarray(sites_to_plot_positions))
+
+            pts_params = dict(self.plot_points_params)
+            pts_params['alpha'] = 0.2
+            return self._site_layers(sn2, pts_params)
         else:
-            linewidths = self.max_linewidth * 0.5
+            return []
 
-        lc = Line3DCollection(segments, linewidths = linewidths, colors = lccolors, zorder = -20)
-        ax.add_collection(lc)
+    def _normalize(self, arr, mask, threshold = 0.001):
+        msked = arr[mask]
 
-        # -- Plot new sites
-        sn2 = sn[sites_to_plot]
-        sn2._centers[:] = sites_to_plot_positions
+        min = np.min(msked)
+        max = np.max(msked)
 
-        pts_params = dict(self.plot_points_params)
-        pts_params['alpha'] = 0.2
-        return self._site_layers(sn2, pts_params)
+        if max - min < threshold:
+            return None
+        else:
+            arr += min
+            arr /= min + max
 
     def _make_discrete(self, arr):
         return np.round(arr).astype(np.int)
