@@ -15,6 +15,8 @@ class JumpAnalysis(object):
         to j. Can be +inf if no such jumps every occur.
     And these site attributes:
      - `residence_times`: Avg. number of frames a particle spends at a site before jumping.
+     - `total_corrected_residences`: Total number of frames when a particle was at the site,
+        *including* frames when an unassigned particle's last known site was this site.
     """
     def __init__(self, verbose = True):
         self.verbose = verbose
@@ -114,6 +116,8 @@ class JumpAnalysis(object):
             else:
                 res_times[site] = np.inf
         st.site_network.add_site_attribute('residence_times', res_times)
+
+        st.site_network.add_site_attribute('total_corrected_residences', total_time_spent_at_site)
 
         return st
 

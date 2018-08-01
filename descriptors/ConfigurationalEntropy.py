@@ -1,6 +1,7 @@
 import numpy as np
 
 from analysis import SiteTrajectory
+from analysis.dynamics import JumpAnalysis
 
 class ConfigurationalEntropy(object):
     """Compute the S~ configurational entropy.
@@ -14,27 +15,35 @@ class ConfigurationalEntropy(object):
         Chemistry of Materials 2017 29 (21), 9142-9153
         DOI: 10.1021/acs.chemmater.7b02902
     """
-    def __init__(self, acceptable_overshoot = 0.0, verbose = True):
+    def __init__(self, acceptable_overshoot = 0.0001, verbose = True):
         self.acceptable_overshoot = acceptable_overshoot
         self.verbose = verbose
 
     def compute(self, st):
         assert isinstance(st, SiteTrajectory)
 
-        traj_re = np.reshape(st._traj, (st.site_network.n_mobile * st.n_frames,))
+        sn = st.site_network
+
+        traj_re = np.reshape(st._traj, (sn.n_mobile * st.n_frames,))
         traj_re = traj_re[traj_re >= 0]
 
-        if not st.site_network.site_types is None:
+        if not sn.has_attribute('total_corrected_residences'):
+            ja = JumpAnalysis()
+            ja.run(st)
+
+        if not sn.site_types is None:
             # By site type
-            traj_re = st.site_network.site_types[traj_re]
-            _, N_i = np.unique(st.site_network.site_types, return_counts = True)
+            _, N_i = np.unique(sn.site_types, return_counts = True)
+            n_i = np.empty(shape = sn.n_types, dtype = np.float)
+            for stype in sn.types:
+                n_i[stype] = np.true_divide(np.sum(sn.total_corrected_residences[sn.site_types == stype]), st.n_frames)
         else:
             # By site
-            N_i = np.ones(shape = st.site_network.n_sites)
+            N_i = np.ones(shape = sn.n_sites)
+            n_i = np.true_divide(sn.total_corrected_residences, st.n_frames)
 
-        _, counts = np.unique(traj_re, return_counts = True)
+
         # Corrected divisor for unassigned particles
-        n_i = np.true_divide(counts, st.n_frames - (st.n_unassigned / float(st.site_network.n_mobile)))
         p2 = np.true_divide(n_i, N_i)
         n = np.sum(n_i)
 
