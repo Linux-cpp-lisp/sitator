@@ -3,7 +3,7 @@ import numpy as np
 from analysis import SiteTrajectory
 
 class ConfigurationalEntropy(object):
-    """Compute the S~ configurational entropy descriptor.
+    """Compute the S~ configurational entropy.
 
     If the SiteTrajectory lacks type information, the summation is taken over
     the sites rather than the site types.
@@ -33,7 +33,8 @@ class ConfigurationalEntropy(object):
             N_i = np.ones(shape = st.site_network.n_sites)
 
         _, counts = np.unique(traj_re, return_counts = True)
-        n_i = np.true_divide(counts, st.n_frames)
+        # Corrected divisor for unassigned particles
+        n_i = np.true_divide(counts, st.n_frames - (st.n_unassigned / float(st.site_network.n_mobile)))
         p2 = np.true_divide(n_i, N_i)
         n = np.sum(n_i)
 
