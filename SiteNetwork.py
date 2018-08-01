@@ -7,7 +7,7 @@ import numpy as np
 import re
 
 import matplotlib
-from analysis.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
+from analysis.visualization import SiteNetworkPlotter
 
 class SiteNetwork(object):
     """A network of sites for some diffusive/mobile particle in a static lattice.
@@ -31,6 +31,8 @@ class SiteNetwork(object):
           Should be a representative/ideal/thermal-average structure.
         :param ndarray(bool) static_mask: Boolean mask indicating which atoms to consider immobile
         :param ndarray(bool) mobile_mask: Boolean mask indicating which atoms to track
+        :param SiteNetworkPlotter plotter: The plotter implementing this SiteNetwork's
+            :func:plot method.
         """
 
         assert static_mask.ndim == mobile_mask.ndim == 1, "The masks must be one-dimensional"
@@ -60,44 +62,36 @@ class SiteNetwork(object):
 
     def copy(self):
         """Returns a (shallowish) copy of self."""
-        sn = type(self)(self.structure,
-                        self.static_mask,
-                        self.mobile_mask)
-
-        if not self._centers is None:
-            sn.centers = self._centers.copy()
-            if not self._vertices is None:
-                sn.vertices = list(self._vertices)
-            if not self._types is None:
-                sn.site_types = self._types.copy()
-
-        return sn
+        # Use a mask to force a copy
+        msk = np.ones(shape = self.n_sites, dtype = np.bool)
+        return self[msk]
 
     def __len__(self):
         return self.n_sites
 
     def __getitem__(self, key):
-        if self._centers is None:
-            raise ValueError("This SiteNetwork has no sites; can't slice.")
-
-        mask = np.zeros(shape = len(self), dtype = np.bool)
-        mask[key] = True # This will deal with wrong shapes and all kinds of fancy indexing
-
         sn = type(self)(self.structure,
                         self.static_mask,
                         self.mobile_mask)
 
-        view = self._centers[mask]
-        view.flags.writeable = False
-        sn.centers = view
+        if not self._centers is None:
+            sn.centers = self._centers[key]
 
         if not self._vertices is None:
-            sn.vertices = [v for i, v in enumerate(self._vertices) if mask[i]]
+            sn.vertices = np.asarray(self._vertices)[key].tolist()
 
         if not self._types is None:
-            view = self._types[mask]
-            view.flags.writeable = False
+            view = self._types[key]
             sn.site_types = view
+
+        for site_attr in self._site_attrs:
+            view = self._site_attrs[site_attr][key]
+            sn.add_site_attribute(site_attr, view)
+
+        for edge_attr in self._site_attrs:
+            oldmat = self._site_attrs[site_attr]
+            newmat = oldmat[key][:, key]
+            sn.add_edge_attribute(edge_attr, newmat)
 
         return sn
 
@@ -113,6 +107,8 @@ class SiteNetwork(object):
 
     @property
     def n_sites(self):
+        if self._centers is None:
+            return 0
         return len(self._centers)
 
     @property
@@ -177,7 +173,7 @@ class SiteNetwork(object):
         elif attrkey in self._edge_attrs:
             return self._edge_attrs[attrkey]
         else:
-            raise KeyError("This SiteNetwork has no site or edge attribute `%s`" % attrkey)
+            raise AttributeError("This SiteNetwork has no site or edge attribute `%s`" % attrkey)
 
     def get_site(self, site):
         """Get all info about a site.
@@ -209,6 +205,13 @@ class SiteNetwork(object):
         if len(self._edge_attrs) == 0:
             raise ValueError("This SiteNetwork has no edge attributes")
 
+        out = {}
+
+        for edgekey in self._edge_attrs:
+            out[edgekey] = self._edge_attrs[edgekey][edge]
+
+        return out
+
     def add_site_attribute(self, name, attr):
         self._check_name(name)
         if not attr.shape[0] == self.n_sites:
@@ -219,7 +222,7 @@ class SiteNetwork(object):
     def add_edge_attribute(self, name, attr):
         self._check_name(name)
         if not (attr.shape[0] == attr.shape[1] == self.n_sites):
-            raise ValueError("Attribute matrix has shape; need first two dimensions to be %i" % (attr.shape, self.n_sites))
+            raise ValueError("Attribute matrix has shape %s; need first two dimensions to be %i" % (attr.shape, self.n_sites))
 
         self._edge_attrs[name] = attr
 
@@ -231,68 +234,7 @@ class SiteNetwork(object):
         if name in self.__dict__:
             raise ValueError("Attribute name `%s` reserved." % name)
 
-    DEFAULT_MAPPINGS = {
-        'marker' : 'site_types',
-    }
-
-    DEFAULT_MARKERS = ['x', 'D', '+', 'v', '<', '^', '>']
-
-    @plotter(is3D = True)
-    def plot(self, mappings = DEFAULT_MAPPINGS, plot_points_params = {}, **kwargs):
-        """Plot the SiteNetwork.
-
-        mappings defines how to show different properties. Each entry maps a
-        visual aspect ('marker', 'color', 'size') to the name of a site attribute
-        including 'site_type'.
-
-        The type for marker must be integral; the others can be integer or float.
-        """
-        pts_arrays = {'points' : self.centers}
-        pts_params = {}
-
-        # -- Apply mapping
-        # - other mappings
-        markers = None
-
-        for key in mappings:
-            val = getattr(self, mappings[key])
-            if key == 'marker':
-                markers = val
-            elif key == 'color':
-                pts_arrays['c'] = val
-            elif key == 'size':
-                pts_arrays['s'] = val
-            else:
-                raise KeyError("Unknown mapping `%s`" % key)
-        # - markers first
-        marker_layers = {}
-
-        if markers is None:
-            # Just one layer with all points and one marker
-            marker_layers[SiteNetwork.DEFAULT_MARKERS[0]] = np.ones(shape = self.n_sites, dtype = np.bool)
-        else:
-            unique_markers = np.unique(np.round(markers))
-            marker_i = 0
-            for um in unique_markers:
-                marker_layers[SiteNetwork.DEFAULT_MARKERS[marker_i]] = (markers == um)
-                marker_i += 1
-
-        # -- Do plot
-
-        if not 'color' in kwargs and not 'c' in pts_arrays:
-            pts_params['color'] = 'k'
-
-        pts_params.update(plot_points_params)
-
-        pts_layers = []
-
-        for marker in marker_layers:
-            d = {'marker' : marker}
-            msk = marker_layers[marker]
-            for arr in pts_arrays:
-                d[arr] = pts_arrays[arr][msk]
-            d.update(pts_params)
-            pts_layers.append((plot_points, d))
-
-        layers((plot_atoms,  {'atoms' : self.static_structure}),
-               *pts_layers, **kwargs)
+    def plot(self, *args, **kwargs):
+        """Convenience method -- constructs a defualt SiteNetworkPlotter and calls it."""
+        p = SiteNetworkPlotter()
+        p(self, *args, **kwargs)
