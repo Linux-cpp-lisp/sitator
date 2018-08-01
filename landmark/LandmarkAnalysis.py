@@ -46,6 +46,7 @@ class LandmarkAnalysis(object):
                  check_for_zero_landmarks = True,
                  static_movement_threshold = 1.0,
                  dynamic_lattice_mapping = False,
+                 relaxed_lattice_checks = False,
                  max_mobile_per_site = 1,
                  verbose = True):
         """
@@ -100,6 +101,7 @@ class LandmarkAnalysis(object):
         self.check_for_zero_landmarks = check_for_zero_landmarks
         self.weighted_site_positions = weighted_site_positions
         self.dynamic_lattice_mapping = dynamic_lattice_mapping
+        self.relaxed_lattice_checks = relaxed_lattice_checks
 
         self._landmark_vectors = None
         self._landmark_dimension = None

@@ -66,7 +66,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
         # In normal circumstances, every current static position should be assigned.
         # Just a sanity check
-        if not np.all(static_positions_seen):
+        if (not self.relaxed_lattice_checks) and (not np.all(static_positions_seen)):
             raise ValueError("At frame %i, static positions of atoms %s not assigned to lattice positions" % (i, np.where(~static_positions_seen)[0]))
 
 
