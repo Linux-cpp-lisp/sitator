@@ -3,8 +3,9 @@
 import numpy as np
 
 cimport cython
+cimport numpy as npc
 
-from libc.math cimport sqrt, cos, M_PI, isnan, floor
+from libc.math cimport sqrt, cos, M_PI, isnan, floor, INFINITY
 
 ctypedef double precision
 ctypedef double cell_precision
@@ -15,6 +16,7 @@ cdef class PBCCalculator(object):
     cdef cell_precision [:, :] _cell_array
     cdef cell_precision [:, :] _cell_inverse_array
     cdef cell_precision [:] _cell_centroid
+    cdef npc.ndarray _cell
 
     def __init__(self, cell):
         """
@@ -25,6 +27,7 @@ cdef class PBCCalculator(object):
 
         assert cell.shape[1] == cell.shape[0], "Cell must be square"
 
+        self._cell = cell
         self._cell_array = np.asarray(cellmat)
         self._cell_inverse_array = np.asarray(cellmat.I)
         self._cell_centroid = np.sum(0.5 * cell, axis = 0)
@@ -216,6 +219,59 @@ cdef class PBCCalculator(object):
 
             # Store into points
             points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
+
+    cpdef int min_image(self, precision [:] ref, precision [:] pt):
+        """Find the minimum image of `pt` relative to `ref`. In place in pt.
+
+        Uses the brute force algorithm for correctness; returns the minimum image.
+
+        :returns int[3] minimg: Which image was the minimum image.
+        """
+        # # There are 27 possible minimum images
+        # buf = np.empty(shape = (27, 3), dtype = ref.dtype)
+        # All possible min images
+        cdef int minimg[3]
+        cdef precision mindist = INFINITY
+        cdef precision curdist = 0.0
+
+        cdef precision buf[3]
+
+        for i in xrange(3):
+            for j in xrange(3):
+                for k in xrange(3):
+                    # Copy point
+                    buf[0] = pt[0]; buf[1] = pt[1]; buf[2] = pt[2]
+                    # Add the right cell vectors to get this image
+                    buf[0] += (i - 1) * self._cell_array[0, 0] + \
+                              (j - 1) * self._cell_array[1, 0] + \
+                              (k - 1) * self._cell_array[2, 0]
+                    buf[1] += (i - 1) * self._cell_array[0, 1] + \
+                              (j - 1) * self._cell_array[1, 1] + \
+                              (k - 1) * self._cell_array[2, 1]
+                    buf[2] += (i - 1) * self._cell_array[0, 2] + \
+                              (j - 1) * self._cell_array[1, 2] + \
+                              (k - 1) * self._cell_array[2, 2]
+                    # Compute distance
+                    buf[0] -= ref[0]; buf[1] -= ref[1]; buf[2] -= ref[2]
+                    buf[0] *= buf[0]; buf[1] *= buf[1]; buf[2] *= buf[2]
+                    curdist = sqrt(buf[0] + buf[1] + buf[2])
+
+                    if curdist < mindist:
+                        mindist = curdist
+                        minimg[0] = i; minimg[1] = j; minimg[2] = k
+
+        # Update pt in-place
+        pt[0] += (minimg[0] - 1) * self._cell_array[0, 0] + \
+                 (minimg[1] - 1) * self._cell_array[1, 0] + \
+                 (minimg[2] - 1) * self._cell_array[2, 0]
+        pt[1] += (minimg[0] - 1) * self._cell_array[0, 1] + \
+                 (minimg[1] - 1) * self._cell_array[1, 1] + \
+                 (minimg[2] - 1) * self._cell_array[2, 1]
+        pt[2] += (minimg[0] - 1) * self._cell_array[0, 2] + \
+                 (minimg[1] - 1) * self._cell_array[1, 2] + \
+                 (minimg[2] - 1) * self._cell_array[2, 2]
+
+        return minimg[0] + 3 * minimg[1] + 9 * minimg[2]
 
     cpdef void to_real_coords(self, precision [:, :] points):
         """Convert to real coords from crystal coords in place."""
