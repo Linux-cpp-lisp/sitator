@@ -29,8 +29,9 @@ class MergeSitesByDynamics(object):
             raise ValueError("Cannot run a check_types=True MergeSitesByDynamics on a SiteTrajectory without type information.")
 
         # Compute jump statistics
-        ja = JumpAnalysis(verbose = self.verbose)
-        ja.run(st)
+        if not st.site_network.has_attribute('p_ij'):
+            ja = JumpAnalysis(verbose = self.verbose)
+            ja.run(st)
 
         pbcc = PBCCalculator(st.site_network.structure.cell)
         site_centers = st.site_network.centers
