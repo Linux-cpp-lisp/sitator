@@ -21,7 +21,7 @@ from sitator.util import PBCCalculator
 # TODO: benchmark CUC vs CIF
 
 class Zeopy(object):
-    """An instance of the `network` tool that can be repeatedly invoked.
+    """A wrapper for the Zeo++ `network` tool.
 
     :warning: Do not use a single instance of Zeopy in parallel.
     """
@@ -31,6 +31,8 @@ class Zeopy(object):
 
         :param str path_to_zeo: Path to the `network` executable.
         """
+        if not (os.path.exists(path_to_zeo) and os.access(path_to_zeo, os.X_OK)):
+            raise ValueError("`%s` doesn't seem to be the path to an executable file." % path_to_zeo)
         self._exe = path_to_zeo
         self._tmpdir = None
 
