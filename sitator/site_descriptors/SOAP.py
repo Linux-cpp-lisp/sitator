@@ -1,8 +1,12 @@
 
 import numpy as np
 
-import quippy as qp
-from quippy import descriptors
+try:
+    import quippy as qp
+    from quippy import descriptors
+except ImportError:
+    raise ImportError("Quippy with GAP is required for using SOAP descriptors.")
+
 import mendeleev
 from ase.data import atomic_numbers
 

@@ -13,7 +13,10 @@ from sklearn.decomposition import PCA
 
 import itertools
 
-import pydpc
+try:
+    import pydpc
+except ImportError:
+    raise ImportError("SiteTypeAnalysis requires the `pydpc` package")
 
 class SiteTypeAnalysis(object):
     """Cluster sites into types using SOAP and DPCLUS.
