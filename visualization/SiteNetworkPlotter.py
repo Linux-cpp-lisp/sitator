@@ -41,7 +41,7 @@ class SiteNetworkPlotter(object):
                 plot_points_params = {},
                 minmax_linewidth = (1, 6),
                 minmax_edge_alpha = (0.1, 0.75),
-                minmax_markersize = (1.0, 2.0),
+                minmax_markersize = (75.0, 175.0),
                 min_color_threshold = 0.01,
                 min_width_threshold = 0.01,
                 title = ""):
@@ -72,7 +72,7 @@ class SiteNetworkPlotter(object):
 
     def _site_layers(self, sn, plot_points_params):
         pts_arrays = {'points' : sn.centers}
-        pts_params = {'cmap' : 'YlOrRd'}
+        pts_params = {'cmap' : 'rainbow'}
 
         # -- Apply mapping
         # - other mappings
@@ -81,9 +81,10 @@ class SiteNetworkPlotter(object):
         for key in self.site_mappings:
             val = getattr(sn, self.site_mappings[key])
             if key == 'marker':
-                markers = val
+                if not val is None:
+                    markers = val.copy()
             elif key == 'color':
-                pts_arrays['c'] = val
+                pts_arrays['c'] = val.copy()
                 pts_params['norm'] = matplotlib.colors.Normalize(vmin = np.min(val), vmax = np.max(val))
             elif key == 'size':
                 s = val.copy()
@@ -144,9 +145,9 @@ class SiteNetworkPlotter(object):
         for edgekey in self.edge_mappings:
             edgeval = getattr(sn, self.edge_mappings[edgekey])
             if edgekey == 'intensity':
-                all_cs = edgeval
+                all_cs = edgeval.copy()
             elif edgekey == 'width':
-                all_linewidths = edgeval
+                all_linewidths = edgeval.copy()
             else:
                 raise KeyError("Invalid edge mapping key `%s`" % edgekey)
 
