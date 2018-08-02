@@ -12,6 +12,7 @@ setup(name = 'sitator',
       ]),
       install_requires = [
         "numpy",
+        "scipy",
         "matplotlib",
         "ase",
         "markov_clustering",
