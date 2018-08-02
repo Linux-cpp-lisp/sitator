@@ -4,8 +4,8 @@ from builtins import *
 
 import numpy as np
 
-from analysis.util import PBCCalculator
-from analysis.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
+from sitator.util import PBCCalculator
+from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
 
 import matplotlib
 from matplotlib.collections import LineCollection

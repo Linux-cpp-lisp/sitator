@@ -2,8 +2,8 @@ import numpy as np
 
 import itertools
 
-from analysis import SiteNetwork, SiteTrajectory
-from analysis.visualization import plotter, plot_atoms, layers
+from sitator import SiteNetwork, SiteTrajectory
+from sitator.visualization import plotter, plot_atoms, layers
 
 class JumpAnalysis(object):
     """Given a SiteTrajectory, compute various statistics about the jumps it contains.

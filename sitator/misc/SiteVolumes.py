@@ -3,8 +3,8 @@ import numpy as np
 from scipy.spatial import ConvexHull
 from scipy.spatial.qhull import QhullError
 
-from analysis import SiteTrajectory
-from analysis.util import PBCCalculator
+from sitator import SiteTrajectory
+from sitator.util import PBCCalculator
 
 class SiteVolumes(object):
     """Computes the volumes of convex hulls around all positions associated with a site.

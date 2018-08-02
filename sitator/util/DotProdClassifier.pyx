@@ -6,6 +6,7 @@ import numbers
 
 import sys
 try:
+    from IPython import get_ipython
     ipy_str = str(type(get_ipython()))
     if 'zmqshell' in ipy_str:
         from tqdm import tqdm_notebook as tqdm

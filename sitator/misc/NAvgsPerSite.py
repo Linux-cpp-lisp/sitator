@@ -1,8 +1,8 @@
 
 import numpy as np
 
-from analysis import SiteNetwork, SiteTrajectory
-from analysis.util import PBCCalculator
+from sitator import SiteNetwork, SiteTrajectory
+from sitator.util import PBCCalculator
 
 class NAvgsPerSite(object):
     """Given a SiteTrajectory, return a SiteNetwork containing n avg. positions per site.

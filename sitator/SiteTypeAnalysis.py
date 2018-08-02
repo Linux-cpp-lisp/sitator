@@ -4,10 +4,10 @@ from builtins import *
 
 import numpy as np
 
-from analysis.misc import GenerateAroundSites
-from analysis import SiteNetwork, SiteTrajectory
-from analysis.visualization import plotter, DEFAULT_COLORS
-from analysis.util.elbow import index_of_elbow
+from sitator.misc import GenerateAroundSites
+from sitator import SiteNetwork, SiteTrajectory
+from sitator.visualization import plotter, DEFAULT_COLORS
+from sitator.util.elbow import index_of_elbow
 
 from sklearn.decomposition import PCA
 

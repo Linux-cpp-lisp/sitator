@@ -1,7 +1,7 @@
 import numpy as np
 
-from analysis import SiteTrajectory
-from analysis.dynamics import JumpAnalysis
+from sitator import SiteTrajectory
+from sitator.dynamics import JumpAnalysis
 
 class ConfigurationalEntropy(object):
     """Compute the S~ configurational entropy.

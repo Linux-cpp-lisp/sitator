@@ -1,7 +1,7 @@
 import numpy as np
 
-from analysis import SiteNetwork
-from analysis.util import PBCCalculator
+from sitator import SiteNetwork
+from sitator.util import PBCCalculator
 
 class GenerateAroundSites(object):
     """Generate n normally distributed sites around each input site"""

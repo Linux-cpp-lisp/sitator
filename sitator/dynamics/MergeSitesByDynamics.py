@@ -1,8 +1,8 @@
 import numpy as np
 
-from analysis import SiteNetwork, SiteTrajectory
-from analysis.dynamics import JumpAnalysis
-from analysis.util import PBCCalculator
+from sitator import SiteNetwork, SiteTrajectory
+from sitator.dynamics import JumpAnalysis
+from sitator.util import PBCCalculator
 
 import markov_clustering
 

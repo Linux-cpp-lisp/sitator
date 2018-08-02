@@ -9,9 +9,9 @@ from mpl_toolkits.mplot3d import Axes3D
 import ase
 import ase.data
 
-from analysis.util import PBCCalculator
+from sitator.util import PBCCalculator
 
-from analysis.visualization.common import plotter, DEFAULT_COLORS, set_axes_equal, color_for_species
+from sitator.visualization.common import plotter, DEFAULT_COLORS, set_axes_equal, color_for_species
 
 @plotter(is3D = True)
 def plot_atoms(atoms, positions = None, hide_species = (), wrap = False, fig = None, ax = None, i = None):

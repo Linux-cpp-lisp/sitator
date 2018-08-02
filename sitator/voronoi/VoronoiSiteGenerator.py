@@ -1,8 +1,8 @@
 
 import numpy as np
 
-from analysis import SiteNetwork
-from analysis.util import Zeopy
+from sitator import SiteNetwork
+from sitator.util import Zeopy
 
 DEFAULT_ZEOPP = "/home/amusaelian/Documents/Ionic Frustration/code/lib/zeo++/trunk/network"
 

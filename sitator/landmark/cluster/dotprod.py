@@ -1,5 +1,5 @@
 
-from analysis.util import DotProdClassifier
+from sitator.util import DotProdClassifier
 
 DEFAULT_PARAMS = {
     'clustering_threshold' : 0.45,

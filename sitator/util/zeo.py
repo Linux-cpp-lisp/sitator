@@ -16,7 +16,7 @@ import numpy as np
 import ase
 import ase.io
 
-from analysis.util import PBCCalculator
+from sitator.util import PBCCalculator
 
 # TODO: benchmark CUC vs CIF
 

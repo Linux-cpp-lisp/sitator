@@ -1,1 +1,11 @@
-*.pyc
+__pycache__/
+*.py[cod]
+
+build/
+*.so
+
+#Ignore Cython-generated *.c files
+*.c
+
+/dist/
+/*.egg-info

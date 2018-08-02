@@ -1,6 +1,6 @@
 import numpy as np
 
-from analysis.util import PBCCalculator
+from sitator.util import PBCCalculator
 
 # From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
 import sys
@@ -20,7 +20,7 @@ except:
 import importlib
 
 import helpers
-from analysis import SiteNetwork, SiteTrajectory
+from sitator import SiteNetwork, SiteTrajectory
 
 
 from functools import wraps

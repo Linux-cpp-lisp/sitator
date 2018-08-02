@@ -9,8 +9,8 @@ import itertools
 import matplotlib
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
-from analysis.util import PBCCalculator
-from analysis.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
+from sitator.util import PBCCalculator
+from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
 
 class SiteNetworkPlotter(object):
     """Plot a SiteNetwork.

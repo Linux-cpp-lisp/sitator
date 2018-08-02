@@ -7,7 +7,7 @@ import numpy as np
 import re
 
 import matplotlib
-from analysis.visualization import SiteNetworkPlotter
+from sitator.visualization import SiteNetworkPlotter
 
 class SiteNetwork(object):
     """A network of sites for some diffusive/mobile particle in a static lattice.
