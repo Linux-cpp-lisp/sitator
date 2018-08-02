@@ -72,7 +72,7 @@ class JumpAnalysis(object):
             jumped[np.where(jumped)[0][problems]] = False
             n_problems += np.sum(problems)
 
-            n_ij[frame[fknown], last_known[fknown]] += 1
+            n_ij[last_known[fknown], frame[fknown]] += 1
 
             # Record number of jumps this frame
             total_jumps_frame[i] = np.sum(jumped)
@@ -116,7 +116,7 @@ class JumpAnalysis(object):
             else:
                 res_times[site] = np.inf
         st.site_network.add_site_attribute('residence_times', res_times)
-
+        st.site_network.add_site_attribute('occupancy_freqs', np.sum(n_ij, axis = 0) / st.n_frames)
         st.site_network.add_site_attribute('total_corrected_residences', total_time_spent_at_site)
 
         return st
