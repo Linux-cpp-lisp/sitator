@@ -13,11 +13,12 @@ ELEMENT_COLORS = {
     'C' : 'k',
     'N' : 'b',
     'O' : 'r',
+    'S' : 'orange',
     'F' : 'g',
     'Cl' : 'g',
     'Br' : 'darkred',
     'I' : 'purple',
-    'P' : 'orange',
+    'P' : 'peru',
     'Li' : 'violet'
 }
 OTHER_ELEMENT_COLOR = 'gray'
