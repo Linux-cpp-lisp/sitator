@@ -16,7 +16,8 @@ setup(name = 'sitator',
         "matplotlib",
         "ase",
         "markov_clustering",
-        "tqdm"
+        "tqdm",
+        "backports.tempfile"
       ],
       extras_require = {
         "SiteTypeAnalysis" : [
