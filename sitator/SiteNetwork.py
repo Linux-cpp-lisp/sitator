@@ -5,6 +5,11 @@ from builtins import *
 import numpy as np
 
 import re
+import os
+import tarfile
+from backports import tempfile
+
+import ase.io
 
 import matplotlib
 from sitator.visualization import SiteNetworkPlotter
@@ -90,6 +95,78 @@ class SiteNetwork(object):
             oldmat = self._edge_attrs[edge_attr]
             newmat = oldmat[key][:, key]
             sn.add_edge_attribute(edge_attr, newmat)
+
+        return sn
+
+    _STRUCT_FNAME = "structure.xyz"
+    _SMASK_FNAME = "static_mask.npy"
+    _MMASK_FNAME = "mobile_mask.npy"
+    _MAIN_FNAMES = ['centers', 'vertices', 'site_types']
+
+    def save(self, file):
+        """Save this SiteNetwork to a tar archive."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # -- Write the structure
+            ase.io.write(os.path.join(tmpdir, self._STRUCT_FNAME), self.structure)
+            # -- Write masks
+            np.save(os.path.join(tmpdir, self._SMASK_FNAME), self.static_mask)
+            np.save(os.path.join(tmpdir, self._MMASK_FNAME), self.mobile_mask)
+            # -- Write what we have
+            for arrname in self._MAIN_FNAMES:
+                if not getattr(self, arrname) is None:
+                    np.save(os.path.join(tmpdir, "%s.npy" % arrname), getattr(self, arrname))
+            # -- Write all site/edge attributes
+            for atype, attrs in zip(("site_attr", "edge_attr"), (self._site_attrs, self._edge_attrs)):
+                for attr in attrs:
+                    np.save(os.path.join(tmpdir, "%s-%s.npy" % (atype, attr)), attrs[attr])
+            # -- Write final archive
+            with tarfile.open(file, mode = 'w:gz', format = tarfile.PAX_FORMAT) as outf:
+                outf.add(tmpdir, arcname = "")
+
+    @classmethod
+    def from_file(cls, file):
+        """Load a SiteNetwork from a tar file/file descriptor."""
+        all_others = {}
+        site_attrs = {}
+        edge_attrs = {}
+        structure = None
+        with tarfile.open(file, mode = 'r:gz', format = tarfile.PAX_FORMAT) as input:
+            # -- Load everything
+            for member in input.getmembers():
+                if member.name == '':
+                    continue
+                f = input.extractfile(member)
+                if member.name == cls._STRUCT_FNAME:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        input.extract(member, path = tmpdir)
+                        structure = ase.io.read(os.path.join(tmpdir, member.name), format = 'xyz')
+                else:
+                    basename = os.path.splitext(os.path.basename(member.name))[0]
+                    data = np.load(f)
+                    if basename.startswith("site_attr"):
+                        site_attrs[basename.split('-')[1]] = data
+                    elif basename.startswith("edge_attr"):
+                        edge_attrs[basename.split('-')[1]] = data
+                    else:
+                        all_others[basename] = data
+
+        # Create SiteNetwork
+        assert not structure is None
+        assert all(k in all_others for k in ("static_mask", "mobile_mask")), "Malformed SiteNetwork file."
+        sn = SiteNetwork(structure,
+                         all_others['static_mask'],
+                         all_others['mobile_mask'])
+        if 'centers' in all_others:
+            sn.centers = all_others['centers']
+        for key in all_others:
+            if key in ('centers', 'static_mask', 'mobile_mask'):
+                continue
+            setattr(sn, key, all_others[key])
+
+        assert all(len(sa) == sn.n_sites for sa in site_attrs.values())
+        assert all(ea.shape == (sn.n_sites, sn.n_sites) for ea in edge_attrs.values())
+        sn._site_attrs = site_attrs
+        sn._edge_attrs = edge_attrs
 
         return sn
 
@@ -235,6 +312,7 @@ class SiteNetwork(object):
 
     def add_site_attribute(self, name, attr):
         self._check_name(name)
+        attr = np.asarray(attr)
         if not attr.shape[0] == self.n_sites:
             raise ValueError("Attribute array has only %i entries; need one for all %i sites." % (len(attr), self.n_sites))
 
@@ -242,6 +320,7 @@ class SiteNetwork(object):
 
     def add_edge_attribute(self, name, attr):
         self._check_name(name)
+        attr = np.asarray(attr)
         if not (attr.shape[0] == attr.shape[1] == self.n_sites):
             raise ValueError("Attribute matrix has shape %s; need first two dimensions to be %i" % (attr.shape, self.n_sites))
 
@@ -257,5 +336,5 @@ class SiteNetwork(object):
 
     def plot(self, *args, **kwargs):
         """Convenience method -- constructs a defualt SiteNetworkPlotter and calls it."""
-        p = SiteNetworkPlotter()
+        p = SiteNetworkPlotter(title = "Sites")
         p(self, *args, **kwargs)
