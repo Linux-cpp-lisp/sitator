@@ -7,7 +7,6 @@ try:
 except ImportError:
     raise ImportError("Quippy with GAP is required for using SOAP descriptors.")
 
-import mendeleev
 from ase.data import atomic_numbers
 
 DEFAULT_SOAP_PARAMS = {
