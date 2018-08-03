@@ -35,8 +35,8 @@ class ConfigurationalEntropy(object):
             # By site type
             _, N_i = np.unique(sn.site_types, return_counts = True)
             n_i = np.empty(shape = sn.n_types, dtype = np.float)
-            for stype in sn.types:
-                n_i[stype] = np.true_divide(np.sum(sn.total_corrected_residences[sn.site_types == stype]), st.n_frames)
+            for i, stype in enumerate(sn.types):
+                n_i[i] = np.true_divide(np.sum(sn.total_corrected_residences[sn.site_types == stype]), st.n_frames)
         else:
             # By site
             N_i = np.ones(shape = sn.n_sites)
