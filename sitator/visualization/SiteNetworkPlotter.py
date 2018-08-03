@@ -31,7 +31,7 @@ class SiteNetworkPlotter(object):
         'marker' : 'site_types',
     }
 
-    DEFAULT_MARKERS = ['x', '+', 'v', '<', '^', '>']
+    DEFAULT_MARKERS = ['x', '+', 'v', '<', '^', '>', '*', 'd', 'h', 'p']
     DEFAULT_LINESTYLES = ['--', ':', '-.', '-']
 
     EDGE_GROUP_COLORS = ['b', 'g', 'm', 'lightseagreen', 'crimson'] + ['gray'] # gray last for -1's
@@ -87,9 +87,7 @@ class SiteNetworkPlotter(object):
                     markers = val.copy()
             elif key == 'color':
                 pts_arrays['c'] = val.copy()
-                finite = np.isfinite(val)
-                pts_params['vmin'] = np.min(val[finite])
-                pts_params['vmax'] = np.max(val[finite])
+                pts_params['norm'] = matplotlib.colors.Normalize(vmin = np.min(val), vmax = np.max(val))
             elif key == 'size':
                 s = val.copy()
                 s += np.min(s)
