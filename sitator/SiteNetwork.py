@@ -31,8 +31,6 @@ class SiteNetwork(object):
           Should be a representative/ideal/thermal-average structure.
         :param ndarray(bool) static_mask: Boolean mask indicating which atoms to consider immobile
         :param ndarray(bool) mobile_mask: Boolean mask indicating which atoms to track
-        :param SiteNetworkPlotter plotter: The plotter implementing this SiteNetwork's
-            :func:plot method.
         """
 
         assert static_mask.ndim == mobile_mask.ndim == 1, "The masks must be one-dimensional"
@@ -181,6 +179,14 @@ class SiteNetwork(object):
 
     def has_attribute(self, attr):
         return (attr in self._site_attrs) or (attr in self._edge_attrs)
+
+    def remove_attribute(self, attr):
+        if attr in self._site_attrs:
+            del self._site_attrs[attr]
+        elif attr in self._edge_attrs:
+            del self._edge_attrs[attr]
+        else:
+            raise AttributeError("This SiteNetwork has no site or edge attribute `%s`" % attr)
 
     def __getattr__(self, attrkey):
         if attrkey in self._site_attrs:
