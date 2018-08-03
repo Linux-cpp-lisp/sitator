@@ -34,14 +34,16 @@ class SiteNetworkPlotter(object):
     DEFAULT_MARKERS = ['x', '+', 'v', '<', '^', '>']
     DEFAULT_LINESTYLES = ['--', ':', '-.', '-']
 
+    EDGE_GROUP_COLORS = ['b', 'g', 'm', 'lightseagreen', 'crimson'] + ['gray'] # gray last for -1's
+
     def __init__(self,
                 site_mappings = DEFAULT_SITE_MAPPINGS,
                 edge_mappings = {},
                 markers = DEFAULT_MARKERS,
                 plot_points_params = {},
-                minmax_linewidth = (1, 6),
-                minmax_edge_alpha = (0.1, 0.75),
-                minmax_markersize = (75.0, 175.0),
+                minmax_linewidth = (1.75, 7),
+                minmax_edge_alpha = (0.15, 0.75),
+                minmax_markersize = (80.0, 180.0),
                 min_color_threshold = 0.01,
                 min_width_threshold = 0.01,
                 title = ""):
@@ -141,6 +143,7 @@ class SiteNetworkPlotter(object):
         all_cs = None
         all_linewidths = None
         all_color = None
+        all_groups = None
         # Get value arrays as they exist
         for edgekey in self.edge_mappings:
             edgeval = getattr(sn, self.edge_mappings[edgekey])
@@ -148,10 +151,14 @@ class SiteNetworkPlotter(object):
                 all_cs = edgeval.copy()
             elif edgekey == 'width':
                 all_linewidths = edgeval.copy()
+            elif edgekey == 'group':
+                assert edgeval.dtype == np.int
+                all_groups = edgeval
             else:
                 raise KeyError("Invalid edge mapping key `%s`" % edgekey)
 
         do_widths = not all_linewidths is None
+        do_groups = not all_groups is None
 
         # - Normalize
         # Ignore values on the diagonal since we ignore them in the loop
@@ -171,6 +178,7 @@ class SiteNetworkPlotter(object):
         segments = []
         cs = []
         linewidths = []
+        groups = []
         # To plot minimum images that are outside unit cell
         sites_to_plot = []
         sites_to_plot_positions = []
@@ -213,14 +221,24 @@ class SiteNetworkPlotter(object):
 
                 if do_widths:
                     linewidths.append(np.mean([all_linewidths[i, j], all_linewidths[j, i]]))
+                if do_groups:
+                    # Assumes symmetric
+                    groups.append(all_groups[i, j])
 
                 done_already[i, j] = True
 
         # -- Construct final Line3DCollection
         assert len(cs) == len(segments)
+
         if len(cs) > 0:
             lccolors = np.empty(shape = (len(cs), 4), dtype = np.float)
-            lccolors[:] = [0.0, 0.1, 1.0, 0.0]
+            # Group colors
+            if do_groups:
+                for i in xrange(len(cs)):
+                    lccolors[i] = matplotlib.colors.to_rgba(SiteNetworkPlotter.EDGE_GROUP_COLORS[groups[i]])
+            else:
+                lccolors[:] = matplotlib.colors.to_rgba(SiteNetworkPlotter.EDGE_GROUP_COLORS[0])
+            # Intensity alpha
             lccolors[:,3] = np.array(cs) * self.minmax_edge_alpha[1]
             lccolors[:,3] += self.minmax_edge_alpha[0]
 
