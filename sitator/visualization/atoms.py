@@ -51,7 +51,7 @@ def plot_atoms(atoms, positions = None, hide_species = (), wrap = False, fig = N
                 cvec[:,2],
                 color = "gray",
                 alpha=0.5,
-                linewidth = 0.5,
+                linewidth = 0.7,
                 linestyle="--")
 
     set_axes_equal(ax)

@@ -87,7 +87,9 @@ class SiteNetworkPlotter(object):
                     markers = val.copy()
             elif key == 'color':
                 pts_arrays['c'] = val.copy()
-                pts_params['norm'] = matplotlib.colors.Normalize(vmin = np.min(val), vmax = np.max(val))
+                finite = np.isfinite(val)
+                pts_params['vmin'] = np.min(val[finite])
+                pts_params['vmax'] = np.max(val[finite])
             elif key == 'size':
                 s = val.copy()
                 s += np.min(s)

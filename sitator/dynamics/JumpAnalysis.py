@@ -114,7 +114,8 @@ class JumpAnalysis(object):
             if np.any(noninf):
                 res_times[site] = np.mean(times[noninf])
             else:
-                res_times[site] = np.inf
+                res_times[site] = n_frames
+                
         st.site_network.add_site_attribute('residence_times', res_times)
         st.site_network.add_site_attribute('occupancy_freqs', np.sum(n_ij, axis = 0) / st.n_frames)
         st.site_network.add_site_attribute('total_corrected_residences', total_time_spent_at_site)
