@@ -14,6 +14,7 @@ ELEMENT_COLORS = {
     'N' : 'b',
     'O' : 'r',
     'S' : 'orange',
+    'Si' : 'tan',
     'F' : 'g',
     'Cl' : 'g',
     'Br' : 'darkred',
