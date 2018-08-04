@@ -15,7 +15,6 @@ setup(name = 'sitator',
         "scipy",
         "matplotlib",
         "ase",
-        "markov_clustering",
         "tqdm",
         "backports.tempfile"
       ],
