@@ -13,10 +13,10 @@ ctypedef double cell_precision
 cdef class PBCCalculator(object):
     """Performs calculations on collections of 3D points under PBC"""
 
-    cdef cell_precision [:, :] _cell_array
-    cdef cell_precision [:, :] _cell_inverse_array
+    cdef cell_precision [:, :] _cell_mat_array
+    cdef cell_precision [:, :] _cell_mat_inverse_array
     cdef cell_precision [:] _cell_centroid
-    cdef npc.ndarray _cell
+    cdef cell_precision [:, :] _cell
 
     def __init__(self, cell):
         """
@@ -28,8 +28,8 @@ cdef class PBCCalculator(object):
         assert cell.shape[1] == cell.shape[0], "Cell must be square"
 
         self._cell = cell
-        self._cell_array = np.asarray(cellmat)
-        self._cell_inverse_array = np.asarray(cellmat.I)
+        self._cell_mat_array = np.asarray(cellmat)
+        self._cell_mat_inverse_array = np.asarray(cellmat.I)
         self._cell_centroid = np.sum(0.5 * cell, axis = 0)
 
     @property
@@ -139,8 +139,8 @@ cdef class PBCCalculator(object):
 
     cpdef void wrap_point(self, precision [:] pt):
         """Wrap a single point into the unit cell, IN PLACE. 3D only."""
-        cdef cell_precision [:, :] cell = self._cell_array
-        cdef cell_precision [:, :] cell_I = self._cell_inverse_array
+        cdef cell_precision [:, :] cell = self._cell_mat_array
+        cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
         assert len(pt) == 3, "Points must be 3D"
 
@@ -159,8 +159,8 @@ cdef class PBCCalculator(object):
         pt[0] = buf[0]; pt[1] = buf[1]; pt[2] = buf[2];
 
     cpdef bint is_in_unit_cell(self, precision [:] pt):
-        cdef cell_precision [:, :] cell = self._cell_array
-        cdef cell_precision [:, :] cell_I = self._cell_inverse_array
+        cdef cell_precision [:, :] cell = self._cell_mat_array
+        cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
         assert len(pt) == 3, "Points must be 3D"
 
@@ -181,8 +181,8 @@ cdef class PBCCalculator(object):
         return True
 
     cpdef bint is_in_image_of_cell(self, precision [:] pt, image):
-        cdef cell_precision [:, :] cell = self._cell_array
-        cdef cell_precision [:, :] cell_I = self._cell_inverse_array
+        cdef cell_precision [:, :] cell = self._cell_mat_array
+        cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
         assert len(pt) == 3, "Points must be 3D"
 
@@ -206,7 +206,7 @@ cdef class PBCCalculator(object):
         cdef precision buf[3]
         cdef precision pt[3]
 
-        cdef cell_precision [:, :] cell_I = self._cell_inverse_array
+        cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
         # Iterates over points
         for i in xrange(len(points)):
@@ -242,15 +242,15 @@ cdef class PBCCalculator(object):
                     # Copy point
                     buf[0] = pt[0]; buf[1] = pt[1]; buf[2] = pt[2]
                     # Add the right cell vectors to get this image
-                    buf[0] += (i - 1) * self._cell_array[0, 0] + \
-                              (j - 1) * self._cell_array[1, 0] + \
-                              (k - 1) * self._cell_array[2, 0]
-                    buf[1] += (i - 1) * self._cell_array[0, 1] + \
-                              (j - 1) * self._cell_array[1, 1] + \
-                              (k - 1) * self._cell_array[2, 1]
-                    buf[2] += (i - 1) * self._cell_array[0, 2] + \
-                              (j - 1) * self._cell_array[1, 2] + \
-                              (k - 1) * self._cell_array[2, 2]
+                    buf[0] += (i - 1) * self._cell[0, 0] + \
+                              (j - 1) * self._cell[1, 0] + \
+                              (k - 1) * self._cell[2, 0]
+                    buf[1] += (i - 1) * self._cell[0, 1] + \
+                              (j - 1) * self._cell[1, 1] + \
+                              (k - 1) * self._cell[2, 1]
+                    buf[2] += (i - 1) * self._cell[0, 2] + \
+                              (j - 1) * self._cell[1, 2] + \
+                              (k - 1) * self._cell[2, 2]
                     # Compute distance
                     buf[0] -= ref[0]; buf[1] -= ref[1]; buf[2] -= ref[2]
                     buf[0] *= buf[0]; buf[1] *= buf[1]; buf[2] *= buf[2]
@@ -261,15 +261,15 @@ cdef class PBCCalculator(object):
                         minimg[0] = i; minimg[1] = j; minimg[2] = k
 
         # Update pt in-place
-        pt[0] += (minimg[0] - 1) * self._cell_array[0, 0] + \
-                 (minimg[1] - 1) * self._cell_array[1, 0] + \
-                 (minimg[2] - 1) * self._cell_array[2, 0]
-        pt[1] += (minimg[0] - 1) * self._cell_array[0, 1] + \
-                 (minimg[1] - 1) * self._cell_array[1, 1] + \
-                 (minimg[2] - 1) * self._cell_array[2, 1]
-        pt[2] += (minimg[0] - 1) * self._cell_array[0, 2] + \
-                 (minimg[1] - 1) * self._cell_array[1, 2] + \
-                 (minimg[2] - 1) * self._cell_array[2, 2]
+        pt[0] += (minimg[0] - 1) * self._cell[0, 0] + \
+                 (minimg[1] - 1) * self._cell[1, 0] + \
+                 (minimg[2] - 1) * self._cell[2, 0]
+        pt[1] += (minimg[0] - 1) * self._cell[0, 1] + \
+                 (minimg[1] - 1) * self._cell[1, 1] + \
+                 (minimg[2] - 1) * self._cell[2, 1]
+        pt[2] += (minimg[0] - 1) * self._cell[0, 2] + \
+                 (minimg[1] - 1) * self._cell[1, 2] + \
+                 (minimg[2] - 1) * self._cell[2, 2]
 
         return 100 * minimg[0] + 10 * minimg[1] + 1 * minimg[2]
 
@@ -280,7 +280,7 @@ cdef class PBCCalculator(object):
         cdef precision buf[3]
         cdef precision pt[3]
 
-        cdef cell_precision [:, :] cell = self._cell_array
+        cdef cell_precision [:, :] cell = self._cell_mat_array
 
         # Iterates over points
         for i in xrange(len(points)):
@@ -300,8 +300,8 @@ cdef class PBCCalculator(object):
 
         assert points.shape[1] == 3, "Points must be 3D"
 
-        cdef cell_precision [:, :] cell = self._cell_array
-        cdef cell_precision [:, :] cell_I = self._cell_inverse_array
+        cdef cell_precision [:, :] cell = self._cell_mat_array
+        cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
         cdef precision buf[3]
         cdef precision pt[3]

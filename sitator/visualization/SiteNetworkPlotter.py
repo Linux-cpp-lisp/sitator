@@ -44,8 +44,8 @@ class SiteNetworkPlotter(object):
                 minmax_linewidth = (1.75, 7),
                 minmax_edge_alpha = (0.15, 0.75),
                 minmax_markersize = (80.0, 180.0),
-                min_color_threshold = 0.01,
-                min_width_threshold = 0.01,
+                min_color_threshold = 0.005,
+                min_width_threshold = 0.005,
                 title = ""):
         self.site_mappings = site_mappings
         self.edge_mappings = edge_mappings
@@ -199,11 +199,13 @@ class SiteNetworkPlotter(object):
 
                 segment = np.empty(shape = (2, 3), dtype = centers.dtype)
                 segment[0] = centers[i]
-                segment[1] = centers[j]
+                ptbuf = centers[j].copy()
 
                 # Modified segment[1] in place
-                minimg = pbcc.min_image(segment[0], segment[1])
+                minimg = pbcc.min_image(segment[0], ptbuf)
                 was_already_min_img = minimg == 111
+
+                segment[1] = ptbuf
 
                 segments.append(segment)
 
