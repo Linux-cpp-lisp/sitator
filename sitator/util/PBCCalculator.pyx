@@ -271,7 +271,7 @@ cdef class PBCCalculator(object):
                  (minimg[1] - 1) * self._cell_array[1, 2] + \
                  (minimg[2] - 1) * self._cell_array[2, 2]
 
-        return minimg[0] + 3 * minimg[1] + 9 * minimg[2]
+        return 100 * minimg[0] + 10 * minimg[1] + 1 * minimg[2]
 
     cpdef void to_real_coords(self, precision [:, :] points):
         """Convert to real coords from crystal coords in place."""

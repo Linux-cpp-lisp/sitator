@@ -203,7 +203,7 @@ class SiteNetworkPlotter(object):
 
                 # Modified segment[1] in place
                 minimg = pbcc.min_image(segment[0], segment[1])
-                was_already_min_img = minimg == 13
+                was_already_min_img = minimg == 111
 
                 segments.append(segment)
 
