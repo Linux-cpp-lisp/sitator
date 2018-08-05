@@ -4,8 +4,6 @@ from sitator import SiteNetwork, SiteTrajectory
 from sitator.dynamics import JumpAnalysis
 from sitator.util import PBCCalculator
 
-import markov_clustering
-
 class MergeSitesByDynamics(object):
     """Merges sites using dynamical data.
 
@@ -16,11 +14,18 @@ class MergeSitesByDynamics(object):
     :param bool check_types: If True, only sites of the same type are candidates to
         be merged; if false, type information is ignored. Merged sites will only
         be assigned types if this is True.
+    :param int iterlimit: Maximum number of Markov Clustering iterations to run
+        before throwing an error.
     """
-    def __init__(self, distance_threshold = 1.0, check_types = True, verbose = True):
+    def __init__(self,
+                 distance_threshold = 1.0,
+                 check_types = True,
+                 verbose = True,
+                 iterlimit = 100):
         self.verbose = verbose
         self.distance_threshold = distance_threshold
         self.check_types = check_types
+        self.iterlimit = iterlimit
 
     def run(self, st):
         """Takes a SiteTrajectory and returns a SiteTrajectory, including a new SiteNetwork."""
@@ -41,9 +46,8 @@ class MergeSitesByDynamics(object):
         connectivity_matrix = st.site_network.p_ij
         assert st.site_network.n_sites == connectivity_matrix.shape[0]
 
-        m1 = markov_clustering.run_mcl(connectivity_matrix,
-                                       loop_value = 0) # Don't set new loop values
-        clusters = markov_clustering.get_clusters(m1)
+        clusters = self._markov_clustering(connectivity_matrix)
+
         new_n_sites = len(clusters)
 
         if self.verbose:
@@ -93,3 +97,61 @@ class MergeSitesByDynamics(object):
             newst.set_real_traj(st.real_trajectory)
 
         return newst
+
+    def _markov_clustering(self,
+                           transition_matrix,
+                           expansion = 2,
+                           inflation = 2,
+                           pruning_threshold = 0.001):
+        """
+        See https://micans.org/mcl/.
+
+        Because we're dealing with matrixes that are stochastic already,
+        there's no need to add artificial loop values.
+
+        Implementation inspired by https://github.com/GuyAllard/markov_clustering
+        """
+
+        assert transition_matrix.shape[0] == transition_matrix.shape[1]
+
+        m1 = transition_matrix.copy()
+
+        # Normalize (though it should be close already)
+        m1 /= np.sum(m1, axis = 0)
+
+        allcols = np.arange(m1.shape[1])
+
+        converged = False
+        for i in xrange(self.iterlimit):
+            # -- Expansion
+            m2 = np.linalg.matrix_power(m1, expansion)
+            # -- Inflation
+            np.power(m2, inflation, out = m2)
+            m2 /= np.sum(m2, axis = 0)
+            # -- Prune
+            to_prune = m2 < pruning_threshold
+            # Exclude the max of every column
+            to_prune[np.argmax(m2, axis = 0), allcols] = False
+            m2[to_prune] = 0.0
+            # -- Check converged
+            if np.allclose(m1, m2):
+                converged = True
+                if self.verbose:
+                    print "Markov Clustering converged in %i iterations" % i
+                break
+
+            m1[:] = m2
+
+        if not converged:
+            raise ValueError("Markov Clustering couldn't converge in %i iterations" % self.iterlimit)
+
+        # -- Get clusters
+        attractors = m2.diagonal().nonzero()[0]
+
+        clusters = set()
+
+        for a in attractors:
+            cluster = tuple(m2[a].nonzero()[0])
+            clusters.add(cluster)
+
+        return list(clusters)
