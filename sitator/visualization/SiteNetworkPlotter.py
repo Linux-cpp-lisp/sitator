@@ -41,7 +41,7 @@ class SiteNetworkPlotter(object):
                 edge_mappings = {},
                 markers = DEFAULT_MARKERS,
                 plot_points_params = {},
-                minmax_linewidth = (1.75, 7),
+                minmax_linewidth = (1.5, 7),
                 minmax_edge_alpha = (0.15, 0.75),
                 minmax_markersize = (80.0, 180.0),
                 min_color_threshold = 0.005,

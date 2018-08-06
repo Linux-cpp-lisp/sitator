@@ -1,4 +1,4 @@
-from common import layers, plotter, DEFAULT_COLORS
+from common import layers, grid, plotter, DEFAULT_COLORS
 
 from atoms import plot_atoms, plot_points
 
