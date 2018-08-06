@@ -31,7 +31,7 @@ class SiteNetworkPlotter(object):
         'marker' : 'site_types',
     }
 
-    DEFAULT_MARKERS = ['x', '+', 'v', '<', '^', '>']
+    DEFAULT_MARKERS = ['x', '+', 'v', '<', '^', '>', '*', 'd', 'h', 'p']
     DEFAULT_LINESTYLES = ['--', ':', '-.', '-']
 
     EDGE_GROUP_COLORS = ['b', 'g', 'm', 'lightseagreen', 'crimson'] + ['gray'] # gray last for -1's
@@ -41,11 +41,11 @@ class SiteNetworkPlotter(object):
                 edge_mappings = {},
                 markers = DEFAULT_MARKERS,
                 plot_points_params = {},
-                minmax_linewidth = (1.75, 7),
+                minmax_linewidth = (1.5, 7),
                 minmax_edge_alpha = (0.15, 0.75),
                 minmax_markersize = (80.0, 180.0),
-                min_color_threshold = 0.01,
-                min_width_threshold = 0.01,
+                min_color_threshold = 0.005,
+                min_width_threshold = 0.005,
                 title = ""):
         self.site_mappings = site_mappings
         self.edge_mappings = edge_mappings
@@ -87,9 +87,7 @@ class SiteNetworkPlotter(object):
                     markers = val.copy()
             elif key == 'color':
                 pts_arrays['c'] = val.copy()
-                finite = np.isfinite(val)
-                pts_params['vmin'] = np.min(val[finite])
-                pts_params['vmax'] = np.max(val[finite])
+                pts_params['norm'] = matplotlib.colors.Normalize(vmin = np.min(val), vmax = np.max(val))
             elif key == 'size':
                 s = val.copy()
                 s += np.min(s)
@@ -201,11 +199,13 @@ class SiteNetworkPlotter(object):
 
                 segment = np.empty(shape = (2, 3), dtype = centers.dtype)
                 segment[0] = centers[i]
-                segment[1] = centers[j]
+                ptbuf = centers[j].copy()
 
                 # Modified segment[1] in place
-                minimg = pbcc.min_image(segment[0], segment[1])
-                was_already_min_img = minimg == 13
+                minimg = pbcc.min_image(segment[0], ptbuf)
+                was_already_min_img = minimg == 111
+
+                segment[1] = ptbuf
 
                 segments.append(segment)
 

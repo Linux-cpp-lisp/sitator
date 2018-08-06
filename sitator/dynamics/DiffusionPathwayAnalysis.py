@@ -46,7 +46,7 @@ class DiffusionPathwayAnalysis(object):
         else:
             raise TypeError("Don't know how to interpret connectivity_threshold `%s`" % self.connectivity_threshold)
 
-        connectivity_matrix = sn.n_ij > threshold
+        connectivity_matrix = sn.n_ij >= threshold
 
         n_ccs, ccs = connected_components(connectivity_matrix,
                                    directed = False, # even though the matrix is symmetric
