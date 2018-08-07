@@ -16,7 +16,8 @@ setup(name = 'sitator',
         "matplotlib",
         "ase",
         "tqdm",
-        "backports.tempfile"
+        "backports.tempfile",
+        "future"
       ],
       extras_require = {
         "SiteTypeAnalysis" : [
