@@ -11,34 +11,37 @@ class RecenterTrajectory(object):
     def __init__(self):
         pass
 
-    def run(self, sn, positions, velocities = None, masses = None):
-        """Recenter a trajectory for the analysis of SiteNetwork ``sn``.
+    def run(self, structure, static_mask, positions, velocities = None, masses = None):
+        """Recenter a trajectory.
 
         Recenters ``traj`` on the center of mass of the atoms indicated by
-        ``sn.static_mask``, IN PLACE.
+        ``static_mask``, IN PLACE.
 
         Args:
-            sn (SiteNetwork):
+            structure (ASE Atoms): An atoms representing the structure of the
+                simulation.
+            static_mask (ndarray): Boolean mask indicating which atoms to recenter on
             positions (ndarray): (n_frames, n_atoms, 3), modified in place
             velocities (ndarray, optional): Same; modified in place if provided
             masses (None or dict or ndarray): The masses to use when computing
                 the center of mass.
-                 - If ``None``, masses from ``sn.structure.get_masses()`` will
+                 - If ``None``, masses from ``structure.get_masses()`` will
                     be used.
                  - If a ``dict``, expected to map chemical symbols to masses
                  - If an ``ndarray``, must have ``n_atoms`` elements giving the
                     masses of all atoms in the system.
         """
 
-        factors = sn.static_mask.astype(np.float)
+        factors = static_mask.astype(np.float)
+        n_static = np.sum(static_mask)
 
         # -- Deal with masses
-        atomnums = sn.structure.get_atomic_numbers()
+        atomnums = structure.get_atomic_numbers()
         if masses is None:
             # Take standard masses
-            mass_arr = sn.structure.get_masses()
+            mass_arr = structure.get_masses()
         elif isinstance(masses, dict):
-            mass_arr = np.zeros(shape = (sn.n_static), dtype = np.float)
+            mass_arr = np.zeros(shape = (n_static), dtype = np.float)
             for element in np.unique(atomnums):
                 mass_arr[atomnums == element] = masses[ase.data.chemical_symbols[element]]
         elif isinstance(masses, np.ndarray):
@@ -49,7 +52,7 @@ class RecenterTrajectory(object):
         # -- Do recentering
         recenter_traj_array(positions, mass_arr, factors)
         # Bring to cell center
-        pbcc = PBCCalculator(sn.structure.cell)
+        pbcc = PBCCalculator(structure.cell)
         positions += pbcc.cell_centroid
 
         if not velocities is None:
