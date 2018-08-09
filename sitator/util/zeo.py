@@ -64,7 +64,13 @@ class Zeopy(object):
         if not radial:
             args = ["-nor"]
 
-        output = subprocess.check_output([self._exe] + args + ["-v1", v1out, "-nt2", outp, inp])
+        try:
+            output = subprocess.check_output([self._exe] + args + ["-v1", v1out, "-nt2", outp, inp],
+                                             stderr = subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            print("Zeo++ returned an error:", file = sys.stderr)
+            print(e.output, file = sys.stderr)
+            raise
 
         if verbose:
             print(output)
