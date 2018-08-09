@@ -18,6 +18,7 @@ except:
             return iterable
 
 import importlib
+import tempfile
 
 import helpers
 from sitator import SiteNetwork, SiteTrajectory
@@ -48,6 +49,7 @@ class LandmarkAnalysis(object):
                  dynamic_lattice_mapping = False,
                  relaxed_lattice_checks = False,
                  max_mobile_per_site = 1,
+                 force_no_memmap = False,
                  verbose = True):
         """
         :param double cutoff: The distance cutoff for the landmark vectors. (unitless)
@@ -84,6 +86,8 @@ class LandmarkAnalysis(object):
 
             Statistics related to this are reported in self.avg_mobile_per_site
             and self.n_multiple_assignments.
+        :param bool force_no_memmap: if True, landmark vectors will be stored only in memory.
+            Only useful if access to landmark vectors after the analysis has run is desired.
         :param bool verbose: If `True`, progress bars and messages will be printed to stdout.
         """
 
@@ -108,6 +112,8 @@ class LandmarkAnalysis(object):
 
         self.static_movement_threshold = static_movement_threshold
         self.max_mobile_per_site = max_mobile_per_site
+
+        self.force_no_memmap = force_no_memmap
 
         self._has_run = False
 
@@ -169,23 +175,36 @@ class LandmarkAnalysis(object):
         # -- Step 2: Compute landmark vectors
         if self.verbose: print "  - computing landmark vectors -"
         # Compute landmark vectors
-        helpers._fill_landmark_vectors(self, sn, verts_np, site_vert_dists,
-                                        frames, check_for_zeros = self.check_for_zero_landmarks,
-                                        tqdm = tqdm)
 
-        # -- Step 3: Cluster landmark vectors
-        if self.verbose: print "  - clustering landmark vectors -"
-        #  - Preprocess -
-        self._do_peak_evening()
+        # The dimension of one landmark vector is the number of Voronoi regions
+        shape = (n_frames * sn.n_mobile, self._landmark_dimension)
 
-        #  - Cluster -
-        cluster_func = importlib.import_module("..cluster." + self._cluster_algo, package = __name__).do_landmark_clustering
+        with tempfile.NamedTemporaryFile() as mmap_backing:
+            if self.force_no_memmap:
+                self._landmark_vectors = np.empty(shape = shape, dtype = np.float)
+            else:
+                self._landmark_vectors = np.memmap(mmap_backing.name,
+                                                   mode = 'w+',
+                                                   dtype = np.float,
+                                                   shape = shape)
 
-        cluster_counts, lmk_lbls, lmk_confs = \
-            cluster_func(self._landmark_vectors,
-                         clustering_params = self._clustering_params,
-                         min_samples = self._minimum_site_occupancy / float(sn.n_mobile),
-                         verbose = self.verbose)
+            helpers._fill_landmark_vectors(self, sn, verts_np, site_vert_dists,
+                                            frames, check_for_zeros = self.check_for_zero_landmarks,
+                                            tqdm = tqdm)
+
+            # -- Step 3: Cluster landmark vectors
+            if self.verbose: print "  - clustering landmark vectors -"
+            #  - Preprocess -
+            self._do_peak_evening()
+
+            #  - Cluster -
+            cluster_func = importlib.import_module("..cluster." + self._cluster_algo, package = __name__).do_landmark_clustering
+
+            cluster_counts, lmk_lbls, lmk_confs = \
+                cluster_func(self._landmark_vectors,
+                             clustering_params = self._clustering_params,
+                             min_samples = self._minimum_site_occupancy / float(sn.n_mobile),
+                             verbose = self.verbose)
 
         if self.verbose:
             print "    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls)))
@@ -193,8 +212,6 @@ class LandmarkAnalysis(object):
         # reshape lables and confidences
         lmk_lbls.shape = (n_frames, sn.n_mobile)
         lmk_confs.shape = (n_frames, sn.n_mobile)
-
-
 
         n_sites = len(cluster_counts)
 

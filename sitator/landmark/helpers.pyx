@@ -13,9 +13,6 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
     n_frames = len(frames)
 
-    # The dimension of one landmark vector is the number of Voronoi regions
-    self._landmark_vectors = np.empty(shape = (n_frames * sn.n_mobile, self._landmark_dimension))
-
     cdef pbcc = self._pbcc
 
     frame_shift = np.empty(shape = (sn.n_static, 3))
