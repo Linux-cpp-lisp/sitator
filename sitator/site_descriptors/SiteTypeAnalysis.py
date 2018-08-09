@@ -157,7 +157,7 @@ class SiteTypeAnalysis(object):
         sn.site_types = types
 
         if self.verbose:
-            print(("             " + "Type {:<2} " * self.n_types).format(*xrange(1, self.n_types + 1)))
+            print(("             " + "Type {:<2} " * self.n_types).format(*xrange(self.n_types)))
             print(("# of sites   " + "{:<8}" * self.n_types).format(*n_sites_of_each_type))
 
             if np.any(n_sites_of_each_type == 0):
