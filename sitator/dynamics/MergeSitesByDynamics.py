@@ -16,16 +16,20 @@ class MergeSitesByDynamics(object):
         be assigned types if this is True.
     :param int iterlimit: Maximum number of Markov Clustering iterations to run
         before throwing an error.
+    :param dict markov_parameters: Parameters for underlying Markov Clustering.
+        Valid keys are ``'inflation'``, ``'expansion'``, and ``'pruning_threshold'``.
     """
     def __init__(self,
                  distance_threshold = 1.0,
                  check_types = True,
                  verbose = True,
-                 iterlimit = 100):
+                 iterlimit = 100,
+                 markov_parameters = {}):
         self.verbose = verbose
         self.distance_threshold = distance_threshold
         self.check_types = check_types
         self.iterlimit = iterlimit
+        self.markov_parameters = markov_parameters
 
     def run(self, st):
         """Takes a SiteTrajectory and returns a SiteTrajectory, including a new SiteNetwork."""
@@ -46,7 +50,7 @@ class MergeSitesByDynamics(object):
         connectivity_matrix = st.site_network.p_ij
         assert st.site_network.n_sites == connectivity_matrix.shape[0]
 
-        clusters = self._markov_clustering(connectivity_matrix)
+        clusters = self._markov_clustering(connectivity_matrix, **self.markov_parameters)
 
         new_n_sites = len(clusters)
 
@@ -73,6 +77,7 @@ class MergeSitesByDynamics(object):
 
             # Check distances
             dists = pbcc.distances(to_merge[0], to_merge[1:])
+
             assert np.all(dists < self.distance_threshold), "Markov clustering tried to merge sites more than %f apart -- this may be valid, and the distance threshold may need to be increased." % self.distance_threshold
 
             # New site center
