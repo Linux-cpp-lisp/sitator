@@ -15,14 +15,21 @@ import matplotlib
 from sitator.visualization import SiteNetworkPlotter
 
 class SiteNetwork(object):
-    """A network of sites for some diffusive/mobile particle in a static lattice.
+    """A network of mobile particle sites in a static lattice.
 
-    Stores the locations of sites, their defining static atoms, and their "types".
+    Stores the locations of sites (`centers`), their defining static atoms (`vertices`),
+    and their "types" (`site_types`).
 
-    Arbitrary data can also be associated with each site and with each edge.
-    Site data is any area of length n_sites; edge data is any matrix of shape
-    (n_sites, n_sites) where entry i, j is the value for the edge from site i to
-    site j.
+    Arbitrary data can also be associated with each site and with each edge
+    between sites. Site data can be any array of length n_sites; edge data can be
+    any matrix of shape (n_sites, n_sites) where entry i, j is the value for the
+    edge from site i to site j.
+
+    Attributes:
+        centers (ndarray): (n_sites, 3) coordinates of each site.
+        vertices (list, optional): list of lists of indexes of static atoms defining each
+            site.
+        site_types (ndarray, optional): (n_sites,) values grouping sites into types.
     """
 
     ATTR_NAME_REGEX = re.compile("^[a-zA-Z][a-zA-Z0-9_]*$")
@@ -32,10 +39,13 @@ class SiteNetwork(object):
                  static_mask,
                  mobile_mask):
         """
-        :param Atoms structure: an ASE/Quippy :class:Atoms object containing the structure simulated in the trajectory
-          Should be a representative/ideal/thermal-average structure.
-        :param ndarray(bool) static_mask: Boolean mask indicating which atoms to consider immobile
-        :param ndarray(bool) mobile_mask: Boolean mask indicating which atoms to track
+        Args:
+            structure (Atoms): an ASE/Quippy ``Atoms`` containging whatever atoms exist
+                in the MD trajectory.
+            static_mask (ndarray): Boolean mask indicating which atoms make up the
+                host lattice.
+            mobile_mask (ndarray): Boolean mask indicating which atoms' movement we
+                are interested in.
         """
 
         assert static_mask.ndim == mobile_mask.ndim == 1, "The masks must be one-dimensional"

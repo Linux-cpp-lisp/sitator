@@ -69,11 +69,11 @@ class SiteTrajectory(object):
 
     @property
     def n_assigned(self):
-        return self._sn.n_total - self.n_unassigned
+        return self._sn.n_mobile * self.n_frames - self.n_unassigned
 
     @property
     def percent_unassigned(self):
-        return float(self.n_unassigned) / (self._sn.n_total * self.n_frames)
+        return float(self.n_unassigned) / (self._sn.n_mobile * self.n_frames)
 
     @property
     def site_network(self):

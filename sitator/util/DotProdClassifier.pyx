@@ -21,6 +21,17 @@ except:
 
 N_SITES_ALLOC_INCREMENT = 100
 
+class OneValueListlike(object):
+    def __init__(self, value, length = np.inf):
+        self.length = length
+        self.value = value
+
+    def __getitem__(self, key):
+        if key >= self.length:
+            raise IndexError("Index %s out of range for like-like with length %i" % (key, self.length))
+
+        return self.value
+
 class DotProdClassifier(object):
     def __init__(self,
                  threshold = 0.9,
@@ -76,8 +87,11 @@ class DotProdClassifier(object):
         labels.fill(-1)
 
         # Start with each sample as a cluster
-        old_centers = np.copy(X)
-        old_n_assigned = np.ones(shape = len(X), dtype = np.int)
+        #old_centers = np.copy(X)
+        #old_n_assigned = np.ones(shape = len(X), dtype = np.int)
+        # For memory's sake, no copying
+        old_centers = X
+        old_n_assigned = OneValueListlike(value = 1, length = len(X))
         old_n_clusters = len(X)
 
         # -- Classification loop
@@ -92,6 +106,8 @@ class DotProdClassifier(object):
         cluster_center_norms = np.empty(shape = N_SITES_ALLOC_INCREMENT, dtype = np.float)
         cluster_centers = np.empty(shape = (N_SITES_ALLOC_INCREMENT, X.shape[1]), dtype = X.dtype)
         n_assigned_to = np.empty(shape = N_SITES_ALLOC_INCREMENT, dtype = np.int)
+
+        first_iter = True
 
         for iteration in xrange(self._max_iters):
             # This iteration's centers
@@ -158,8 +174,15 @@ class DotProdClassifier(object):
                     # Update center norm
                     cluster_center_norms[assigned_to] = np.linalg.norm(cluster_centers[assigned_to])
 
-            old_centers[:n_clusters] = cluster_centers[:n_clusters]
-            old_n_assigned[:n_clusters] = n_assigned_to[:n_clusters]
+            if first_iter:
+                # Create new buffers for old centers/n
+                old_centers = cluster_centers[:n_clusters].copy()
+                old_n_assigned = n_assigned_to[:n_clusters].copy()
+            else:
+                # Use existing buffers
+                old_centers[:n_clusters] = cluster_centers[:n_clusters]
+                old_n_assigned[:n_clusters] = n_assigned_to[:n_clusters]
+
             old_n_clusters = n_clusters
 
             n_sites = n_clusters
@@ -170,6 +193,8 @@ class DotProdClassifier(object):
                 break
 
             last_n_sites = n_sites
+
+            first_iter = False
 
         if not did_converge:
             raise ValueError("Clustering did not converge after %i iterations" % (self._max_iters))
@@ -247,6 +272,8 @@ class DotProdClassifier(object):
         zeros_count = 0
 
         center_norms = np.linalg.norm(self._cluster_centers, axis = 1)
+        normed_centers = self._cluster_centers.copy()
+        normed_centers /= center_norms[:, np.newaxis]
 
         # preallocate buffers
         diffs = np.empty(shape = len(center_norms), dtype = np.float)
@@ -263,9 +290,9 @@ class DotProdClassifier(object):
 
             # diffs = np.sum(x * self._cluster_centers, axis = 1)
             # diffs /= np.linalg.norm(x) * center_norms
-            np.dot(self._cluster_centers, x, out = diffs)
+            np.dot(normed_centers, x, out = diffs)
             diffs /= np.linalg.norm(x)
-            diffs /= center_norms
+            #diffs /= center_norms
 
             assigned_to = np.argmax(diffs)
             assignment_confidence = diffs[assigned_to]

@@ -3,6 +3,8 @@ from libc.math cimport sqrt, cos, M_PI, isnan, pow
 
 import numpy as np
 
+from sitator.landmark import StaticLatticeError, ZeroLandmarkError
+
 # -- Cython helpers --
 
 ctypedef double precision
@@ -12,9 +14,6 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
         raise ValueError("_fill_landmark_vectors called before Voronoi!")
 
     n_frames = len(frames)
-
-    # The dimension of one landmark vector is the number of Voronoi regions
-    self._landmark_vectors = np.empty(shape = (n_frames * sn.n_mobile, self._landmark_dimension))
 
     cdef pbcc = self._pbcc
 
@@ -59,7 +58,10 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
             static_positions_seen[nearest_static_position] = True
 
             if lattice_pt_dists[nearest_static_position] > self.static_movement_threshold:
-                raise ValueError("No static atom position within %f A threshold of static lattice position %i" % (self.static_movement_threshold, lattice_index))
+                raise StaticLatticeError("No static atom position within %f A threshold of static lattice position %i" % (self.static_movement_threshold, lattice_index),
+                                         lattice_atoms = [lattice_index],
+                                         frame = i,
+                                         try_recentering = True)
 
             if self.dynamic_lattice_mapping:
                 lattice_map[lattice_index] = nearest_static_position
@@ -67,7 +69,11 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
         # In normal circumstances, every current static position should be assigned.
         # Just a sanity check
         if (not self.relaxed_lattice_checks) and (not np.all(static_positions_seen)):
-            raise ValueError("At frame %i, static positions of atoms %s not assigned to lattice positions" % (i, np.where(~static_positions_seen)[0]))
+            not_assigned_atoms = np.where(~static_positions_seen)[0]
+            raise StaticLatticeError("At frame %i, static positions of atoms %s not assigned to lattice positions" % (i, not_assigned_atoms),
+                                     lattice_atoms = not_assigned_atoms,
+                                     frame = i,
+                                     try_recentering = True)
 
 
         for j in xrange(sn.n_mobile):
@@ -89,7 +95,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
                               self._cutoff, temp_distbuff)
 
             if check_for_zeros and (np.count_nonzero(self._landmark_vectors[current_landmark_i]) == 0):
-                raise ValueError("Encountered a zero landmark vector for mobile ion %i at frame %i." % (j, i))
+                raise ZeroLandmarkError(mobile_index = j, frame = i)
 
             current_landmark_i += 1
 
