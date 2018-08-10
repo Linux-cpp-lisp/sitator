@@ -272,6 +272,8 @@ class DotProdClassifier(object):
         zeros_count = 0
 
         center_norms = np.linalg.norm(self._cluster_centers, axis = 1)
+        normed_centers = self._cluster_centers.copy()
+        normed_centers /= center_norms[:, np.newaxis]
 
         # preallocate buffers
         diffs = np.empty(shape = len(center_norms), dtype = np.float)
@@ -288,9 +290,9 @@ class DotProdClassifier(object):
 
             # diffs = np.sum(x * self._cluster_centers, axis = 1)
             # diffs /= np.linalg.norm(x) * center_norms
-            np.dot(self._cluster_centers, x, out = diffs)
+            np.dot(normed_centers, x, out = diffs)
             diffs /= np.linalg.norm(x)
-            diffs /= center_norms
+            #diffs /= center_norms
 
             assigned_to = np.argmax(diffs)
             assignment_confidence = diffs[assigned_to]
