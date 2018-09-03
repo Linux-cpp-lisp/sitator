@@ -181,7 +181,7 @@ class JumpAnalysis(object):
             Default: 1
         """
         if mode == 'site':
-            mat = sn.jump_lag
+            mat = np.copy(sn.jump_lag)
             counts = sn.n_ij
         elif mode == 'type':
             mat, counts = self.jump_lag_by_type(sn, return_counts = True)
