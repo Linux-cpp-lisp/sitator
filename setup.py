@@ -22,8 +22,7 @@ setup(name = 'sitator',
       ],
       extras_require = {
         "SiteTypeAnalysis" : [
-            "pydpc",
-            "mendeleev"
+            "pydpc"
         ]
       },
       zip_safe = True)
