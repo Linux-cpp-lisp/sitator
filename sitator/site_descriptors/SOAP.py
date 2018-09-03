@@ -83,7 +83,7 @@ class SOAP(object):
 
         self._structure.set_cutoff(self._soaper.cutoff())
 
-        for i, pt in enumerate(tqdm(pts, desc = "SOAP") if self.verbose else pts):
+        for i, pt in enumerate(tqdm(pts, desc="SOAP") if self.verbose else pts):
             # Move tracer
             self._structure.positions[self._tracer_index] = pt
 

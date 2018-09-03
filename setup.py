@@ -16,11 +16,14 @@ setup(name = 'sitator',
         "matplotlib",
         "ase",
         "tqdm",
-        "backports.tempfile"
+        "backports.tempfile",
+        "future",
+        "sklearn"
       ],
       extras_require = {
         "SiteTypeAnalysis" : [
-            "pydpc"
+            "pydpc",
+            "mendeleev"
         ]
       },
       zip_safe = True)
