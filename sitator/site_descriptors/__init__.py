@@ -1,3 +1,3 @@
 from SiteTypeAnalysis import SiteTypeAnalysis
 
-from SOAP import SOAP
+from SOAP import SOAPCenters, SOAPSampledCenters, SOAPDescriptorAverages
