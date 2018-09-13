@@ -5,7 +5,8 @@ from builtins import *
 import numpy as np
 
 from sitator.misc import GenerateAroundSites
-from sitator import SiteNetwork, SiteTrajectory
+from sitator.SiteNetwork import SiteNetwork
+from sitator.SiteTrajectory import SiteTrajectory
 from sitator.visualization import plotter, DEFAULT_COLORS
 from sitator.util.elbow import index_of_elbow
 
@@ -47,10 +48,12 @@ class SiteTypeAnalysis(object):
         if self.verbose:
             print(" -- Running SiteTypeAnalysis --")
 
-        if isinstance(input, SiteNetwork):
-            sn = input.copy()
-        elif isinstance(input, SiteTrajectory):
-            sn = input.site_network.copy()
+        if isinstance(descriptor_input, SiteNetwork):
+            sn = descriptor_input.copy()
+        elif isinstance(descriptor_input, SiteTrajectory):
+            sn = descriptor_input.site_network.copy()
+        else:
+            raise RuntimeError("Input {}".format(type(descriptor_input)))
 
         # -- Compute descriptor vectors
         if self.verbose:

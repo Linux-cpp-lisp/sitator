@@ -2,6 +2,8 @@
 import numpy as np
 from abc import ABCMeta, abstractmethod
 
+from sitator.SiteNetwork import SiteNetwork
+from sitator.SiteTrajectory import SiteTrajectory
 try:
     import quippy as qp
     from quippy import descriptors
@@ -99,6 +101,7 @@ class SOAP(object):
         if self._soap_mask is None:
             # Make a copy of the static structure
             structure = qp.Atoms(sn.static_structure)
+            soap_mask = sn.static_mask # soap mask is the 
         else:
             if isinstance(self._soap_mask, tuple):
                 soap_mask = np.in1d(sn.structure.get_chemical_species(), self._soap_mask)
