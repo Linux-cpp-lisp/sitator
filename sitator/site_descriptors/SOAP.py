@@ -118,6 +118,7 @@ class SOAP(object):
             tracer_atomic_number = self.tracer_atomic_number
 
         structure.add_atoms((0.0, 0.0, 0.0), tracer_atomic_number)
+        structure.set_pbc([True, True, True])
         tracer_index = len(structure) - 1
 
         return structure, tracer_index, soap_mask

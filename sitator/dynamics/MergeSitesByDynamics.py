@@ -47,7 +47,8 @@ class MergeSitesByDynamics(object):
         if self.check_types:
             site_types = st.site_network.site_types
 
-        connectivity_matrix = st.site_network.p_ij
+        connectivity_matrix = st.site_network.p_ij # to set n_ijinstead of
+        # probabilities.
         assert st.site_network.n_sites == connectivity_matrix.shape[0]
 
         clusters = self._markov_clustering(connectivity_matrix, **self.markov_parameters)
