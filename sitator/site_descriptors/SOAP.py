@@ -49,7 +49,7 @@ class SOAP(object):
     :param dict soap_params = {}: Any custom SOAP params.
     """
     __metaclass__ = ABCMeta
-    def __init__(self, tracer_atomic_number=None, soap_mask=None,
+    def __init__(self, tracer_atomic_number=0, soap_mask=None,
             soap_params={}, verbose =True):
 
         self._soap_mask = soap_mask
@@ -101,7 +101,7 @@ class SOAP(object):
         if self._soap_mask is None:
             # Make a copy of the static structure
             structure = qp.Atoms(sn.static_structure)
-            soap_mask = sn.static_mask # soap mask is the 
+            soap_mask = sn.static_mask # soap mask is the
         else:
             if isinstance(self._soap_mask, tuple):
                 soap_mask = np.in1d(sn.structure.get_chemical_species(), self._soap_mask)
@@ -174,8 +174,8 @@ class SOAPSampledCenters(SOAPCenters):
     def get_descriptors(self, stn):
 
         # Do sampling
-        sampled = sampling_transform.run(stn)
-        assert isinstance(sampling, SiteNetwork), "Sampling transform returned `%s`, not a SiteNetwork" % sampling
+        sampled = self.sampling_transform.run(stn)
+        assert isinstance(sampled, SiteNetwork), "Sampling transform returned `%s`, not a SiteNetwork" % sampled
 
         # Compute actual dvecs
         dvecs, _ = super(SOAPSampledCenters, self).get_descriptors(sampled)
