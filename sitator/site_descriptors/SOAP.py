@@ -4,6 +4,7 @@ from abc import ABCMeta, abstractmethod
 
 from sitator.SiteNetwork import SiteNetwork
 from sitator.SiteTrajectory import SiteTrajectory
+
 try:
     import quippy as qp
     from quippy import descriptors
@@ -39,22 +40,45 @@ class SOAP(object):
 
     SOAP computations are *not* thread-safe; use one SOAP object per thread.
 
-    :param int tracer_atomic_number = None: The type of tracer atom to add. If None,
-        defaults to the type of the first mobile atom in the SiteNetwork.
+    :param int tracer_atomic_number: The atomic number of the tracer.
+    :param list environment: The atomic numbers or atomic symbols
+        of the environment to consider. I.e. for Li2CO3, can be set to ['O']  or [8]
+        for oxygen only, or ['C', 'O'] / ['C', 8] / [6,8] if carbon and oxygen 
+        are considered an environment.
     :param soap_mask: Which atoms in the SiteNetwork's structure
         to use in SOAP calculations.
         Can be either a boolean mask ndarray or a tuple of species.
-        If `None`, the static_structure of the SiteNetwork will be used.
+        If `None`, the entire static_structure of the SiteNetwork will be used.
         Mobile atoms cannot be used for the SOAP host structure.
+        Even not masked, species not considered in environment will be not accounted for.
+        For ideal performance: Specify environment and soap_mask correctly!
     :param dict soap_params = {}: Any custom SOAP params.
     """
     __metaclass__ = ABCMeta
-    def __init__(self, tracer_atomic_number=0, soap_mask=None,
-            soap_params={}, verbose =True):
+    def __init__(self, tracer_atomic_number, environment,
+            soap_mask=None, soap_params={}, verbose =True):
+        from ase.data import atomic_numbers
 
+        if not isinstance(environment, (list, tuple)):
+            raise TypeError('environment has to be a list or tuple of species (atomic number'
+                ' or symbol of the environment to consider')
+        # Creating a dictionary for convenience, to check the types and values:
+        self.tracer_atomic_number = 3
+        centers_list = [self.tracer_atomic_number]
+
+        environment_list = []
+        for e in environment:
+            if isinstance(e, int):
+                assert 0 < e <= max(atomic_numbers.values())
+                environment_list.append(e)
+            elif isinstance(e, str):
+                try:
+                    environment_list.append(atomic_numbers[e])
+                except KeyError:
+                    raise KeyError("You provided a string that is not a valid atomic symbol")
+            else:
+                raise TypeError("Environment has to be a list of atomic numbers or atomic symbols")
         self._soap_mask = soap_mask
-        self.tracer_atomic_number = tracer_atomic_number
-
         # -- Create the descriptor object
         soap_opts = dict(DEFAULT_SOAP_PARAMS)
         soap_opts.update(soap_params)
@@ -62,15 +86,21 @@ class SOAP(object):
         # User options
         for opt in soap_opts:
             soap_cmd_line.append("{}={}".format(opt, soap_opts[opt]))
-        # Stuff that's the same no matter what
-        # There's always only one tracer:
-        soap_cmd_line.append("n_Z=1")
-        # The species of that tracer is tracer_atomic_number
-        soap_cmd_line.append("Z={{{}}}".format(self.tracer_atomic_number))
+
+
+        soap_cmd_line.append(' n_Z={} Z={{{}}}'.format(len(centers_list), ' '.join(map(str, centers_list))))
+        soap_cmd_line.append('n_species={} species_Z={{{}}}'.format(len(environment_list), ' '.join(map(str, environment_list))))
+
+        if verbose:
+            print("The soap command line string")
+            for line in soap_cmd_line:
+                print(line)
 
         self._soaper = descriptors.Descriptor(" ".join(soap_cmd_line))
+        self._verbose = verbose
+        self._cutoff = soap_opts['cutoff']
 
-        self.verbose = verbose
+
 
     @property
     def n_dim(self):
@@ -185,7 +215,118 @@ class SOAPSampledCenters(SOAPCenters):
 
 
 
-class SOAPDescriptorAverages(SOAP):
+class SOAPDescriptorAverages(SOAP.SOAP):
+    """Compute many instantaneous SOAPs for each site, and then average them in SOAP space.
+
+    Computes the SOAP descriptors for mobile particles assigned to each site,
+    in the host structure *as it was at that moment*. Those descriptor vectors are
+    then averaged in SOAP space to give the final SOAP vectors for each site.
+
+    This method often performs better than SOAPSampledCenters on more dynamic
+    systems.
+
+    :param int stepsize: Stride (in frames) when computing SOAPs
+    :param int averaging: Number of average SOAP vectors to compute for each site.
+
+    """
+    def __init__(self, *args, **kwargs):
+
+        stepsize = kwargs.pop('stepsize', 1)
+        averaging = kwargs.pop('averaging', 1)
+
+        d = dict(averaging=averaging, stepsize=stepsize)
+        for k,v in d.items():
+            if not isinstance(v, int):
+                raise TypeError('{} has to be an integer'.format(k))
+            if not ( v > 0):
+                raise ValueError('{} has to be an positive'.format(k))
+        del d # not needed anymore!
+        self._stepsize = stepsize
+        self._averaging = averaging
+
+        super(SOAPDescriptor3Averages, self).__init__(*args, **kwargs)
+
+    def get_descriptors_lalala(self, site_trajectory):
+        qpatoms = QpAtoms(site_trajectory.site_network.copy())
+        positions = site_trajectory._real_traj[::self._stepsize]
+
+        soaps = np.empty((positions.shape[0], n_centers, desc.n_dim))
+        for i, pos in enumerate(positions):
+            qpatoms.set_positions(pos)
+            qpatoms.set_cutoff(cutoff)
+            qpatoms.calc_connect()
+            soaps[i,:,:] = desc.calc(qpatoms ,grad=False)["descriptor"]
+        if is_fast_average:
+            soaps = soaps.mean(axis=0)
+
+        return soaps.reshape(positions.shape[0]*n_centers, desc.n_dim)
+
+
+    def _get_descriptors(self, site_trajectory, structure, tracer_index, soap_mask):
+        """
+        calculate descriptors
+        """
+        #~ structure = qp.Atoms(site_trajectory.static_structure)
+        # the number of sites in the network
+        nsit = site_trajectory.site_network.n_sites
+        # I load the indices of the mobiles species into mob_indices:
+        mob_indices = np.where(site_trajectory.site_network.mobile_mask)[0]
+        # real_traj is the real space positions, site_traj the site trajectory
+        # (i.e. for every mobile species the site index)
+        # I load into new variable, only the steps I need (memory???)
+        real_traj = site_trajectory._real_traj[::self._stepsize]
+        site_traj = site_trajectory.traj[::self._stepsize]
+
+        # Now, I need to allocate the output
+        # so for each site, I count how much data there is!
+        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in range(nsit)], dtype=int)
+        nr_of_descs = counts // self._averaging
+        if np.any(nr_of_descs == 0):
+            raise ValueError("You are asking too much, averaging with {} gives a problem".format(self._averaging))
+        # This is where I load the descriptor:
+        descs = np.zeros((np.sum(nr_of_descs), self.n_dim))
+
+        # An array that tells  me the index I'm at for each site type
+        desc_index = [np.sum(nr_of_descs[:i]) for i in range(len(nr_of_descs))]
+        max_index = [np.sum(nr_of_descs[:i+1]) for i in range(len(nr_of_descs))]
+
+        count_of_site = np.zeros(len(nr_of_descs), dtype=int)
+        blocked = np.empty(nsit, dtype=bool)
+        blocked[:] = False
+        structure.set_cutoff(self._soaper.cutoff())
+        for site_traj_t, pos in tqdm(zip(site_traj, real_traj), desc="SOAP"):
+            # I update the host lattice positions here, once for every timestep
+            structure.positions[:tracer_index] = pos[soap_mask]
+            for mob_idx, site_idx in enumerate(site_traj_t):
+                if site_idx >= 0 and not blocked[site_idx]:
+                    # Now, for every lithium that has been associated to a site of index site_idx,
+                    # I take my structure and load the position of this mobile atom:
+                    structure.positions[tracer_index] = pos[mob_indices[mob_idx]]
+                    # calc_connect to calculated distance
+#                     structure.calc_connect()
+                    #There should only be one descriptor, since there should only be one mobile
+                    # I also divide  by averaging, to avoid getting into large numbers.
+#                     soapv =  self._soaper.calc(structure)['descriptor'][0] / self._averaging
+                    structure.set_cutoff(self._cutoff)
+                    structure.calc_connect()
+                    soapv = self._soaper.calc(structure, grad=False)["descriptor"]
+
+                    #~ soapv ,_,_ = get_fingerprints([structure], d)
+                    # So, now I need to figure out where to load the soapv into desc
+                    idx_to_add_desc = desc_index[site_idx]
+                    descs[idx_to_add_desc,  :] += soapv[0] / self._averaging
+                    count_of_site[site_idx] += 1
+                    # Now, if the count reaches the averaging I want, I augment
+                    if count_of_site[site_idx] == self._averaging:
+                        desc_index[site_idx] += 1
+                        count_of_site[site_idx] = 0
+                        # Now I check whether I have to block this site from accumulating more descriptors
+                        if max_index[site_idx] == desc_index[site_idx]:
+                            blocked[site_idx] = True
+
+        desc_to_site = np.repeat(range(nsit), nr_of_descs)
+        return descs, desc_to_site
+
     """Compute many instantaneous SOAPs for each site, and then average them in SOAP space.
 
     Computes the SOAP descriptors for mobile particles assigned to each site,
