@@ -215,7 +215,7 @@ class SOAPSampledCenters(SOAPCenters):
 
 
 
-class SOAPDescriptorAverages(SOAP.SOAP):
+class SOAPDescriptorAverages(SOAP):
     """Compute many instantaneous SOAPs for each site, and then average them in SOAP space.
 
     Computes the SOAP descriptors for mobile particles assigned to each site,

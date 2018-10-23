@@ -180,8 +180,8 @@ class SiteTypeAnalysis(object):
             ax.scatter(dvecs_core[:,0], dvecs_core[:,1], s = 3, color = color, label = "Type %i" % cluster)
             ax.scatter(dvecs_border[:,0], dvecs_border[:,1], s = 3, color = color, alpha = 0.3)
 
-        ax.set_xlabel("(%i%% of variance)" % (100.0 * self.pca.explained_variance_ratio_[0]))
-        ax.set_ylabel("(%i%% of variance)" % (100.0 * self.pca.explained_variance_ratio_[1]))
+        ax.set_xlabel(r"$1^{st}$ comp. (%i%% of $\sigma^2$)" % (100.0 * self.pca.explained_variance_ratio_[0]))
+        ax.set_ylabel(r"$2^{nd}$ comp. (%i%% of $\sigma^2$)" % (100.0 * self.pca.explained_variance_ratio_[1]))
         ax.set_title("Descriptor Clustering")
         ax.legend()
 
