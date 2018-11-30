@@ -244,29 +244,13 @@ class SOAPDescriptorAverages(SOAP):
         self._stepsize = stepsize
         self._averaging = averaging
 
-        super(SOAPDescriptor3Averages, self).__init__(*args, **kwargs)
-
-    def get_descriptors_lalala(self, site_trajectory):
-        qpatoms = QpAtoms(site_trajectory.site_network.copy())
-        positions = site_trajectory._real_traj[::self._stepsize]
-
-        soaps = np.empty((positions.shape[0], n_centers, desc.n_dim))
-        for i, pos in enumerate(positions):
-            qpatoms.set_positions(pos)
-            qpatoms.set_cutoff(cutoff)
-            qpatoms.calc_connect()
-            soaps[i,:,:] = desc.calc(qpatoms ,grad=False)["descriptor"]
-        if is_fast_average:
-            soaps = soaps.mean(axis=0)
-
-        return soaps.reshape(positions.shape[0]*n_centers, desc.n_dim)
+        super(SOAPDescriptorAverages, self).__init__(*args, **kwargs)
 
 
     def _get_descriptors(self, site_trajectory, structure, tracer_index, soap_mask):
         """
         calculate descriptors
         """
-        #~ structure = qp.Atoms(site_trajectory.static_structure)
         # the number of sites in the network
         nsit = site_trajectory.site_network.n_sites
         # I load the indices of the mobiles species into mob_indices:
@@ -327,78 +311,3 @@ class SOAPDescriptorAverages(SOAP):
         desc_to_site = np.repeat(range(nsit), nr_of_descs)
         return descs, desc_to_site
 
-    """Compute many instantaneous SOAPs for each site, and then average them in SOAP space.
-
-    Computes the SOAP descriptors for mobile particles assigned to each site,
-    in the host structure *as it was at that moment*. Those descriptor vectors are
-    then averaged in SOAP space to give the final SOAP vectors for each site.
-
-    This method often performs better than SOAPSampledCenters on more dynamic
-    systems.
-
-    :param int stepsize: Stride (in frames) when computing SOAPs
-    :param int averaging: Number of average SOAP vectors to compute for each site.
-
-    """
-    def __init__(self, *args, **kwargs):
-        self.stepsize = kwargs.pop('stepsize', 1)
-        self.averaging = kwargs.pop('averaging', 1)
-        super(SOAPDescriptorAverages, self).__init__(*args, **kwargs)
-
-
-    def _get_descriptors(self, site_trajectory, structure, tracer_index, soap_mask):
-
-        # the number of sites in the network
-        nsit = site_trajectory.site_network.n_sites
-        # I load the indices of the mobiles species into mob_indices:
-        mob_indices = np.where(site_trajectory.site_network.mobile_mask)[0]
-
-        # real_traj is the real space positions, site_traj the site trajectory
-        # (i.e. for every mobile species the site index)
-        # I load into new variable, only the steps I need (memory???)
-        real_traj = site_trajectory._real_traj[::self.stepsize]
-        site_traj = site_trajectory.traj[::self.stepsize]
-
-        # Now, I need to allocate the output
-        # so for each site, I count how much data there is!
-        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in range(nsit)], dtype=int)
-        nr_of_descs = counts // self.averaging
-        if np.any(nr_of_descs == 0):
-            raise ValueError("You are asking too much, averaging with {} gives a problem".format(self.averaging))
-        # This is where I load the descriptor:
-        descs = np.zeros((np.sum(nr_of_descs), self.n_dim))
-        # An array that tells  me the index I'm at for each site type
-        desc_index = [np.sum(nr_of_descs[:i]) for i in range(len(nr_of_descs))]
-        max_index = [np.sum(nr_of_descs[:i+1]) for i in range(len(nr_of_descs))]
-
-        count_of_site = np.zeros(len(nr_of_descs), dtype=int)
-        blocked = np.empty(nsit, dtype=bool)
-        blocked[:] = False
-        structure.set_cutoff(self._soaper.cutoff())
-        for site_traj_t, pos in zip(site_traj, real_traj):
-            # I update the host lattice positions here, once for every timestep
-            structure.positions[:tracer_index] = pos[soap_mask]
-            for mob_idx, site_idx in enumerate(site_traj_t):
-                if site_idx >= 0 and not blocked[site_idx]:
-                    # Now, for every lithium that has been associated to a site of index site_idx,
-                    # I take my structure and load the position of this mobile atom:
-                    structure.positions[tracer_index] = pos[mob_indices[mob_idx]]
-                    # calc_connect to calculated distance
-                    structure.calc_connect()
-                    #There should only be one descriptor, since there should only be one mobile
-                    # I also divide  by averaging, to avoid getting into large numbers.
-                    soapv =  self._soaper.calc(structure)['descriptor'][0] / self.averaging
-                    # So, now I need to figure out where to load the soapv into desc
-                    idx_to_add_desc = desc_index[site_idx]
-                    descs[idx_to_add_desc,  :] += soapv
-                    count_of_site[site_idx] += 1
-                    # Now, if the count reaches the averaging I want, I augment
-                    if count_of_site[site_idx] == self.averaging:
-                        desc_index[site_idx] += 1
-                        count_of_site[site_idx] = 0
-                        # Now I check whether I have to block this site from accumulating more descriptors
-                        if max_index[site_idx] == desc_index[site_idx]:
-                            blocked[site_idx] = True
-
-        desc_to_site = np.repeat(range(nsit), nr_of_descs)
-        return descs, desc_to_site
