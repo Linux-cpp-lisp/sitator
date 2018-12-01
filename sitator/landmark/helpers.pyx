@@ -54,11 +54,15 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
         for lattice_index in xrange(sn.n_static):
             lattice_pt = sn.static_structure.positions[lattice_index]
-            pbcc.distances(lattice_pt, static_positions, out = lattice_pt_dists)
+
             if self.dynamic_lattice_mapping:
+                # Only compute all distances if dynamic remapping is on
+                pbcc.distances(lattice_pt, static_positions, out = lattice_pt_dists)
                 nearest_static_position = np.argmin(lattice_pt_dists)
+                nearest_static_distance = lattice_pt_dists[nearest_static_position]
             else:
                 nearest_static_position = lattice_index
+                nearest_static_distance = pbcc.distances(lattice_pt, static_positions[nearest_static_position])[0]
 
             if static_positions_seen[nearest_static_position]:
                 # We've already seen this one... error
@@ -67,7 +71,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
             static_positions_seen[nearest_static_position] = True
 
-            if lattice_pt_dists[nearest_static_position] > self.static_movement_threshold:
+            if nearest_static_distance > self.static_movement_threshold:
                 raise StaticLatticeError("No static atom position within %f A threshold of static lattice position %i" % (self.static_movement_threshold, lattice_index),
                                          lattice_atoms = [lattice_index],
                                          frame = i,
