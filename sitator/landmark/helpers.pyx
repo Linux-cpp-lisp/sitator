@@ -13,6 +13,8 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
     if self._landmark_dimension is None:
         raise ValueError("_fill_landmark_vectors called before Voronoi!")
 
+    # Setup state variables
+
     n_frames = len(frames)
 
     cdef pbcc = self._pbcc
@@ -31,6 +33,14 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
     lattice_pt = np.empty(shape = 3, dtype = sn.static_structure.positions.dtype)
     lattice_pt_dists = np.empty(shape = sn.n_static, dtype = np.float)
     static_positions_seen = np.empty(shape = sn.n_static, dtype = np.bool)
+
+    # - Precompute cutoff function rounding point
+    # TODO: Think about the 0.0001 value
+    # Even at 0.0000001 and steepness 20 this still gives only ~1.9 (center 1.4),
+    # so a stricter threshold is probably fine
+    cutoff_round_to_zero = cutoff_round_to_zero_point(self._cutoff_midpoint,
+                                                      self._cutoff_steepness,
+                                                      0.0001)
 
     cdef Py_ssize_t landmark_dim = self._landmark_dimension
     cdef Py_ssize_t current_landmark_i = 0
@@ -92,12 +102,21 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
                               landmark_dim, frame_shift, lattice_map,
                               verts_np, site_vert_dists,
                               pbcc.cell_centroid,
-                              self._cutoff, temp_distbuff)
+                              self._cutoff_midpoint,
+                              self._cutoff_steepness,
+                              cutoff_round_to_zero,
+                              temp_distbuff)
 
             if check_for_zeros and (np.count_nonzero(self._landmark_vectors[current_landmark_i]) == 0):
                 raise ZeroLandmarkError(mobile_index = j, frame = i)
 
             current_landmark_i += 1
+
+cdef precision cutoff_round_to_zero_point(precision cutoff_midpoint,
+                                          precision cutoff_steepness,
+                                          precision threshold):
+    # Computed by solving for x:
+    return cutoff_midpoint + log((1/threshold) - 1.) / cutoff_steepness
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -111,7 +130,9 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
                   const Py_ssize_t [:,:] verts_np,
                   const precision [:, :] verts_centroid_dists,
                   const precision [:] li_pos,
-                  precision cutoff,
+                  precision cutoff_midpoint,
+                  precision cutoff_steepness,
+                  precision cutoff_round_to_zero,
                   precision [:] distbuff) nogil:
 
     # Pure Python equiv:
@@ -162,15 +183,13 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
             # normalize to centroid distance
             temp = distbuff[v] / verts_centroid_dists[k, h]
 
-            if temp > cutoff:
+            if temp > cutoff_round_to_zero:
                 temp = 0.0
                 # Short circut
                 ci = 0.0
                 break
-            elif temp < 1.0:
-                temp = 1.0
             else:
-                temp = (cos((M_PI / (cutoff - 1.0)) * (temp - 1.0)) + 1.0) * 0.5
+                temp = 1. / (1. + exp(cutoff_steepness * (temp - cutoff_midpoint)))
 
             # Multiply into accumulator
             #ci *= distbuff[v]

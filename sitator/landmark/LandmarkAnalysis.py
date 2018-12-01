@@ -40,7 +40,8 @@ class LandmarkAnalysis(object):
     def __init__(self,
                  clustering_algorithm = 'dotprod',
                  clustering_params = {},
-                 cutoff = 2.0,
+                 cutoff_center = 1.5,
+                 cutoff_steepness = 20,
                  minimum_site_occupancy = 0.1,
                  peak_evening = 'none',
                  weighted_site_positions = True,
@@ -52,7 +53,9 @@ class LandmarkAnalysis(object):
                  force_no_memmap = False,
                  verbose = True):
         """
-        :param double cutoff: The distance cutoff for the landmark vectors. (unitless)
+        :param double cutoff_center: The midpoint for the logistic function used
+            as the landmark cutoff function. (unitless)
+        :param double cutoff_steepness: Steepness of the logistic cutoff function.
         :param double minimum_site_occupancy = 0.1: Minimum occupancy (% of time occupied)
             for a site to qualify as such.
         :param dict clustering_params: Parameters for the chosen clustering_algorithm
@@ -91,7 +94,8 @@ class LandmarkAnalysis(object):
         :param bool verbose: If `True`, progress bars and messages will be printed to stdout.
         """
 
-        self._cutoff = cutoff
+        self._cutoff_midpoint = cutoff_midpoint
+        self._cutoff_steepness = cutoff_steepness
         self._minimum_site_occupancy = minimum_site_occupancy
 
         self._cluster_algo = clustering_algorithm
