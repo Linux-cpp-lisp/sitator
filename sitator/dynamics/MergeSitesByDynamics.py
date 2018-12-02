@@ -147,7 +147,7 @@ class MergeSitesByDynamics(object):
                            transition_matrix,
                            expansion = 2,
                            inflation = 2,
-                           pruning_threshold = 0.001):
+                           pruning_threshold = 0.00001):
         """
         See https://micans.org/mcl/.
 
