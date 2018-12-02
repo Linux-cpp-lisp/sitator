@@ -237,26 +237,46 @@ class SOAPDescriptorAverages(SOAP):
     then averaged in SOAP space to give the final SOAP vectors for each site.
 
     This method often performs better than SOAPSampledCenters on more dynamic
-    systems.
+    systems, but requires significantly more computation. 
 
-    :param int stepsize: Stride (in frames) when computing SOAPs
-    :param int averaging: Number of average SOAP vectors to compute for each site.
+    :param int stepsize: Stride (in frames) when computing SOAPs. Default 1.
+    :param int averaging: Number of SOAP vectors to average for each output vector.
+    :param int avg_descriptors_per_site: Can be specified instead of `averaging`.
+        Specifies the _average_ number of average SOAP vectors to compute for each
+        site. This does not guerantee that number of SOAP vectors for any site,
+        rather, it allows a trajectory-size agnostic way to specify approximately
+        how many descriptors are desired.
 
     """
     def __init__(self, *args, **kwargs):
 
-        stepsize = kwargs.pop('stepsize', 1)
-        averaging = kwargs.pop('averaging', 1)
+        averaging_key = 'averaging'
+        stepsize_key = 'stepsize'
+        avg_desc_per_key = 'avg_descriptors_per_site'
 
-        d = dict(averaging=averaging, stepsize=stepsize)
+        assert not ((averaging_key in kwargs) and (avg_desc_per_key in kwargs)), "`averaging` and `avg_descriptors_per_site` cannot be specified at the same time."
+
+        self._stepsize = kwargs.pop(stepsize_key, 1)
+
+        d = {stepsize_key : self._stepsize}
+
+        if averaging_key in kwargs:
+            self._averaging = kwargs.pop(averaging_key)
+            d[averaging_key] = self._averaging
+            self._avg_desc_per_site = None
+        elif avg_desc_per_key in kwargs:
+            self._avg_desc_per_site = kwargs.pop(avg_desc_per_key)
+            d[avg_desc_per_key] = self._avg_desc_per_site
+            self._averaging = None
+        else:
+            raise RuntimeError("Either the `averaging` or `avg_descriptors_per_site` option must be provided.")
+
         for k,v in d.items():
             if not isinstance(v, int):
                 raise TypeError('{} has to be an integer'.format(k))
             if not ( v > 0):
                 raise ValueError('{} has to be an positive'.format(k))
         del d # not needed anymore!
-        self._stepsize = stepsize
-        self._averaging = averaging
 
         super(SOAPDescriptorAverages, self).__init__(*args, **kwargs)
 
@@ -277,10 +297,17 @@ class SOAPDescriptorAverages(SOAP):
 
         # Now, I need to allocate the output
         # so for each site, I count how much data there is!
-        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in range(nsit)], dtype=int)
-        nr_of_descs = counts // self._averaging
+        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in xrange(nsit)], dtype=int)
+
+        if self._averaging is not None:
+            averaging = self._averaging
+        else:
+            averaging = int(np.floor(np.mean(counts) / self._avg_desc_per_site))
+
+        nr_of_descs = counts // averaging
+
         if np.any(nr_of_descs == 0):
-            raise ValueError("You are asking too much, averaging with {} gives a problem".format(self._averaging))
+            raise ValueError("You are asking too much, averaging with {} gives a problem".format(averaging))
         # This is where I load the descriptor:
         descs = np.zeros((np.sum(nr_of_descs), self.n_dim))
 
@@ -312,10 +339,10 @@ class SOAPDescriptorAverages(SOAP):
                     #~ soapv ,_,_ = get_fingerprints([structure], d)
                     # So, now I need to figure out where to load the soapv into desc
                     idx_to_add_desc = desc_index[site_idx]
-                    descs[idx_to_add_desc,  :] += soapv[0] / self._averaging
+                    descs[idx_to_add_desc,  :] += soapv[0] / averaging
                     count_of_site[site_idx] += 1
                     # Now, if the count reaches the averaging I want, I augment
-                    if count_of_site[site_idx] == self._averaging:
+                    if count_of_site[site_idx] == averaging:
                         desc_index[site_idx] += 1
                         count_of_site[site_idx] = 0
                         # Now I check whether I have to block this site from accumulating more descriptors
