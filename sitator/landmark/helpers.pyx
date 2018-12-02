@@ -1,5 +1,5 @@
 cimport cython
-from libc.math cimport sqrt, cos, M_PI, isnan, pow
+from libc.math cimport sqrt, cos, M_PI, isnan, pow, exp, log
 
 import numpy as np
 
@@ -62,7 +62,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
                 nearest_static_distance = lattice_pt_dists[nearest_static_position]
             else:
                 nearest_static_position = lattice_index
-                nearest_static_distance = pbcc.distances(lattice_pt, static_positions[nearest_static_position])[0]
+                nearest_static_distance = pbcc.distances(lattice_pt, static_positions[nearest_static_position:nearest_static_position+1])[0]
 
             if static_positions_seen[nearest_static_position]:
                 # We've already seen this one... error
@@ -193,7 +193,7 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
                 ci = 0.0
                 break
             else:
-                temp = 1. / (1. + exp(cutoff_steepness * (temp - cutoff_midpoint)))
+                temp = 1.0 / (1.0 + exp(cutoff_steepness * (temp - cutoff_midpoint)))
 
             # Multiply into accumulator
             #ci *= distbuff[v]

@@ -40,7 +40,7 @@ class LandmarkAnalysis(object):
     def __init__(self,
                  clustering_algorithm = 'dotprod',
                  clustering_params = {},
-                 cutoff_center = 1.5,
+                 cutoff_midpoint = 1.5,
                  cutoff_steepness = 20,
                  minimum_site_occupancy = 0.1,
                  peak_evening = 'none',
