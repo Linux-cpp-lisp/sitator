@@ -43,8 +43,10 @@ class SOAP(object):
     :param int tracer_atomic_number: The atomic number of the tracer.
     :param list environment: The atomic numbers or atomic symbols
         of the environment to consider. I.e. for Li2CO3, can be set to ['O']  or [8]
-        for oxygen only, or ['C', 'O'] / ['C', 8] / [6,8] if carbon and oxygen 
+        for oxygen only, or ['C', 'O'] / ['C', 8] / [6,8] if carbon and oxygen
         are considered an environment.
+        Defaults to `None`, in which case all non-mobile atoms are considered
+        regardless of species.
     :param soap_mask: Which atoms in the SiteNetwork's structure
         to use in SOAP calculations.
         Can be either a boolean mask ndarray or a tuple of species.
@@ -55,48 +57,56 @@ class SOAP(object):
     :param dict soap_params = {}: Any custom SOAP params.
     """
     __metaclass__ = ABCMeta
-    def __init__(self, tracer_atomic_number, environment,
+    def __init__(self, tracer_atomic_number, environment = None,
             soap_mask=None, soap_params={}, verbose =True):
         from ase.data import atomic_numbers
 
-        if not isinstance(environment, (list, tuple)):
-            raise TypeError('environment has to be a list or tuple of species (atomic number'
-                ' or symbol of the environment to consider')
         # Creating a dictionary for convenience, to check the types and values:
         self.tracer_atomic_number = 3
         centers_list = [self.tracer_atomic_number]
-
-        environment_list = []
-        for e in environment:
-            if isinstance(e, int):
-                assert 0 < e <= max(atomic_numbers.values())
-                environment_list.append(e)
-            elif isinstance(e, str):
-                try:
-                    environment_list.append(atomic_numbers[e])
-                except KeyError:
-                    raise KeyError("You provided a string that is not a valid atomic symbol")
-            else:
-                raise TypeError("Environment has to be a list of atomic numbers or atomic symbols")
         self._soap_mask = soap_mask
+
         # -- Create the descriptor object
         soap_opts = dict(DEFAULT_SOAP_PARAMS)
         soap_opts.update(soap_params)
         soap_cmd_line = ["soap"]
+
         # User options
         for opt in soap_opts:
             soap_cmd_line.append("{}={}".format(opt, soap_opts[opt]))
 
+        #
+        soap_cmd_line.append('n_Z={} Z={{{}}}'.format(len(centers_list), ' '.join(map(str, centers_list))))
 
-        soap_cmd_line.append(' n_Z={} Z={{{}}}'.format(len(centers_list), ' '.join(map(str, centers_list))))
-        soap_cmd_line.append('n_species={} species_Z={{{}}}'.format(len(environment_list), ' '.join(map(str, environment_list))))
+        # - Add environment species controls if given
+        self._environment = None
+        if not environment is None:
+            if not isinstance(environment, (list, tuple)):
+                raise TypeError('environment has to be a list or tuple of species (atomic number'
+                    ' or symbol of the environment to consider')
+
+            environment_list = []
+            for e in environment:
+                if isinstance(e, int):
+                    assert 0 < e <= max(atomic_numbers.values())
+                    environment_list.append(e)
+                elif isinstance(e, str):
+                    try:
+                        environment_list.append(atomic_numbers[e])
+                    except KeyError:
+                        raise KeyError("You provided a string that is not a valid atomic symbol")
+                else:
+                    raise TypeError("Environment has to be a list of atomic numbers or atomic symbols")
+
+            self._environment = environment_list
+            soap_cmd_line.append('n_species={} species_Z={{{}}}'.format(len(environment_list), ' '.join(map(str, environment_list))))
+
+        soap_cmd_line = " ".join(soap_cmd_line)
 
         if verbose:
-            print("The soap command line string")
-            for line in soap_cmd_line:
-                print(line)
+            print("SOAP command line: %s" % soap_cmd_line)
 
-        self._soaper = descriptors.Descriptor(" ".join(soap_cmd_line))
+        self._soaper = descriptors.Descriptor(soap_cmd_line)
         self._verbose = verbose
         self._cutoff = soap_opts['cutoff']
 
@@ -141,6 +151,10 @@ class SOAP(object):
             assert not np.any(soap_mask & sn.mobile_mask), "Error for atoms %s; No atom can be both static and mobile" % np.where(soap_mask & sn.mobile_mask)[0]
             structure = qp.Atoms(sn.structure[soap_mask])
 
+        assert np.any(soap_mask), "Given `soap_mask` excluded all host atoms."
+        if not self._environment is None:
+            assert np.any(np.isin(sn.structure.get_atomic_numbers()[soap_mask], self._environment)), "Combination of given `soap_mask` with the given `environment` excludes all host atoms."
+
         # Add a tracer
         if self.tracer_atomic_number is None:
             tracer_atomic_number = sn.structure.get_atomic_numbers()[sn.mobile_mask][0]
@@ -174,7 +188,7 @@ class SOAPCenters(SOAP):
 
         structure.set_cutoff(self._soaper.cutoff())
 
-        for i, pt in enumerate(tqdm(pts, desc="SOAP") if self.verbose else pts):
+        for i, pt in enumerate(tqdm(pts, desc="SOAP") if self._verbose else pts):
             # Move tracer
             structure.positions[tracer_index] = pt
 
@@ -310,4 +324,3 @@ class SOAPDescriptorAverages(SOAP):
 
         desc_to_site = np.repeat(range(nsit), nr_of_descs)
         return descs, desc_to_site
-
