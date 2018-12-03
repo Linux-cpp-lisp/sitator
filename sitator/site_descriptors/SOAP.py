@@ -43,8 +43,10 @@ class SOAP(object):
     :param int tracer_atomic_number: The atomic number of the tracer.
     :param list environment: The atomic numbers or atomic symbols
         of the environment to consider. I.e. for Li2CO3, can be set to ['O']  or [8]
-        for oxygen only, or ['C', 'O'] / ['C', 8] / [6,8] if carbon and oxygen 
+        for oxygen only, or ['C', 'O'] / ['C', 8] / [6,8] if carbon and oxygen
         are considered an environment.
+        Defaults to `None`, in which case all non-mobile atoms are considered
+        regardless of species.
     :param soap_mask: Which atoms in the SiteNetwork's structure
         to use in SOAP calculations.
         Can be either a boolean mask ndarray or a tuple of species.
@@ -55,48 +57,56 @@ class SOAP(object):
     :param dict soap_params = {}: Any custom SOAP params.
     """
     __metaclass__ = ABCMeta
-    def __init__(self, tracer_atomic_number, environment,
+    def __init__(self, tracer_atomic_number, environment = None,
             soap_mask=None, soap_params={}, verbose =True):
         from ase.data import atomic_numbers
 
-        if not isinstance(environment, (list, tuple)):
-            raise TypeError('environment has to be a list or tuple of species (atomic number'
-                ' or symbol of the environment to consider')
         # Creating a dictionary for convenience, to check the types and values:
         self.tracer_atomic_number = 3
         centers_list = [self.tracer_atomic_number]
-
-        environment_list = []
-        for e in environment:
-            if isinstance(e, int):
-                assert 0 < e <= max(atomic_numbers.values())
-                environment_list.append(e)
-            elif isinstance(e, str):
-                try:
-                    environment_list.append(atomic_numbers[e])
-                except KeyError:
-                    raise KeyError("You provided a string that is not a valid atomic symbol")
-            else:
-                raise TypeError("Environment has to be a list of atomic numbers or atomic symbols")
         self._soap_mask = soap_mask
+
         # -- Create the descriptor object
         soap_opts = dict(DEFAULT_SOAP_PARAMS)
         soap_opts.update(soap_params)
         soap_cmd_line = ["soap"]
+
         # User options
         for opt in soap_opts:
             soap_cmd_line.append("{}={}".format(opt, soap_opts[opt]))
 
+        #
+        soap_cmd_line.append('n_Z={} Z={{{}}}'.format(len(centers_list), ' '.join(map(str, centers_list))))
 
-        soap_cmd_line.append(' n_Z={} Z={{{}}}'.format(len(centers_list), ' '.join(map(str, centers_list))))
-        soap_cmd_line.append('n_species={} species_Z={{{}}}'.format(len(environment_list), ' '.join(map(str, environment_list))))
+        # - Add environment species controls if given
+        self._environment = None
+        if not environment is None:
+            if not isinstance(environment, (list, tuple)):
+                raise TypeError('environment has to be a list or tuple of species (atomic number'
+                    ' or symbol of the environment to consider')
+
+            environment_list = []
+            for e in environment:
+                if isinstance(e, int):
+                    assert 0 < e <= max(atomic_numbers.values())
+                    environment_list.append(e)
+                elif isinstance(e, str):
+                    try:
+                        environment_list.append(atomic_numbers[e])
+                    except KeyError:
+                        raise KeyError("You provided a string that is not a valid atomic symbol")
+                else:
+                    raise TypeError("Environment has to be a list of atomic numbers or atomic symbols")
+
+            self._environment = environment_list
+            soap_cmd_line.append('n_species={} species_Z={{{}}}'.format(len(environment_list), ' '.join(map(str, environment_list))))
+
+        soap_cmd_line = " ".join(soap_cmd_line)
 
         if verbose:
-            print("The soap command line string")
-            for line in soap_cmd_line:
-                print(line)
+            print("SOAP command line: %s" % soap_cmd_line)
 
-        self._soaper = descriptors.Descriptor(" ".join(soap_cmd_line))
+        self._soaper = descriptors.Descriptor(soap_cmd_line)
         self._verbose = verbose
         self._cutoff = soap_opts['cutoff']
 
@@ -141,6 +151,10 @@ class SOAP(object):
             assert not np.any(soap_mask & sn.mobile_mask), "Error for atoms %s; No atom can be both static and mobile" % np.where(soap_mask & sn.mobile_mask)[0]
             structure = qp.Atoms(sn.structure[soap_mask])
 
+        assert np.any(soap_mask), "Given `soap_mask` excluded all host atoms."
+        if not self._environment is None:
+            assert np.any(np.isin(sn.structure.get_atomic_numbers()[soap_mask], self._environment)), "Combination of given `soap_mask` with the given `environment` excludes all host atoms."
+
         # Add a tracer
         if self.tracer_atomic_number is None:
             tracer_atomic_number = sn.structure.get_atomic_numbers()[sn.mobile_mask][0]
@@ -174,7 +188,7 @@ class SOAPCenters(SOAP):
 
         structure.set_cutoff(self._soaper.cutoff())
 
-        for i, pt in enumerate(tqdm(pts, desc="SOAP") if self.verbose else pts):
+        for i, pt in enumerate(tqdm(pts, desc="SOAP") if self._verbose else pts):
             # Move tracer
             structure.positions[tracer_index] = pt
 
@@ -223,26 +237,46 @@ class SOAPDescriptorAverages(SOAP):
     then averaged in SOAP space to give the final SOAP vectors for each site.
 
     This method often performs better than SOAPSampledCenters on more dynamic
-    systems.
+    systems, but requires significantly more computation. 
 
-    :param int stepsize: Stride (in frames) when computing SOAPs
-    :param int averaging: Number of average SOAP vectors to compute for each site.
+    :param int stepsize: Stride (in frames) when computing SOAPs. Default 1.
+    :param int averaging: Number of SOAP vectors to average for each output vector.
+    :param int avg_descriptors_per_site: Can be specified instead of `averaging`.
+        Specifies the _average_ number of average SOAP vectors to compute for each
+        site. This does not guerantee that number of SOAP vectors for any site,
+        rather, it allows a trajectory-size agnostic way to specify approximately
+        how many descriptors are desired.
 
     """
     def __init__(self, *args, **kwargs):
 
-        stepsize = kwargs.pop('stepsize', 1)
-        averaging = kwargs.pop('averaging', 1)
+        averaging_key = 'averaging'
+        stepsize_key = 'stepsize'
+        avg_desc_per_key = 'avg_descriptors_per_site'
 
-        d = dict(averaging=averaging, stepsize=stepsize)
+        assert not ((averaging_key in kwargs) and (avg_desc_per_key in kwargs)), "`averaging` and `avg_descriptors_per_site` cannot be specified at the same time."
+
+        self._stepsize = kwargs.pop(stepsize_key, 1)
+
+        d = {stepsize_key : self._stepsize}
+
+        if averaging_key in kwargs:
+            self._averaging = kwargs.pop(averaging_key)
+            d[averaging_key] = self._averaging
+            self._avg_desc_per_site = None
+        elif avg_desc_per_key in kwargs:
+            self._avg_desc_per_site = kwargs.pop(avg_desc_per_key)
+            d[avg_desc_per_key] = self._avg_desc_per_site
+            self._averaging = None
+        else:
+            raise RuntimeError("Either the `averaging` or `avg_descriptors_per_site` option must be provided.")
+
         for k,v in d.items():
             if not isinstance(v, int):
                 raise TypeError('{} has to be an integer'.format(k))
             if not ( v > 0):
                 raise ValueError('{} has to be an positive'.format(k))
         del d # not needed anymore!
-        self._stepsize = stepsize
-        self._averaging = averaging
 
         super(SOAPDescriptorAverages, self).__init__(*args, **kwargs)
 
@@ -263,10 +297,17 @@ class SOAPDescriptorAverages(SOAP):
 
         # Now, I need to allocate the output
         # so for each site, I count how much data there is!
-        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in range(nsit)], dtype=int)
-        nr_of_descs = counts // self._averaging
+        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in xrange(nsit)], dtype=int)
+
+        if self._averaging is not None:
+            averaging = self._averaging
+        else:
+            averaging = int(np.floor(np.mean(counts) / self._avg_desc_per_site))
+
+        nr_of_descs = counts // averaging
+
         if np.any(nr_of_descs == 0):
-            raise ValueError("You are asking too much, averaging with {} gives a problem".format(self._averaging))
+            raise ValueError("You are asking too much, averaging with {} gives a problem".format(averaging))
         # This is where I load the descriptor:
         descs = np.zeros((np.sum(nr_of_descs), self.n_dim))
 
@@ -298,10 +339,10 @@ class SOAPDescriptorAverages(SOAP):
                     #~ soapv ,_,_ = get_fingerprints([structure], d)
                     # So, now I need to figure out where to load the soapv into desc
                     idx_to_add_desc = desc_index[site_idx]
-                    descs[idx_to_add_desc,  :] += soapv[0] / self._averaging
+                    descs[idx_to_add_desc,  :] += soapv[0] / averaging
                     count_of_site[site_idx] += 1
                     # Now, if the count reaches the averaging I want, I augment
-                    if count_of_site[site_idx] == self._averaging:
+                    if count_of_site[site_idx] == averaging:
                         desc_index[site_idx] += 1
                         count_of_site[site_idx] = 0
                         # Now I check whether I have to block this site from accumulating more descriptors
@@ -310,4 +351,3 @@ class SOAPDescriptorAverages(SOAP):
 
         desc_to_site = np.repeat(range(nsit), nr_of_descs)
         return descs, desc_to_site
-
