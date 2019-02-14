@@ -3,9 +3,11 @@ from Cython.Build import cythonize
 import numpy as np
 
 setup(name = 'sitator',
-      version = '0.1.0',
-      description = 'Advanced site analysis for molecular dynamics trajectories.',
+      version = '1.0.0',
+      description = 'Unsupervised landmark analysis for jump detection in molecular dynamics simulations.',
+      download_url = "https://github.com/Linux-cpp-lisp/sitator",
       author = 'Alby Musaelian',
+      license = "MIT",
       packages = ['sitator'],
       ext_modules = cythonize([
         "sitator/landmark/helpers.pyx",
