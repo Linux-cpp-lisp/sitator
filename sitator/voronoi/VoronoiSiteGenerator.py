@@ -4,12 +4,16 @@ import numpy as np
 from sitator import SiteNetwork
 from sitator.util import Zeopy
 
-DEFAULT_ZEOPP = "/home/amusaelian/Documents/Ionic Frustration/code/lib/zeo++/trunk/network"
-
 class VoronoiSiteGenerator(object):
-    """Given an empty SiteNetwork, use the Voronoi decomposition to predict/generate sites."""
+    """Given an empty SiteNetwork, use the Voronoi decomposition to predict/generate sites.
 
-    def __init__(self, radial = False, verbose = True, zeopp_path = DEFAULT_ZEOPP):
+    :param str zeopp_path: Path to the Zeo++ `network` executable
+    :param bool radial: Whether to use the radial Voronoi transform. Defaults to,
+        and should typically be, False.
+    :param bool verbose:
+    """
+
+    def __init__(self, zeopp_path = "network", radial = False, verbose = True):
         self._radial = radial
         self._verbose = verbose
         self._zeopy = Zeopy(zeopp_path)

@@ -5,7 +5,8 @@ from builtins import *
 import numpy as np
 
 from sitator.misc import GenerateAroundSites
-from sitator import SiteNetwork, SiteTrajectory
+from sitator.SiteNetwork import SiteNetwork
+from sitator.SiteTrajectory import SiteTrajectory
 from sitator.visualization import plotter, DEFAULT_COLORS
 from sitator.util.elbow import index_of_elbow
 
@@ -19,32 +20,18 @@ except ImportError:
     raise ImportError("SiteTypeAnalysis requires the `pydpc` package")
 
 class SiteTypeAnalysis(object):
-    """Cluster sites into types using SOAP and DPCLUS.
-
-    -- sampling_transform --
-    Can take either a SiteNetwork or a SiteTrajectory. A "sampling method" must
-    be provided -- something with a .run method that will take the input and return
-    a SiteNetwork with a higher density of sites (for more SOAP data). Each site in
-    this SiteNetwork should have its type set to the index of the site in the original
-    input it was generated from.
-
-    NAvgsPerSite and GenerateAroundSites are built for this, the first for SiteTrajectory's
-    and the second for SiteNetwork's.
+    """Cluster sites into types using a descriptor and DPCLUS.
 
     -- descriptor --
     Some kind of object implementing:
          - n_dim: the number of components in a descriptor vector
-         - get_descriptors(pts, out = None): fills and returns out (len(pts), n_dim) with the descriptor
-            vectors for the points in pts.
-
-    :param (density, delta) dpc_thresh: The minimum z-score for a point to be
-        considered an outlier in the DPCLUS decision plot -- in other words to become
-        a cluster. Default (-0.5, 20.0).
+         - get_descriptors(site_traj or site_network): returns an array of descriptor vectors
+            of dimension (M, n_dim) and an array of length M indicating which
+            descriptor vectors correspond to which sites in (site_traj.)site_network.
     """
-    def __init__(self, sampling_transform, descriptor,
+    def __init__(self, descriptor,
                 min_pca_variance = 0.9, min_pca_dimensions = 2,
                 verbose = True, n_site_types_max = 20):
-        self.sampling_transform = sampling_transform
         self.descriptor = descriptor
         self.min_pca_variance = min_pca_variance
         self.min_pca_dimensions = min_pca_dimensions
@@ -53,26 +40,28 @@ class SiteTypeAnalysis(object):
 
         self._n_dvecs = None
 
-    def run(self, input):
+    def run(self, descriptor_input, **kwargs):
         if not self._n_dvecs is None:
             raise ValueError("Can't run SiteTypeAnalysis more than once!")
 
         # -- Sample enough points
         if self.verbose:
             print(" -- Running SiteTypeAnalysis --")
-            print("  - Running Sampling Transform")
-        sampling = self.sampling_transform.run(input)
-        assert isinstance(sampling, SiteNetwork)
 
-        if isinstance(input, SiteNetwork):
-            sn = input.copy()
-        elif isinstance(input, SiteTrajectory):
-            sn = input.site_network.copy()
+        if isinstance(descriptor_input, SiteNetwork):
+            sn = descriptor_input.copy()
+        elif isinstance(descriptor_input, SiteTrajectory):
+            sn = descriptor_input.site_network.copy()
+        else:
+            raise RuntimeError("Input {}".format(type(descriptor_input)))
 
         # -- Compute descriptor vectors
         if self.verbose:
             print("  - Computing Descriptor Vectors")
-        self.dvecs = self.descriptor.get_descriptors(sampling.centers)
+
+        self.dvecs, dvecs_to_site = self.descriptor.get_descriptors(descriptor_input, **kwargs)
+        assert len(self.dvecs) == len(dvecs_to_site), "Length mismatch in descriptor return values"
+        assert np.min(dvecs_to_site) == 0 and np.max(dvecs_to_site) < sn.n_sites
 
         # -- Dimensionality Reduction
         if self.verbose:
@@ -141,7 +130,7 @@ class SiteTypeAnalysis(object):
         types = np.empty(shape = sn.n_sites, dtype = np.int)
         self.winning_vote_percentages = np.empty(shape = sn.n_sites, dtype = np.float)
         for site in xrange(sn.n_sites):
-            corresponding_samples = sampling.site_types == site
+            corresponding_samples = dvecs_to_site == site
             votes = assignments[corresponding_samples]
             n_votes = len(votes)
             votes = np.bincount(votes[votes >= 0])
@@ -191,8 +180,8 @@ class SiteTypeAnalysis(object):
             ax.scatter(dvecs_core[:,0], dvecs_core[:,1], s = 3, color = color, label = "Type %i" % cluster)
             ax.scatter(dvecs_border[:,0], dvecs_border[:,1], s = 3, color = color, alpha = 0.3)
 
-        ax.set_xlabel("(%i%% of variance)" % (100.0 * self.pca.explained_variance_ratio_[0]))
-        ax.set_ylabel("(%i%% of variance)" % (100.0 * self.pca.explained_variance_ratio_[1]))
+        ax.set_xlabel(r"$1^{st}$ comp. (%i%% of $\sigma^2$)" % (100.0 * self.pca.explained_variance_ratio_[0]))
+        ax.set_ylabel(r"$2^{nd}$ comp. (%i%% of $\sigma^2$)" % (100.0 * self.pca.explained_variance_ratio_[1]))
         ax.set_title("Descriptor Clustering")
         ax.legend()
 

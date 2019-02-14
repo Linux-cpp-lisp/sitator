@@ -28,7 +28,7 @@ class StaticLatticeError(Exception):
 class ZeroLandmarkError(Exception):
     def __init__(self, mobile_index, frame):
 
-        message = "Encountered a zero landmark vector for mobile ion %i at frame %i." % (mobile_index, frame)
+        message = "Encountered a zero landmark vector for mobile ion %i at frame %i. Try increasing `cutoff_midpoint` and/or decreasing `cutoff_steepness`." % (mobile_index, frame)
 
         super(ZeroLandmarkError, self).__init__(message)
 

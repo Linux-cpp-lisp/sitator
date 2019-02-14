@@ -115,15 +115,27 @@ class JumpAnalysis(object):
                 res_times[site] = np.mean(times[noninf])
             else:
                 res_times[site] = n_frames
-                
+
         st.site_network.add_site_attribute('residence_times', res_times)
         st.site_network.add_site_attribute('occupancy_freqs', np.sum(n_ij, axis = 0) / st.n_frames)
         st.site_network.add_site_attribute('total_corrected_residences', total_time_spent_at_site)
 
         return st
 
-    def jump_lag_by_type(self, sn):
-        """Given a SiteNetwork with jump_lag info, compute it's jump_lag_by_type"""
+    def jump_lag_by_type(self,
+                         sn,
+                         return_counts = False):
+        """Given a SiteNetwork with jump_lag info, compute avg. residence times by type
+
+        Computes the average number of frames a mobile particle spends at each
+        type of site before jumping to each other type of site.
+
+        Returns an (n_types, n_types) matrix. If no jumps of a given type occured,
+        the corresponding entry is +inf.
+
+        If ``return_counts``, then also returns a matrix giving the number of
+        each type of jump that occured.
+        """
 
         if sn.site_types is None:
             raise ValueError("SiteNetwork has no type information.")
@@ -133,26 +145,51 @@ class JumpAnalysis(object):
         all_types = sn.types
         outmat = np.empty(shape = (n_types, n_types), dtype = sn.jump_lag.dtype)
 
+        if return_counts:
+            countmat = np.empty(shape = outmat.shape, dtype = np.int)
+
         for stype_from, stype_to in itertools.product(xrange(len(all_types)), repeat = 2):
             lags = sn.jump_lag[site_types == all_types[stype_from]][:, site_types == all_types[stype_to]]
             # Only take things that aren't inf
             lags = lags[lags < np.inf]
+
+            if return_counts:
+                countmat[stype_from, stype_to] = len(lags)
+
             # If there aren't any, then avg is inf
             if len(lags) == 0:
                 outmat[stype_from, stype_to] = np.inf
             else:
                 outmat[stype_from, stype_to] = np.mean(lags)
 
-        return outmat
+        if return_counts:
+            return outmat, countmat
+        else:
+            return outmat
 
     @plotter(is3D = False)
-    def plot_jump_lag(self, sn, mode = 'site', ax = None, fig = None, **kwargs):
+    def plot_jump_lag(self, sn, mode = 'site', min_n_events = 1, ax = None, fig = None, **kwargs):
+        """Plot the jump lag of a site network.
+
+        :param SiteNetwork sn:
+        :param str mode: If 'site', show jump lag between individual sites.
+            If 'type', show jump lag between types of sites (see :func:jump_lag_by_type)
+            Default: 'site'
+        :param int min_n_events: Minimum number of jump events of a given type
+            (i -> j or type -> type) to show a jump lag. If a given jump has
+            occured less than min_n_events times, no jump lag will be shown.
+            Default: 1
+        """
         if mode == 'site':
-            mat = sn.jump_lag
+            mat = np.copy(sn.jump_lag)
+            counts = sn.n_ij
         elif mode == 'type':
-            mat = self.jump_lag_by_type(sn)
+            mat, counts = self.jump_lag_by_type(sn, return_counts = True)
         else:
             raise ValueError("`%s` is invalid mode" % mode)
+
+        # min_n_events
+        mat[counts < min_n_events] = np.nan
 
         # Show diagonal
         ax.plot(*zip([0.0, 0.0], mat.shape), color = 'k', alpha = 0.5, linewidth = 1, linestyle = '--')
