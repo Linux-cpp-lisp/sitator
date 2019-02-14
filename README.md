@@ -27,9 +27,11 @@ To enable site type analysis, add the `[SiteTypeAnalysis]` option:
 pip install ".[SiteTypeAnalysis]"
 ```
 
-## Examples
+## Examples and Documentation
 
 Two example Jupyter notebooks for conducting full landmark analyses of LiAlSiO4 and Li12La3Zr2O12, including data files, can be found [on Materials Cloud](https://archive.materialscloud.org/2019.0008/).
+
+All individual classes and parameters are documented with docstrings in the source code.
 
 ## License
 
