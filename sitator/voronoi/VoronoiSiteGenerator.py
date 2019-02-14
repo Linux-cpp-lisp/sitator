@@ -13,7 +13,7 @@ class VoronoiSiteGenerator(object):
     :param bool verbose:
     """
 
-    def __init__(self, zeopp_path, radial = False, verbose = True):
+    def __init__(self, zeopp_path = "network", radial = False, verbose = True):
         self._radial = radial
         self._verbose = verbose
         self._zeopy = Zeopy(zeopp_path)
