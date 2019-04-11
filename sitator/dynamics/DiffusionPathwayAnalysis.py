@@ -54,7 +54,7 @@ class DiffusionPathwayAnalysis(object):
 
         _, counts = np.unique(ccs, return_counts = True)
 
-        is_pathway = counts > self.minimum_n_sites
+        is_pathway = counts >= self.minimum_n_sites
 
         if self.verbose:
             print "Taking all edges with at least %i/%i jumps..." % (threshold, n_non_self_jumps)
