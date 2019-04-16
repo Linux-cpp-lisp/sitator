@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from Cython.Build import cythonize
 import numpy as np
 
@@ -8,7 +8,7 @@ setup(name = 'sitator',
       download_url = "https://github.com/Linux-cpp-lisp/sitator",
       author = 'Alby Musaelian',
       license = "MIT",
-      packages = ['sitator'],
+      packages = find_packages(),
       ext_modules = cythonize([
         "sitator/landmark/helpers.pyx",
         "sitator/util/*.pyx"
