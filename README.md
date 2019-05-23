@@ -6,8 +6,8 @@ A modular framework for conducting and visualizing site analysis of molecular dy
 
 For details on the method and its application, please see our paper:
 
-> L. Kahle, A. Musaelian, N. Marzari, and B. Kozinsky
-> [Unsupervised landmark analysis for jump detection in molecular dynamics simulations](https://doi.org/10.1103/PhysRevMaterials.3.055404)
+> L. Kahle, A. Musaelian, N. Marzari, and B. Kozinsky <br/>
+> [Unsupervised landmark analysis for jump detection in molecular dynamics simulations](https://doi.org/10.1103/PhysRevMaterials.3.055404) <br/>
 > Phys. Rev. Materials 3, 055404 – 21 May 2019
 
 If you use `sitator` in your research, please consider citing this paper. The BibTex citation can be found in [`CITATION.bib`](CITATION.bib).
