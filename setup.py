@@ -8,6 +8,7 @@ setup(name = 'sitator',
       download_url = "https://github.com/Linux-cpp-lisp/sitator",
       author = 'Alby Musaelian',
       license = "MIT",
+      python_requires = '>=2.7, <3',
       packages = find_packages(),
       ext_modules = cythonize([
         "sitator/landmark/helpers.pyx",
