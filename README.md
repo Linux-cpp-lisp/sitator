@@ -2,10 +2,9 @@
 
 A modular framework for conducting and visualizing site analysis of molecular dynamics trajectories.
 
-<p align="center">
-  <img src="example.png" height="5in"/>
-  <small><i> Visualizations of complete landmark site analyses, created with `sitator`, of the superionic conductors (a) LGPS, (b) LLZO, and (c) LASO. Source: figures 11, 14, and 18 from our paper, linked below. </i></small>
-</p>
+![](example.png)
+
+<i> Visualizations of complete landmark site analyses, created with `sitator`, of the superionic conductors (a) LGPS, (b) LLZO, and (c) LASO. Source: figures 11, 14, and 18 from our paper, linked below. </i>
 
 
 `sitator` contains an efficient implementation of our method, landmark analysis, as well as visualization tools, generic data structures for site analysis, pre- and post-processing tools, and more.
