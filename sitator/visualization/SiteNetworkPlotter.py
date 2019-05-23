@@ -63,13 +63,31 @@ class SiteNetworkPlotter(object):
 
     @plotter(is3D = True, figsize = (10, 10))
     def __call__(self, sn, *args, **kwargs):
+        # -- Plot actual SiteNetwork --
         l = [(plot_atoms,  {'atoms' : sn.static_structure})]
         l += self._site_layers(sn, self.plot_points_params)
 
         l += self._plot_edges(sn, *args, **kwargs)
 
-        kwargs['ax'].set_title(self.title)
+        # -- Some visual clean up --
+        ax = kwargs['ax']
 
+        ax.set_title(self.title)
+
+        ax.set_aspect('equal')
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+
+        # Now set color to white (or whatever is "invisible")
+        ax.xaxis.pane.set_edgecolor('w')
+        ax.yaxis.pane.set_edgecolor('w')
+        ax.zaxis.pane.set_edgecolor('w')
+
+        # Finally remove axis:
+        ax.set_axis_off()
+
+        # -- Put it all together --
         layers(*l, **kwargs)
 
     def _site_layers(self, sn, plot_points_params):
