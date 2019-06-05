@@ -74,7 +74,7 @@ def periodic_voronoi(structure, logfile = sys.stdout):
     facet_index = -1
     next_our_index = 0
     for facet_match in facets_regex.finditer(qhull_output):
-        center = np.asarray(map(float, facet_match.group('center').split()))
+        center = np.asarray(list(map(float, facet_match.group('center').split())))
         facet_index += 1
 
         all_facets_centers.append(center)
@@ -82,7 +82,7 @@ def periodic_voronoi(structure, logfile = sys.stdout):
         if not pbcc.is_in_image_of_cell(center, (1, 1, 1)):
             continue
 
-        verts = map(int, vertices_re.findall(facet_match.group('vertices')))
+        verts = list(map(int, vertices_re.findall(facet_match.group('vertices'))))
         verts_in_main_cell = tuple(v % len(structure) for v in verts)
 
         facet_indexes_taken.add(facet_index)

@@ -53,15 +53,15 @@ class ConfigurationalEntropy(object):
         forgivable = problems & (size_of_problems < self.acceptable_overshoot)
 
         if self.verbose:
-            print "n_i      " + ("{:5.3} " * len(n_i)).format(*n_i)
-            print "N_i      " + ("{:>5} " * len(N_i)).format(*N_i)
-            print "         " + ("------" * len(n_i))
-            print "P_2      " + ("{:5.3} " * len(p2)).format(*p2)
+            print("n_i      " + ("{:5.3} " * len(n_i)).format(*n_i))
+            print("N_i      " + ("{:>5} " * len(N_i)).format(*N_i))
+            print("         " + ("------" * len(n_i)))
+            print("P_2      " + ("{:5.3} " * len(p2)).format(*p2))
 
         if not np.all(problems == forgivable):
             raise ValueError("P_2 values for site types %s larger than 1.0 + acceptable_overshoot (%f)" % (np.where(problems)[0], self.acceptable_overshoot))
         elif np.any(problems) and self.verbose:
-            print ""
+            print("")
 
         # Correct forgivable problems
         p2[forgivable] = 1.0

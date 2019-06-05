@@ -29,7 +29,7 @@ class JumpAnalysis(object):
         assert isinstance(st, SiteTrajectory)
 
         if self.verbose:
-            print "Running JumpAnalysis..."
+            print("Running JumpAnalysis...")
 
         n_mobile = st.site_network.n_mobile
         n_frames = st.n_frames
@@ -63,7 +63,7 @@ class JumpAnalysis(object):
             fknown = frame >= 0
 
             if np.any(~fknown) and self.verbose:
-                print "  at frame %i, %i uncorrectable unassigned particles" % (i, np.sum(~fknown))
+                print("  at frame %i, %i uncorrectable unassigned particles" % (i, np.sum(~fknown)))
             # -- Update stats
             total_time_spent_at_site[frame[fknown]] += 1
 
@@ -95,7 +95,7 @@ class JumpAnalysis(object):
         assert not np.any(np.nonzero(avg_time_before_jump.diagonal()))
 
         if self.verbose and n_problems != 0:
-            print "Came across %i times where assignment and last known assignment were unassigned." % n_problems
+            print("Came across %i times where assignment and last known assignment were unassigned." % n_problems)
 
         msk = avg_time_before_jump_n > 0
         # Zeros -- i.e. no jumps -- should actualy be infs
@@ -108,7 +108,7 @@ class JumpAnalysis(object):
         st.site_network.add_edge_attribute('p_ij', n_ij / total_time_spent_at_site)
 
         res_times = np.empty(shape = n_sites, dtype = np.float)
-        for site in xrange(n_sites):
+        for site in range(n_sites):
             times = avg_time_before_jump[site]
             noninf = times < np.inf
             if np.any(noninf):
@@ -148,7 +148,7 @@ class JumpAnalysis(object):
         if return_counts:
             countmat = np.empty(shape = outmat.shape, dtype = np.int)
 
-        for stype_from, stype_to in itertools.product(xrange(len(all_types)), repeat = 2):
+        for stype_from, stype_to in itertools.product(range(len(all_types)), repeat = 2):
             lags = sn.jump_lag[site_types == all_types[stype_from]][:, site_types == all_types[stype_to]]
             # Only take things that aren't inf
             lags = lags[lags < np.inf]
@@ -192,7 +192,7 @@ class JumpAnalysis(object):
         mat[counts < min_n_events] = np.nan
 
         # Show diagonal
-        ax.plot(*zip([0.0, 0.0], mat.shape), color = 'k', alpha = 0.5, linewidth = 1, linestyle = '--')
+        ax.plot(*list(zip([0.0, 0.0], mat.shape)), color = 'k', alpha = 0.5, linewidth = 1, linestyle = '--')
         ax.grid()
 
         im = ax.matshow(mat, zorder = 10, cmap = 'plasma')

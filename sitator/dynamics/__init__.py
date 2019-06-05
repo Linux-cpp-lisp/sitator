@@ -1,3 +1,3 @@
-from JumpAnalysis import JumpAnalysis
+from .JumpAnalysis import JumpAnalysis
 
-from MergeSitesByDynamics import MergeSitesByDynamics
+from .MergeSitesByDynamics import MergeSitesByDynamics

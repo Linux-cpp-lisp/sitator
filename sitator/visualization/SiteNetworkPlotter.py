@@ -201,8 +201,8 @@ class SiteNetworkPlotter(object):
         sites_to_plot = []
         sites_to_plot_positions = []
 
-        for i in xrange(n_sites):
-            for j in xrange(n_sites):
+        for i in range(n_sites):
+            for j in range(n_sites):
                 # No self edges
                 if i == j:
                     continue
@@ -254,7 +254,7 @@ class SiteNetworkPlotter(object):
             lccolors = np.empty(shape = (len(cs), 4), dtype = np.float)
             # Group colors
             if do_groups:
-                for i in xrange(len(cs)):
+                for i in range(len(cs)):
                     lccolors[i] = matplotlib.colors.to_rgba(SiteNetworkPlotter.EDGE_GROUP_COLORS[groups[i]])
             else:
                 lccolors[:] = matplotlib.colors.to_rgba(SiteNetworkPlotter.EDGE_GROUP_COLORS[0])

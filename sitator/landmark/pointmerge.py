@@ -59,7 +59,7 @@ def merge_points_soap_paths(tsoap,
                     assert edge_length <= sanity_check_cutoff, "edge_length %s" % edge_length
 
                     # Points along the line
-                    for i in xrange(n_steps):
+                    for i in range(n_steps):
                         points_along[i] = step_vec
                     points_along *= step_vec_mult
                     points_along += edge_from_pt

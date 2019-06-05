@@ -1,2 +1,2 @@
 
-from VoronoiSiteGenerator import VoronoiSiteGenerator
+from .VoronoiSiteGenerator import VoronoiSiteGenerator

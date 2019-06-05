@@ -20,14 +20,14 @@ class SiteVolumes(object):
 
         pbcc = PBCCalculator(st.site_network.structure.cell)
 
-        for site in xrange(st.site_network.n_sites):
+        for site in range(st.site_network.n_sites):
             pos = st.real_positions_for_site(site)
 
             assert pos.flags['OWNDATA']
 
             vol = np.inf
             area = None
-            for i in xrange(self.n_recenterings):
+            for i in range(self.n_recenterings):
                 # Recenter
                 offset = pbcc.cell_centroid - pos[int(i * (len(pos)/self.n_recenterings))]
                 pos += offset
@@ -36,7 +36,7 @@ class SiteVolumes(object):
                 try:
                     hull = ConvexHull(pos)
                 except QhullError as qhe:
-                    print "For site %i, iter %i: %s" % (site, i, qhe)
+                    print("For site %i, iter %i: %s" % (site, i, qhe))
                     vols[site] = np.nan
                     areas[site] = np.nan
                     continue

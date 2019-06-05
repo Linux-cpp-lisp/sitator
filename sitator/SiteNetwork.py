@@ -258,11 +258,11 @@ class SiteNetwork(object):
 
     @property
     def site_attributes(self):
-        return self._site_attrs.keys()
+        return list(self._site_attrs.keys())
 
     @property
     def edge_attributes(self):
-        return self._edge_attrs.keys()
+        return list(self._edge_attrs.keys())
 
     def has_attribute(self, attr):
         return (attr in self._site_attrs) or (attr in self._edge_attrs)

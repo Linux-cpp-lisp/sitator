@@ -61,7 +61,7 @@ def plotter(is3D = True, **outer):
 @plotter(is3D = True)
 def layers(*args, **fax):
     i = fax['i']
-    print i
+    print(i)
     for p, kwargs in args:
         p(fig = fax['fig'], ax = fax['ax'], i = i, **kwargs)
         i += 1

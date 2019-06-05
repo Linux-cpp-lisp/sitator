@@ -158,7 +158,7 @@ class LandmarkAnalysis(object):
         n_frames = len(frames)
 
         if self.verbose:
-            print "--- Running Landmark Analysis ---"
+            print("--- Running Landmark Analysis ---")
 
         # Create PBCCalculator
         self._pbcc = PBCCalculator(sn.structure.cell)
@@ -177,7 +177,7 @@ class LandmarkAnalysis(object):
             site_vert_dists[i, :len(polyhedron)] = dists
 
         # -- Step 2: Compute landmark vectors
-        if self.verbose: print "  - computing landmark vectors -"
+        if self.verbose: print("  - computing landmark vectors -")
         # Compute landmark vectors
 
         # The dimension of one landmark vector is the number of Voronoi regions
@@ -197,7 +197,7 @@ class LandmarkAnalysis(object):
                                             tqdm = tqdm)
 
             # -- Step 3: Cluster landmark vectors
-            if self.verbose: print "  - clustering landmark vectors -"
+            if self.verbose: print("  - clustering landmark vectors -")
             #  - Preprocess -
             self._do_peak_evening()
 
@@ -211,7 +211,7 @@ class LandmarkAnalysis(object):
                              verbose = self.verbose)
 
         if self.verbose:
-            print "    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls)))
+            print("    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls))))
 
         # reshape lables and confidences
         lmk_lbls.shape = (n_frames, sn.n_mobile)
@@ -223,7 +223,7 @@ class LandmarkAnalysis(object):
             raise ValueError("There are %i mobile particles, but only identified %i sites. Check clustering_params." % (sn.n_mobile, n_sites))
 
         if self.verbose:
-            print "    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts)
+            print("    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts))
 
         # Check that multiple particles are never assigned to one site at the
         # same time, cause that would be wrong.
@@ -246,7 +246,7 @@ class LandmarkAnalysis(object):
         # - Compute site centers
         site_centers = np.empty(shape = (n_sites, 3), dtype = frames.dtype)
 
-        for site in xrange(n_sites):
+        for site in range(n_sites):
             mask = lmk_lbls == site
             pts = frames[:, sn.mobile_mask][mask]
             if self.weighted_site_positions:

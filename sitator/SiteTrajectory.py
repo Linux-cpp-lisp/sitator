@@ -156,7 +156,7 @@ class SiteTrajectory(object):
         max_time_unknown = 0
         total_reassigned = 0
 
-        for i in xrange(self.n_frames):
+        for i in range(self.n_frames):
             # All those unknown this frame
             unknown = self._traj[i] == -1
             # Update last_known for assigned sites

@@ -36,7 +36,7 @@ def plot_atoms(atoms, positions = None, hide_species = (), wrap = False, fig = N
 
 
     all_cvecs = []
-    whos_left = set(xrange(len(atoms.cell)))
+    whos_left = set(range(len(atoms.cell)))
     for i, cvec1 in enumerate(atoms.cell):
         all_cvecs.append(np.array([[0.0, 0.0, 0.0], cvec1]))
         for j, cvec2 in enumerate(atoms.cell[list(whos_left - {i})]):

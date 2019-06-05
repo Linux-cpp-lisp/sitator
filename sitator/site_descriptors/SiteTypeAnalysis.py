@@ -79,7 +79,7 @@ class SiteTypeAnalysis(object):
         self.dvecs = pca_dvecs
 
         if self.verbose:
-            print("     Accounted for %.0f%% of variance in %i dimensions" % (100.0 * np.sum(self.pca.explained_variance_ratio_), self.dvecs.shape[1]))
+            print(("     Accounted for %.0f%% of variance in %i dimensions" % (100.0 * np.sum(self.pca.explained_variance_ratio_), self.dvecs.shape[1])))
 
         # -- Do clustering
         # pydpc requires a C-contiguous array
@@ -129,7 +129,7 @@ class SiteTypeAnalysis(object):
         # -- Voting
         types = np.empty(shape = sn.n_sites, dtype = np.int)
         self.winning_vote_percentages = np.empty(shape = sn.n_sites, dtype = np.float)
-        for site in xrange(sn.n_sites):
+        for site in range(sn.n_sites):
             corresponding_samples = dvecs_to_site == site
             votes = assignments[corresponding_samples]
             n_votes = len(votes)
@@ -146,7 +146,7 @@ class SiteTypeAnalysis(object):
         sn.site_types = types
 
         if self.verbose:
-            print(("             " + "Type {:<2} " * self.n_types).format(*xrange(self.n_types)))
+            print(("             " + "Type {:<2} " * self.n_types).format(*range(self.n_types)))
             print(("# of sites   " + "{:<8}" * self.n_types).format(*n_sites_of_each_type))
 
             if np.any(n_sites_of_each_type == 0):
@@ -172,11 +172,11 @@ class SiteTypeAnalysis(object):
     @plotter(is3D = False)
     def plot_clustering(self, fig = None, ax = None, **kwargs):
         ccycle = itertools.cycle(DEFAULT_COLORS)
-        for cluster in xrange(self.n_types):
+        for cluster in range(self.n_types):
             mask = self.dpc.membership == cluster
             dvecs_core = self.dvecs[mask & ~self.dpc.border_member]
             dvecs_border = self.dvecs[mask & self.dpc.border_member]
-            color = ccycle.next()
+            color = next(ccycle)
             ax.scatter(dvecs_core[:,0], dvecs_core[:,1], s = 3, color = color, label = "Type %i" % cluster)
             ax.scatter(dvecs_border[:,0], dvecs_border[:,1], s = 3, color = color, alpha = 0.3)
 

@@ -14,9 +14,9 @@ class GenerateAroundSites(object):
         out = sn.copy()
         pbcc = PBCCalculator(sn.structure.cell)
 
-        print out.centers.shape
+        print(out.centers.shape)
         newcenters = out.centers.repeat(self.n, axis = 0)
-        print newcenters.shape
+        print(newcenters.shape)
         newcenters += self.sigma * np.random.standard_normal(size = newcenters.shape)
 
         pbcc.wrap_points(newcenters)

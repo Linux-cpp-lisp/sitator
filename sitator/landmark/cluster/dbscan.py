@@ -54,8 +54,8 @@ def do_landmark_clustering(landmark_vectors,
     lmk_lbls = trans_table[lmk_lbls]
 
     if verbose:
-        print "DBSCAN landmark: %i/%i assignment counts below threshold %f (%i); %i clusters remain." % \
-            (len(to_remove), len(cluster_counts), min_samples, min_n_samples_cluster, len(cluster_counts) - len(to_remove))
+        print("DBSCAN landmark: %i/%i assignment counts below threshold %f (%i); %i clusters remain." % \
+            (len(to_remove), len(cluster_counts), min_samples, min_n_samples_cluster, len(cluster_counts) - len(to_remove)))
 
     # Remove counts
     cluster_counts = cluster_counts[~to_remove_mask]

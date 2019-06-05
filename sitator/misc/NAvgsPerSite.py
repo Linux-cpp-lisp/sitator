@@ -35,7 +35,7 @@ class NAvgsPerSite(object):
         types = np.empty(shape = centers.shape[0], dtype = np.int)
 
         current_idex = 0
-        for site in xrange(st.site_network.n_sites):
+        for site in range(st.site_network.n_sites):
             if self.weighted:
                 pts, confs = st.real_positions_for_site(site, return_confidences = True)
             else:
@@ -46,7 +46,7 @@ class NAvgsPerSite(object):
 
             if len(pts) > self.n:
                 sanity = 0
-                for i in xrange(self.n):
+                for i in range(self.n):
                     ps = pts[i::self.n]
                     sanity += len(ps)
                     c = confs[i::self.n]

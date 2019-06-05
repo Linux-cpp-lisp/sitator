@@ -35,7 +35,7 @@ except:
         def tqdm(iterable, **kwargs):
             return iterable
 
-class SOAP(object):
+class SOAP(object, metaclass=ABCMeta):
     """Abstract base class for computing SOAP vectors in a SiteNetwork.
 
     SOAP computations are *not* thread-safe; use one SOAP object per thread.
@@ -56,7 +56,6 @@ class SOAP(object):
         For ideal performance: Specify environment and soap_mask correctly!
     :param dict soap_params = {}: Any custom SOAP params.
     """
-    __metaclass__ = ABCMeta
     def __init__(self, tracer_atomic_number, environment = None,
             soap_mask=None, soap_params={}, verbose =True):
         from ase.data import atomic_numbers
@@ -237,7 +236,7 @@ class SOAPDescriptorAverages(SOAP):
     then averaged in SOAP space to give the final SOAP vectors for each site.
 
     This method often performs better than SOAPSampledCenters on more dynamic
-    systems, but requires significantly more computation. 
+    systems, but requires significantly more computation.
 
     :param int stepsize: Stride (in frames) when computing SOAPs. Default 1.
     :param int averaging: Number of SOAP vectors to average for each output vector.
@@ -297,7 +296,7 @@ class SOAPDescriptorAverages(SOAP):
 
         # Now, I need to allocate the output
         # so for each site, I count how much data there is!
-        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in xrange(nsit)], dtype=int)
+        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in range(nsit)], dtype=int)
 
         if self._averaging is not None:
             averaging = self._averaging
@@ -349,5 +348,5 @@ class SOAPDescriptorAverages(SOAP):
                         if max_index[site_idx] == desc_index[site_idx]:
                             blocked[site_idx] = True
 
-        desc_to_site = np.repeat(range(nsit), nr_of_descs)
+        desc_to_site = np.repeat(list(range(nsit)), nr_of_descs)
         return descs, desc_to_site

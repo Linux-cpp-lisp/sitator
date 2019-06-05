@@ -1,5 +1,5 @@
-from common import layers, grid, plotter, DEFAULT_COLORS
+from .common import layers, grid, plotter, DEFAULT_COLORS
 
-from atoms import plot_atoms, plot_points
+from .atoms import plot_atoms, plot_points
 
-from SiteNetworkPlotter import SiteNetworkPlotter
+from .SiteNetworkPlotter import SiteNetworkPlotter

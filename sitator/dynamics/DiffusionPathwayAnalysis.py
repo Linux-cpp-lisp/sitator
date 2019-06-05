@@ -57,8 +57,8 @@ class DiffusionPathwayAnalysis(object):
         is_pathway = counts >= self.minimum_n_sites
 
         if self.verbose:
-            print "Taking all edges with at least %i/%i jumps..." % (threshold, n_non_self_jumps)
-            print "Found %i connected components, of which %i are large enough to qualify as pathways." % (n_ccs, np.sum(is_pathway))
+            print("Taking all edges with at least %i/%i jumps..." % (threshold, n_non_self_jumps))
+            print("Found %i connected components, of which %i are large enough to qualify as pathways." % (n_ccs, np.sum(is_pathway)))
 
         translation = np.empty(n_ccs, dtype = np.int)
         translation[~is_pathway] = DiffusionPathwayAnalysis.NO_PATHWAY
@@ -68,7 +68,7 @@ class DiffusionPathwayAnalysis(object):
 
         outmat = np.empty(shape = (sn.n_sites, sn.n_sites), dtype = np.int)
 
-        for i in xrange(sn.n_sites):
+        for i in range(sn.n_sites):
             rowmask = node_pathways[i] == node_pathways
             outmat[i, rowmask] = node_pathways[i]
             outmat[i, ~rowmask] = DiffusionPathwayAnalysis.NO_PATHWAY

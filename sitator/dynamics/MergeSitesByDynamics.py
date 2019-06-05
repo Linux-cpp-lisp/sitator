@@ -71,7 +71,7 @@ class MergeSitesByDynamics(object):
         n_alarming_ignored_edges = 0
 
         # Apply distance threshold
-        for i in xrange(n_sites_before):
+        for i in range(n_sites_before):
             dists = pbcc.distances(centers_before[i], centers_before[i + 1:])
             js_too_far = np.where(dists > self.distance_threshold)[0]
             js_too_far += i + 1
@@ -93,7 +93,7 @@ class MergeSitesByDynamics(object):
         new_n_sites = len(clusters)
 
         if self.verbose:
-            print "After merge there will be %i sites" % new_n_sites
+            print("After merge there will be %i sites" % new_n_sites)
 
         if self.check_types:
             new_types = np.empty(shape = new_n_sites, dtype = np.int)
@@ -103,7 +103,7 @@ class MergeSitesByDynamics(object):
         translation = np.empty(shape = st.site_network.n_sites, dtype = np.int)
         translation.fill(-1)
 
-        for newsite in xrange(new_n_sites):
+        for newsite in range(new_n_sites):
             mask = list(clusters[newsite])
             # Update translation table
             if np.any(translation[mask] != -1):
@@ -167,7 +167,7 @@ class MergeSitesByDynamics(object):
         allcols = np.arange(m1.shape[1])
 
         converged = False
-        for i in xrange(self.iterlimit):
+        for i in range(self.iterlimit):
             # -- Expansion
             m2 = np.linalg.matrix_power(m1, expansion)
             # -- Inflation
@@ -182,7 +182,7 @@ class MergeSitesByDynamics(object):
             if np.allclose(m1, m2):
                 converged = True
                 if self.verbose:
-                    print "Markov Clustering converged in %i iterations" % i
+                    print("Markov Clustering converged in %i iterations" % i)
                 break
 
             m1[:] = m2
