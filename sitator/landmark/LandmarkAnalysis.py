@@ -20,7 +20,7 @@ except:
 import importlib
 import tempfile
 
-import helpers
+from . import helpers
 from sitator import SiteNetwork, SiteTrajectory
 
 
@@ -150,7 +150,7 @@ class LandmarkAnalysis(object):
             raise ValueError("Cannot rerun LandmarkAnalysis!")
 
         if frames.shape[1:] != (sn.n_total, 3):
-            raise ValueError("Wrong shape %s for frames." % frames.shape)
+            raise ValueError("Wrong shape %s for frames." % (frames.shape,))
 
         if sn.vertices is None:
             raise ValueError("Input SiteNetwork must have vertices")

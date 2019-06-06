@@ -1,9 +1,6 @@
 #zeopy: simple Python interface to the Zeo++ `network` tool.
 # Alby Musaelian 2018
 
-from __future__ import (absolute_import, division,
-                        print_function)
-
 import os
 import sys
 import tempfile
@@ -130,12 +127,12 @@ class Zeopy(object):
         # remove blank lines:
         v1lines = iter(filter(None, v1lines))
         # First line is just "Unit cell vectors:"
-        assert v1lines.next().strip() == "Unit cell vectors:"
+        assert next(v1lines).strip() == "Unit cell vectors:"
         # Unit cell:
         cell = np.empty(shape = (3, 3), dtype = np.float)
         cellvec_re = re.compile('v[abc]=')
-        for i in xrange(3):
-            cellvec = v1lines.next().strip().split()
+        for i in range(3):
+            cellvec = next(v1lines).strip().split()
             assert cellvec_re.match(cellvec[0])
             cell[i] = [float(e) for e in cellvec[1:]]
         # number of atoms, etc.

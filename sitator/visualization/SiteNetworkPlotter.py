@@ -10,7 +10,7 @@ import matplotlib
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 from sitator.util import PBCCalculator
-from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
+from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS, set_axes_equal
 
 class SiteNetworkPlotter(object):
     """Plot a SiteNetwork.
@@ -74,7 +74,7 @@ class SiteNetworkPlotter(object):
 
         ax.set_title(self.title)
 
-        ax.set_aspect('equal')
+        set_axes_equal(ax)
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
         ax.zaxis.pane.fill = False
