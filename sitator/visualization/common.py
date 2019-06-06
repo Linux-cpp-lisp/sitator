@@ -33,8 +33,10 @@ def plotter(is3D = True, **outer):
         def plotter_wraped(*args, **kwargs):
             fig = None
             ax = None
+            toplevel = False
             if not ('ax' in kwargs and 'fig' in kwargs):
-                # No existing axis/figure
+                # No existing axis/figure - toplevel
+                toplevel = True
                 fig = plt.figure(**outer)
                 if is3D:
                     ax = fig.add_subplot(111, projection = '3d')
@@ -54,8 +56,14 @@ def plotter(is3D = True, **outer):
                 kwargs['i'] = 0
 
             func(*args, fig = fig, ax = ax, **kwargs)
+
+            if is3D and toplevel:
+                set_axes_equal(ax)
+
             return fig, ax
+
         return plotter_wraped
+
     return plotter_wrapper
 
 @plotter(is3D = True)

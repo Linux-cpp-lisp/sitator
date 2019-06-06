@@ -74,7 +74,6 @@ class SiteNetworkPlotter(object):
 
         ax.set_title(self.title)
 
-        set_axes_equal(ax)
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
         ax.zaxis.pane.fill = False
