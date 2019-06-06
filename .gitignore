@@ -9,3 +9,8 @@ build/
 
 /dist/
 /*.egg-info
+
+*.bak
+
+.tags
+.tags_swap

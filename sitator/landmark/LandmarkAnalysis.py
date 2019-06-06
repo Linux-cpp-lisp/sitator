@@ -167,7 +167,7 @@ class LandmarkAnalysis(object):
         self._landmark_dimension = sn.n_sites
 
         longest_vert_set = np.max([len(v) for v in sn.vertices])
-        verts_np = np.array([v + [-1] * (longest_vert_set - len(v)) for v in sn.vertices])
+        verts_np = np.array([np.concatenate((v, [-1] * (longest_vert_set - len(v)))) for v in sn.vertices])
         site_vert_dists = np.empty(shape = verts_np.shape, dtype = np.float)
         site_vert_dists.fill(np.nan)
 
