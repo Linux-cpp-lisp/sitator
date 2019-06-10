@@ -19,10 +19,12 @@ If you use `sitator` in your research, please consider citing this paper. The Bi
 
 ## Installation
 
-`sitator` is currently built for Python 2.7. We recommend the use of a Python 2.7 virtual environment (`virtualenv`, `conda`, etc.). `sitator` has two external dependencies:
+`sitator` is built for Python >=3.2 (the older version supports Python 2.7). We recommend the use of a virtual environment (`virtualenv`, `conda`, etc.). `sitator` has one mandatory external dependency:
 
  - The `network` executable from [Zeo++](http://www.maciejharanczyk.info/Zeopp/examples.html) is required for computing the Voronoi decomposition. (It does *not* have to be installed in `PATH`; the path to it can be given with the `zeopp_path` option of `VoronoiSiteGenerator`.)
- - If you want to use the site type analysis features, a working installation of [Quippy](https://libatoms.github.io/QUIP/) with [GAP](http://www.libatoms.org/gap/gap_download.html) and Python bindings is required for computing SOAP descriptors.
+
+
+If you want to use the site type analysis features, the `quip` binary from an installation of [QUIP](https://libatoms.github.io/QUIP/) with [GAP](http://www.libatoms.org/gap/gap_download.html) can be used to compute the SOAP vectors. The Python 2.7 bindings (`quippy`) are **not** required. SOAP vectors can **also** be computed with [`DScribe`](https://singroup.github.io/dscribe/index.html) and the installation of QUIP avoided; note, however, that the descriptor vectors **differ** between QUIP and `DScribe` and one or the other may give better results depending on your system.
 
 After downloading, the package is installed with `pip`:
 
@@ -32,7 +34,7 @@ cd sitator
 pip install .
 ```
 
-To enable site type analysis, add the `[SiteTypeAnalysis]` option:
+To enable site type analysis, add the `[SiteTypeAnalysis]` option (this adds two dependencies -- Python packages `pydpc` and `dscribe`):
 
 ```
 pip install ".[SiteTypeAnalysis]"

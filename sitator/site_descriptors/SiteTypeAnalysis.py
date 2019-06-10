@@ -24,7 +24,6 @@ class SiteTypeAnalysis(object):
 
     -- descriptor --
     Some kind of object implementing:
-         - n_dim: the number of components in a descriptor vector
          - get_descriptors(site_traj or site_network): returns an array of descriptor vectors
             of dimension (M, n_dim) and an array of length M indicating which
             descriptor vectors correspond to which sites in (site_traj.)site_network.

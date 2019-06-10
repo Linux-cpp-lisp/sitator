@@ -5,20 +5,8 @@ from abc import ABCMeta, abstractmethod
 from sitator.SiteNetwork import SiteNetwork
 from sitator.SiteTrajectory import SiteTrajectory
 
-try:
-    import quippy as qp
-    from quippy import descriptors
-except ImportError:
-    raise ImportError("Quippy with GAP is required for using SOAP descriptors.")
-
 from ase.data import atomic_numbers
 
-DEFAULT_SOAP_PARAMS = {
-    'cutoff' : 3.0,
-    'cutoff_transition_width' : 1.0,
-    'l_max' : 6, 'n_max' : 6,
-    'atom_sigma' : 0.4
-}
 
 # From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
 import sys
@@ -55,31 +43,31 @@ class SOAP(object, metaclass=ABCMeta):
         Even not masked, species not considered in environment will be not accounted for.
         For ideal performance: Specify environment and soap_mask correctly!
     :param dict soap_params = {}: Any custom SOAP params.
+    :param func backend: A function that can be called with `sn, soap_mask, tracer_atomic_number, environment_list` as
+        parameters, returning a function that, given the current soap structure
+        along with tracer atoms, returns SOAP vectors in a numpy array. (i.e.
+        its signature is `soap(structure, positions)`)
     """
+
+    from .backend.quip import quip_soap_backend as backend_quip
+    from .backend.dscribe import dscribe_soap_backend as backend_dscribe
+
     def __init__(self, tracer_atomic_number, environment = None,
-            soap_mask=None, soap_params={}, verbose =True):
+            soap_mask = None, verbose =True,
+            backend = None):
         from ase.data import atomic_numbers
 
-        # Creating a dictionary for convenience, to check the types and values:
-        self.tracer_atomic_number = 3
-        centers_list = [self.tracer_atomic_number]
+        self.tracer_atomic_number = tracer_atomic_number
         self._soap_mask = soap_mask
 
-        # -- Create the descriptor object
-        soap_opts = dict(DEFAULT_SOAP_PARAMS)
-        soap_opts.update(soap_params)
-        soap_cmd_line = ["soap"]
+        self._verbose = verbose
 
-        # User options
-        for opt in soap_opts:
-            soap_cmd_line.append("{}={}".format(opt, soap_opts[opt]))
+        if backend is None:
+            backend = SOAP.dscribe_soap_backend
+        self._backend = backend
 
-        #
-        soap_cmd_line.append('n_Z={} Z={{{}}}'.format(len(centers_list), ' '.join(map(str, centers_list))))
-
-        # - Add environment species controls if given
-        self._environment = None
-        if not environment is None:
+        # - Standardize environment species controls if given
+        if not environment is None: # User given environment
             if not isinstance(environment, (list, tuple)):
                 raise TypeError('environment has to be a list or tuple of species (atomic number'
                     ' or symbol of the environment to consider')
@@ -98,22 +86,9 @@ class SOAP(object, metaclass=ABCMeta):
                     raise TypeError("Environment has to be a list of atomic numbers or atomic symbols")
 
             self._environment = environment_list
-            soap_cmd_line.append('n_species={} species_Z={{{}}}'.format(len(environment_list), ' '.join(map(str, environment_list))))
+        else:
+            self._environment = None
 
-        soap_cmd_line = " ".join(soap_cmd_line)
-
-        if verbose:
-            print("SOAP command line: %s" % soap_cmd_line)
-
-        self._soaper = descriptors.Descriptor(soap_cmd_line)
-        self._verbose = verbose
-        self._cutoff = soap_opts['cutoff']
-
-
-
-    @property
-    def n_dim(self):
-        return self._soaper.n_dim
 
     def get_descriptors(self, stn):
         """
@@ -124,14 +99,24 @@ class SOAP(object, metaclass=ABCMeta):
         """
         # Build SOAP host structure
         if isinstance(stn, SiteTrajectory):
-            structure, tracer_index, soap_mask = self._make_structure(stn.site_network)
+            sn = stn.site_network
         elif isinstance(stn, SiteNetwork):
-            structure, tracer_index, soap_mask = self._make_structure(stn)
+            sn = stn
         else:
             raise TypeError("`stn` must be SiteNetwork or SiteTrajectory")
 
+        structure, tracer_atomic_number, soap_mask = self._make_structure(sn)
+
+        if self._environment is not None:
+            environment_list = self._environment
+        else:
+            # Set it to all species represented by the soap_mask
+            environment_list = np.unique(sn.structure.get_atomic_numbers()[soap_mask])
+
+        soaper = self._backend(sn, soap_mask, tracer_atomic_number, environment_list)
+
         # Compute descriptors
-        return self._get_descriptors(stn, structure, tracer_index, soap_mask)
+        return self._get_descriptors(stn, structure, tracer_atomic_number, soap_mask, soaper)
 
     # ----
 
@@ -139,7 +124,7 @@ class SOAP(object, metaclass=ABCMeta):
 
         if self._soap_mask is None:
             # Make a copy of the static structure
-            structure = qp.Atoms(sn.static_structure)
+            structure = sn.static_structure.copy()
             soap_mask = sn.static_mask # soap mask is the
         else:
             if isinstance(self._soap_mask, tuple):
@@ -148,7 +133,7 @@ class SOAP(object, metaclass=ABCMeta):
                 soap_mask = self._soap_mask
 
             assert not np.any(soap_mask & sn.mobile_mask), "Error for atoms %s; No atom can be both static and mobile" % np.where(soap_mask & sn.mobile_mask)[0]
-            structure = qp.Atoms(sn.structure[soap_mask])
+            structure = sn.structure[soap_mask]
 
         assert np.any(soap_mask), "Given `soap_mask` excluded all host atoms."
         if not self._environment is None:
@@ -160,14 +145,16 @@ class SOAP(object, metaclass=ABCMeta):
         else:
             tracer_atomic_number = self.tracer_atomic_number
 
-        structure.add_atoms((0.0, 0.0, 0.0), tracer_atomic_number)
-        structure.set_pbc([True, True, True])
-        tracer_index = len(structure) - 1
+        if np.any(structure.get_atomic_numbers() == tracer_atomic_number):
+            raise ValueError("Structure cannot have static atoms (that are enabled in the SOAP mask) of the same species as `tracer_atomic_number`.")
 
-        return structure, tracer_index, soap_mask
+        structure.set_pbc([True, True, True])
+
+        return structure, tracer_atomic_number, soap_mask
+
 
     @abstractmethod
-    def _get_descriptors(self, stn, structure, tracer_index):
+    def _get_descriptors(self, stn, structure, tracer_atomic_number, soaper):
         pass
 
 
@@ -178,24 +165,12 @@ class SOAPCenters(SOAP):
 
     Requires a SiteNetwork as input.
     """
-    def _get_descriptors(self, sn, structure, tracer_index, soap_mask):
+    def _get_descriptors(self, sn, structure, tracer_atomic_number, soap_mask, soaper):
         assert isinstance(sn, SiteNetwork), "SOAPCenters requires a SiteNetwork, not `%s`" % sn
 
         pts = sn.centers
 
-        out = np.empty(shape = (len(pts), self.n_dim), dtype = np.float)
-
-        structure.set_cutoff(self._soaper.cutoff())
-
-        for i, pt in enumerate(tqdm(pts, desc="SOAP") if self._verbose else pts):
-            # Move tracer
-            structure.positions[tracer_index] = pt
-
-            # SOAP requires connectivity data to be computed first
-            structure.calc_connect()
-
-            #There should only be one descriptor, since there should only be one Li
-            out[i] = self._soaper.calc(structure)['descriptor'][0]
+        out = soaper(structure, pts)
 
         return out, np.arange(sn.n_sites)
 
@@ -280,7 +255,7 @@ class SOAPDescriptorAverages(SOAP):
         super(SOAPDescriptorAverages, self).__init__(*args, **kwargs)
 
 
-    def _get_descriptors(self, site_trajectory, structure, tracer_index, soap_mask):
+    def _get_descriptors(self, site_trajectory, structure, tracer_atomic_number, soap_mask, soaper):
         """
         calculate descriptors
         """
@@ -317,23 +292,21 @@ class SOAPDescriptorAverages(SOAP):
         count_of_site = np.zeros(len(nr_of_descs), dtype=int)
         blocked = np.empty(nsit, dtype=bool)
         blocked[:] = False
-        structure.set_cutoff(self._soaper.cutoff())
+
         for site_traj_t, pos in tqdm(zip(site_traj, real_traj), desc="SOAP"):
             # I update the host lattice positions here, once for every timestep
-            structure.positions[:tracer_index] = pos[soap_mask]
+            structure.positions[:] = pos[soap_mask]
+
             for mob_idx, site_idx in enumerate(site_traj_t):
                 if site_idx >= 0 and not blocked[site_idx]:
                     # Now, for every lithium that has been associated to a site of index site_idx,
                     # I take my structure and load the position of this mobile atom:
-                    structure.positions[tracer_index] = pos[mob_indices[mob_idx]]
                     # calc_connect to calculated distance
 #                     structure.calc_connect()
                     #There should only be one descriptor, since there should only be one mobile
                     # I also divide  by averaging, to avoid getting into large numbers.
 #                     soapv =  self._soaper.calc(structure)['descriptor'][0] / self._averaging
-                    structure.set_cutoff(self._cutoff)
-                    structure.calc_connect()
-                    soapv = self._soaper.calc(structure, grad=False)["descriptor"]
+                    soapv = soaper(structure, [pos[mob_indices[mob_idx]]])
 
                     #~ soapv ,_,_ = get_fingerprints([structure], d)
                     # So, now I need to figure out where to load the soapv into desc

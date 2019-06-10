@@ -8,7 +8,7 @@ setup(name = 'sitator',
       download_url = "https://github.com/Linux-cpp-lisp/sitator",
       author = 'Alby Musaelian',
       license = "MIT",
-      python_requires = '>=3',
+      python_requires = '>=3.2',
       packages = find_packages(),
       ext_modules = cythonize([
         "sitator/landmark/helpers.pyx",
@@ -27,7 +27,8 @@ setup(name = 'sitator',
       ],
       extras_require = {
         "SiteTypeAnalysis" : [
-            "pydpc"
+            "pydpc",
+            "dscribe"
         ]
       },
       zip_safe = True)
