@@ -32,6 +32,8 @@ class RecenterTrajectory(object):
                     masses of all atoms in the system.
         """
 
+        assert np.any(static_mask), "Static mask all false; there must be static atoms to recenter on."
+
         factors = static_mask.astype(np.float)
         n_static = np.sum(static_mask)
 
