@@ -1,5 +1,6 @@
 import numpy as np
 
+from sitator.landmark import MultipleOccupancyError
 from sitator.util import PBCCalculator
 
 # From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
@@ -219,8 +220,8 @@ class LandmarkAnalysis(object):
 
         n_sites = len(cluster_counts)
 
-        if n_sites < sn.n_mobile:
-            raise ValueError("There are %i mobile particles, but only identified %i sites. Check clustering_params." % (sn.n_mobile, n_sites))
+        if n_sites < (sn.n_mobile / self.max_mobile_per_site):
+            raise MultipleOccupancyError("There are %i mobile particles, but only identified %i sites. With %i max_mobile_per_site, this is an error. Check clustering_params." % (sn.n_mobile, n_sites, self.max_mobile_per_site))
 
         if self.verbose:
             print("    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts))
@@ -234,7 +235,7 @@ class LandmarkAnalysis(object):
             _, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
             count_msk = counts > self.max_mobile_per_site
             if np.any(count_msk):
-                raise ValueError("%i mobile particles were assigned to only %i site(s) (%s) at frame %i." % (np.sum(counts[count_msk]), np.sum(count_msk), np.where(count_msk)[0], frame_i))
+                raise MultipleOccupancyError("%i mobile particles were assigned to only %i site(s) (%s) at frame %i." % (np.sum(counts[count_msk]), np.sum(count_msk), np.where(count_msk)[0], frame_i))
             n_more_than_ones += np.sum(counts > 1)
             avg_mobile_per_site += np.sum(counts)
             divisor += len(counts)

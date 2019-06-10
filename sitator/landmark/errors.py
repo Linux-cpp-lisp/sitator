@@ -2,7 +2,7 @@
 class LandmarkAnalysisError(Exception):
     pass
 
-class StaticLatticeError(Exception):
+class StaticLatticeError(LandmarkAnalysisError):
     """Error raised when static lattice atoms break any limits on their movement/position.
 
     Attributes:
@@ -25,7 +25,7 @@ class StaticLatticeError(Exception):
         self.lattice_atoms = lattice_atoms
         self.frame = frame
 
-class ZeroLandmarkError(Exception):
+class ZeroLandmarkError(LandmarkAnalysisError):
     def __init__(self, mobile_index, frame):
 
         message = "Encountered a zero landmark vector for mobile ion %i at frame %i. Try increasing `cutoff_midpoint` and/or decreasing `cutoff_steepness`." % (mobile_index, frame)
@@ -34,3 +34,6 @@ class ZeroLandmarkError(Exception):
 
         self.mobile_index = mobile_index
         self.frame = frame
+
+class MultipleOccupancyError(LandmarkAnalysisError):
+    pass
