@@ -4,17 +4,10 @@ import numpy as np
 # From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
 import sys
 try:
-    ipy_str = str(type(get_ipython()))
-    if 'zmqshell' in ipy_str:
-        from tqdm import tqdm_notebook as tqdm
-    if 'terminal' in ipy_str:
-        from tqdm import tqdm
+    from tqdm.autonotebook import tqdm
 except:
-    if sys.stderr.isatty():
-        from tqdm import tqdm
-    else:
-        def tqdm(iterable, **kwargs):
-            return iterable
+    def tqdm(iterable, **kwargs):
+        return iterable
 
 def merge_points_soap_paths(tsoap,
                             pbcc,
