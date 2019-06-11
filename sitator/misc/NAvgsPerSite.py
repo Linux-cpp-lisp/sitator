@@ -32,7 +32,9 @@ class NAvgsPerSite(object):
         pbcc = PBCCalculator(st.site_network.structure.cell)
         # Maximum length
         centers = np.empty(shape = (self.n * st.site_network.n_sites, 3), dtype = st.real_trajectory.dtype)
+        centers.fill(np.nan)
         types = np.empty(shape = centers.shape[0], dtype = np.int)
+        types.fill(np.nan)
 
         current_idex = 0
         for site in range(st.site_network.n_sites):
@@ -64,7 +66,9 @@ class NAvgsPerSite(object):
             types[old_idex:current_idex] = site
 
         sn = st.site_network.copy()
-        sn.centers = centers
-        sn.site_types = types
+        sn.centers = centers[:current_idex]
+        sn.site_types = types[:current_idex]
+
+        assert not (np.any(np.isnan(sn.centers)) or np.any(np.isnan(sn.site_types)))
 
         return sn
