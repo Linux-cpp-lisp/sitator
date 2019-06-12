@@ -25,6 +25,7 @@ def dscribe_soap_backend(soap_params = {}):
                 nmax = soap_opts['n_max'],
                 lmax = soap_opts['l_max'],
                 rbf = soap_opts['rbf'],
+                sigma = soap_opts['atom_sigma'],
                 periodic = np.all(structure.pbc),
                 sparse = False
             )
