@@ -1,7 +1,3 @@
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-
 import numpy as np
 
 from sitator.util import PBCCalculator
@@ -9,6 +5,9 @@ from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFA
 
 import matplotlib
 from matplotlib.collections import LineCollection
+
+import logging
+logger = logging.getLogger(__name__)
 
 class SiteTrajectory(object):
     """A trajectory capturing the dynamics of particles through a SiteNetwork."""
@@ -137,7 +136,7 @@ class SiteTrajectory(object):
         self.site_network.add_site_attribute('occupancies', occ)
         return occ
 
-    def assign_to_last_known_site(self, frame_threshold = 1, verbose = True):
+    def assign_to_last_known_site(self, frame_threshold = 1):
         """Assign unassigned mobile particles to their last known site within
             `frame_threshold` frames.
 
@@ -145,8 +144,7 @@ class SiteTrajectory(object):
         """
         total_unknown = self.n_unassigned
 
-        if verbose:
-            print("%i unassigned positions (%i%%); assigning unassigned mobile particles to last known positions within %i frames..." % (total_unknown, 100.0 * self.percent_unassigned, frame_threshold))
+        logger.info("%i unassigned positions (%i%%); assigning unassigned mobile particles to last known positions within %i frames..." % (total_unknown, 100.0 * self.percent_unassigned, frame_threshold))
 
         last_known = np.empty(shape = self._sn.n_mobile, dtype = np.int)
         last_known.fill(-1)
@@ -184,10 +182,9 @@ class SiteTrajectory(object):
         if avg_time_unknown_div > 0: # We corrected some unknowns
             avg_time_unknown = float(avg_time_unknown) / avg_time_unknown_div
 
-            if verbose:
-                print("  Maximum # of frames any mobile particle spent unassigned: %i" % max_time_unknown)
-                print("  Avg. # of frames spent unassigned: %f" % avg_time_unknown)
-                print("  Assigned %i/%i unassigned positions, leaving %i (%i%%) unknown" % (total_reassigned, total_unknown, self.n_unassigned, self.percent_unassigned))
+            logger.info("  Maximum # of frames any mobile particle spent unassigned: %i" % max_time_unknown)
+            logger.info("  Avg. # of frames spent unassigned: %f" % avg_time_unknown)
+            logger.info("  Assigned %i/%i unassigned positions, leaving %i (%i%%) unknown" % (total_reassigned, total_unknown, self.n_unassigned, self.percent_unassigned))
 
             res = {
                 'max_time_unknown' : max_time_unknown,
@@ -195,8 +192,7 @@ class SiteTrajectory(object):
                 'total_reassigned' : total_reassigned
             }
         else:
-            if self.verbose:
-                print("  None to correct.")
+            logger.info("  None to correct.")
 
             res = {
                 'max_time_unknown' : 0,

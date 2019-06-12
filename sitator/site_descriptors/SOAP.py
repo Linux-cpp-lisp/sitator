@@ -46,14 +46,12 @@ class SOAP(object, metaclass=ABCMeta):
     from .backend.dscribe import dscribe_soap_backend as backend_dscribe
 
     def __init__(self, tracer_atomic_number, environment = None,
-            soap_mask = None, verbose =True,
+            soap_mask = None,
             backend = None):
         from ase.data import atomic_numbers
 
         self.tracer_atomic_number = tracer_atomic_number
         self._soap_mask = soap_mask
-
-        self._verbose = verbose
 
         if backend is None:
             backend = SOAP.dscribe_soap_backend

@@ -4,6 +4,9 @@ from sitator import SiteNetwork, SiteTrajectory
 from sitator.dynamics import JumpAnalysis
 from sitator.util import PBCCalculator
 
+import logging
+logger = logging.getLogger(__name__)
+
 class MergeSitesByDynamics(object):
     """Merges sites using dynamical data.
 
@@ -28,11 +31,8 @@ class MergeSitesByDynamics(object):
                  distance_threshold = 1.0,
                  post_check_thresh_factor = 1.5,
                  check_types = True,
-                 verbose = True,
                  iterlimit = 100,
                  markov_parameters = {}):
-
-        self.verbose = verbose
         self.distance_threshold = distance_threshold
         self.post_check_thresh_factor = post_check_thresh_factor
         self.check_types = check_types
@@ -47,7 +47,7 @@ class MergeSitesByDynamics(object):
 
         # -- Compute jump statistics
         if not st.site_network.has_attribute('p_ij'):
-            ja = JumpAnalysis(verbose = self.verbose)
+            ja = JumpAnalysis()
             ja.run(st)
 
         pbcc = PBCCalculator(st.site_network.structure.cell)
@@ -83,17 +83,16 @@ class MergeSitesByDynamics(object):
             connectivity_matrix[i, js_too_far] = 0
             connectivity_matrix[js_too_far, i] = 0 # Symmetry
 
-        if self.verbose and n_alarming_ignored_edges > 0:
-            print("  At least %i site pairs with high (z-score > 3) fluxes were over the given distance cutoff.\n"
-                  "  This may or may not be a problem; but if `distance_threshold` is low, consider raising it." % n_alarming_ignored_edges)
+        if n_alarming_ignored_edges > 0:
+            logger.warning("  At least %i site pairs with high (z-score > 3) fluxes were over the given distance cutoff.\n"
+                           "  This may or may not be a problem; but if `distance_threshold` is low, consider raising it." % n_alarming_ignored_edges)
 
         # -- Do Markov Clustering
         clusters = self._markov_clustering(connectivity_matrix, **self.markov_parameters)
 
         new_n_sites = len(clusters)
 
-        if self.verbose:
-            print("After merge there will be %i sites" % new_n_sites)
+        logger.info("After merge there will be %i sites" % new_n_sites)
 
         if self.check_types:
             new_types = np.empty(shape = new_n_sites, dtype = np.int)
@@ -181,8 +180,7 @@ class MergeSitesByDynamics(object):
             # -- Check converged
             if np.allclose(m1, m2):
                 converged = True
-                if self.verbose:
-                    print("Markov Clustering converged in %i iterations" % i)
+                logger.info("Markov Clustering converged in %i iterations" % i)
                 break
 
             m1[:] = m2

@@ -5,6 +5,9 @@ import numbers
 
 from scipy.sparse.csgraph import connected_components
 
+import logging
+logger = logging.getLogger(__name__)
+
 class DiffusionPathwayAnalysis(object):
     """Find connected diffusion pathways in a SiteNetwork.
 
@@ -19,14 +22,11 @@ class DiffusionPathwayAnalysis(object):
 
     def __init__(self,
                 connectivity_threshold = 0.001,
-                minimum_n_sites = 4,
-                verbose = True):
+                minimum_n_sites = 4):
         assert minimum_n_sites >= 0
 
         self.connectivity_threshold = connectivity_threshold
         self.minimum_n_sites = minimum_n_sites
-
-        self.verbose = verbose
 
     def run(self, sn):
         """
@@ -56,9 +56,8 @@ class DiffusionPathwayAnalysis(object):
 
         is_pathway = counts >= self.minimum_n_sites
 
-        if self.verbose:
-            print("Taking all edges with at least %i/%i jumps..." % (threshold, n_non_self_jumps))
-            print("Found %i connected components, of which %i are large enough to qualify as pathways." % (n_ccs, np.sum(is_pathway)))
+        logging.info("Taking all edges with at least %i/%i jumps..." % (threshold, n_non_self_jumps))
+        logging.info("Found %i connected components, of which %i are large enough to qualify as pathways." % (n_ccs, np.sum(is_pathway)))
 
         translation = np.empty(n_ccs, dtype = np.int)
         translation[~is_pathway] = DiffusionPathwayAnalysis.NO_PATHWAY

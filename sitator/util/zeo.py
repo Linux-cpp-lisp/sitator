@@ -16,6 +16,9 @@ import ase.io
 
 from sitator.util import PBCCalculator
 
+import logging
+logger = logging.getLogger(__name__)
+
 # TODO: benchmark CUC vs CIF
 
 class Zeopy(object):
@@ -40,7 +43,7 @@ class Zeopy(object):
     def __exit__(self, *args):
         shutil.rmtree(self._tmpdir)
 
-    def voronoi(self, structure, radial = False, verbose=True):
+    def voronoi(self, structure, radial = False):
         """
         :param Atoms structure: The ASE Atoms to compute the Voronoi decomposition of.
         """
@@ -66,12 +69,11 @@ class Zeopy(object):
             output = subprocess.check_output([self._exe] + args + ["-v1", v1out, "-nt2", outp, inp],
                                              stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            print("Zeo++ returned an error:", file = sys.stderr)
-            print(e.output, file = sys.stderr)
+            logger.error("Zeo++ returned an error:")
+            logger.error(e.output)
             raise
 
-        if verbose:
-            print(output)
+        logger.debug(output)
 
         with open(outp, "r") as outf:
             verts, edges = self.parse_nt2(outf.readlines())

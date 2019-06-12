@@ -17,6 +17,8 @@ import tempfile
 from . import helpers
 from sitator import SiteNetwork, SiteTrajectory
 
+import logging
+logger = logging.getLogger(__name__)
 
 from functools import wraps
 def analysis_result(func):
@@ -85,7 +87,8 @@ class LandmarkAnalysis(object):
             and self.n_multiple_assignments.
         :param bool force_no_memmap: if True, landmark vectors will be stored only in memory.
             Only useful if access to landmark vectors after the analysis has run is desired.
-        :param bool verbose: If `True`, progress bars and messages will be printed to stdout.
+        :param bool verbose: If `True`, progress bars will be printed to stdout.
+            Other output is handled seperately through the `logging` module.
         """
 
         self._cutoff_midpoint = cutoff_midpoint
@@ -151,8 +154,7 @@ class LandmarkAnalysis(object):
 
         n_frames = len(frames)
 
-        if self.verbose:
-            print("--- Running Landmark Analysis ---")
+        logger.info("--- Running Landmark Analysis ---")
 
         # Create PBCCalculator
         self._pbcc = PBCCalculator(sn.structure.cell)
@@ -171,7 +173,7 @@ class LandmarkAnalysis(object):
             site_vert_dists[i, :len(polyhedron)] = dists
 
         # -- Step 2: Compute landmark vectors
-        if self.verbose: print("  - computing landmark vectors -")
+        logger.info("  - computing landmark vectors -")
         # Compute landmark vectors
 
         # The dimension of one landmark vector is the number of Voronoi regions
@@ -188,10 +190,15 @@ class LandmarkAnalysis(object):
 
             helpers._fill_landmark_vectors(self, sn, verts_np, site_vert_dists,
                                             frames, check_for_zeros = self.check_for_zero_landmarks,
-                                            tqdm = tqdm)
+                                            tqdm = tqdm, logger = logger)
+
+            if not self.check_for_zero_landmarks and self.n_all_zero_lvecs > 0:
+                logger.warning("     Had %i all-zero landmark vectors; no error because `check_for_zero_landmarks = False`." % self.n_all_zero_lvecs)
+            elif self.check_for_zero_landmarks:
+                assert self.n_all_zero_lvecs == 0
 
             # -- Step 3: Cluster landmark vectors
-            if self.verbose: print("  - clustering landmark vectors -")
+            logger.info("  - clustering landmark vectors -")
             #  - Preprocess -
             self._do_peak_evening()
 
@@ -204,8 +211,7 @@ class LandmarkAnalysis(object):
                              min_samples = self._minimum_site_occupancy / float(sn.n_mobile),
                              verbose = self.verbose)
 
-        if self.verbose:
-            print("    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls))))
+        logging.info("    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls))))
 
         # reshape lables and confidences
         lmk_lbls.shape = (n_frames, sn.n_mobile)
@@ -216,8 +222,7 @@ class LandmarkAnalysis(object):
         if n_sites < (sn.n_mobile / self.max_mobile_per_site):
             raise MultipleOccupancyError("There are %i mobile particles, but only identified %i sites. With %i max_mobile_per_site, this is an error. Check clustering_params." % (sn.n_mobile, n_sites, self.max_mobile_per_site))
 
-        if self.verbose:
-            print("    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts))
+        logging.info("    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts))
 
         # Check that multiple particles are never assigned to one site at the
         # same time, cause that would be wrong.

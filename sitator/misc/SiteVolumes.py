@@ -6,6 +6,9 @@ from scipy.spatial.qhull import QhullError
 from sitator import SiteTrajectory
 from sitator.util import PBCCalculator
 
+import logging
+logger = logging.getLogger(__name__)
+
 class SiteVolumes(object):
     """Computes the volumes of convex hulls around all positions associated with a site.
 
@@ -36,7 +39,7 @@ class SiteVolumes(object):
                 try:
                     hull = ConvexHull(pos)
                 except QhullError as qhe:
-                    print("For site %i, iter %i: %s" % (site, i, qhe))
+                    logging.warning("For site %i, iter %i: %s" % (site, i, qhe))
                     vols[site] = np.nan
                     areas[site] = np.nan
                     continue

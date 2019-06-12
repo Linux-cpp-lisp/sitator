@@ -5,6 +5,9 @@ import itertools
 from sitator import SiteNetwork, SiteTrajectory
 from sitator.visualization import plotter, plot_atoms, layers
 
+import logging
+logger = logging.getLogger(__name__)
+
 class JumpAnalysis(object):
     """Given a SiteTrajectory, compute various statistics about the jumps it contains.
 
@@ -18,8 +21,8 @@ class JumpAnalysis(object):
      - `total_corrected_residences`: Total number of frames when a particle was at the site,
         *including* frames when an unassigned particle's last known site was this site.
     """
-    def __init__(self, verbose = True):
-        self.verbose = verbose
+    def __init__(self):
+        pass
 
     def run(self, st):
         """Run the analysis.
@@ -28,8 +31,7 @@ class JumpAnalysis(object):
         """
         assert isinstance(st, SiteTrajectory)
 
-        if self.verbose:
-            print("Running JumpAnalysis...")
+        logger.info("Running JumpAnalysis...")
 
         n_mobile = st.site_network.n_mobile
         n_frames = st.n_frames
@@ -62,8 +64,8 @@ class JumpAnalysis(object):
             frame[unassigned] = last_known[unassigned]
             fknown = frame >= 0
 
-            if np.any(~fknown) and self.verbose:
-                print("  at frame %i, %i uncorrectable unassigned particles" % (i, np.sum(~fknown)))
+            if np.any(~fknown):
+                logger.warning("  at frame %i, %i uncorrectable unassigned particles" % (i, np.sum(~fknown)))
             # -- Update stats
             total_time_spent_at_site[frame[fknown]] += 1
 
@@ -94,8 +96,8 @@ class JumpAnalysis(object):
         # The time before jumping to self should always be inf
         assert not np.any(np.nonzero(avg_time_before_jump.diagonal()))
 
-        if self.verbose and n_problems != 0:
-            print("Came across %i times where assignment and last known assignment were unassigned." % n_problems)
+        if n_problems != 0:
+            logger.warning("Came across %i times where assignment and last known assignment were unassigned." % n_problems)
 
         msk = avg_time_before_jump_n > 0
         # Zeros -- i.e. no jumps -- should actualy be infs

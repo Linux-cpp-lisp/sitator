@@ -14,6 +14,9 @@ except:
 
 N_SITES_ALLOC_INCREMENT = 100
 
+import logging
+logger = logging.getLogger(__name__)
+
 class OneValueListlike(object):
     def __init__(self, value, length = np.inf):
         self.length = length
@@ -222,9 +225,8 @@ class DotProdClassifier(object):
                 # Then we removed everything...
                 raise ValueError("`min_samples` too large; all %i clusters under threshold." % len(count_mask))
 
-            if verbose:
-                print "DotProdClassifier: %i/%i assignment counts below threshold %s (%s); %i clusters remain." % \
-                    (np.sum(~count_mask), len(count_mask), self._min_samples, min_samples, len(self._cluster_counts))
+            logger.info("DotProdClassifier: %i/%i assignment counts below threshold %s (%s); %i clusters remain." % \
+                    (np.sum(~count_mask), len(count_mask), self._min_samples, min_samples, len(self._cluster_counts)))
 
             # Do another predict -- this could be more efficient, but who cares?
             labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
@@ -297,8 +299,8 @@ class DotProdClassifier(object):
             labels[i] = assigned_to
             confidences[i] = assignment_confidence
 
-        if verbose and zeros_count > 0:
-            print "Encountered %i zero vectors during prediction" % zeros_count
+        if zeros_count > 0:
+            logger.warning("Encountered %i zero vectors during prediction" % zeros_count)
 
         if return_confidences:
             return labels, confidences

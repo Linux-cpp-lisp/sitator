@@ -15,8 +15,7 @@ def merge_points_soap_paths(tsoap,
                             connectivity_dict,
                             threshold,
                             n_steps = 5,
-                            sanity_check_cutoff = np.inf,
-                            verbose = True):
+                            sanity_check_cutoff = np.inf):
     """Merge points using SOAP paths method.
 
     :param SOAP tsoap: to compute SOAPs with.

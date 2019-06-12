@@ -4,6 +4,9 @@ import numpy as np
 import numbers
 from sklearn.cluster import DBSCAN
 
+import logging
+logger = logging.getLogger(__name__)
+
 DEFAULT_PARAMS = {
     'eps' : 0.05,
     'min_samples' : 5,
@@ -13,7 +16,8 @@ DEFAULT_PARAMS = {
 def do_landmark_clustering(landmark_vectors,
                            clustering_params,
                            min_samples,
-                           verbose):
+                           verbose = False):
+    # `verbose` ignored.
 
     tmp = DEFAULT_PARAMS.copy()
     tmp.update(clustering_params)
@@ -53,8 +57,7 @@ def do_landmark_clustering(landmark_vectors,
     # Do the remapping
     lmk_lbls = trans_table[lmk_lbls]
 
-    if verbose:
-        print("DBSCAN landmark: %i/%i assignment counts below threshold %f (%i); %i clusters remain." % \
+    logging.info("DBSCAN landmark: %i/%i assignment counts below threshold %f (%i); %i clusters remain." % \
             (len(to_remove), len(cluster_counts), min_samples, min_n_samples_cluster, len(cluster_counts) - len(to_remove)))
 
     # Remove counts
