@@ -268,12 +268,14 @@ class SiteNetworkPlotter(object):
             ax.add_collection(lc)
 
             # -- Plot new sites
-            sn2 = sn[sites_to_plot]
-            sn2.update_centers(np.asarray(sites_to_plot_positions))
-
-            pts_params = dict(self.plot_points_params)
-            pts_params['alpha'] = 0.2
-            return self._site_layers(sn2, pts_params)
+            if len(sites_to_plot) > 0:
+                sn2 = sn[sites_to_plot]
+                sn2.update_centers(np.asarray(sites_to_plot_positions))
+                pts_params = dict(self.plot_points_params)
+                pts_params['alpha'] = 0.2
+                return self._site_layers(sn2, pts_params)
+            else:
+                return []
         else:
             return []
 
