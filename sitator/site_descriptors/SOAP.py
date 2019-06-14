@@ -4,17 +4,9 @@ from abc import ABCMeta, abstractmethod
 
 from sitator.SiteNetwork import SiteNetwork
 from sitator.SiteTrajectory import SiteTrajectory
+from sitator.util.progress import tqdm
 
 from ase.data import atomic_numbers
-
-
-# From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
-import sys
-try:
-    from tqdm.autonotebook import tqdm
-except:
-    def tqdm(iterable, **kwargs):
-        return iterable
 
 class SOAP(object, metaclass=ABCMeta):
     """Abstract base class for computing SOAP vectors in a SiteNetwork.

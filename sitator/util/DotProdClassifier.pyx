@@ -4,13 +4,7 @@ import numpy as np
 
 import numbers
 
-import sys
-
-try:
-    from tqdm.autonotebook import tqdm
-except:
-    def tqdm(iterable, **kwargs):
-        return iterable
+from sitator.util.progress import tqdm
 
 N_SITES_ALLOC_INCREMENT = 100
 

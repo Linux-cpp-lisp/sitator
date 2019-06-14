@@ -1,13 +1,7 @@
 
 import numpy as np
 
-# From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
-import sys
-try:
-    from tqdm.autonotebook import tqdm
-except:
-    def tqdm(iterable, **kwargs):
-        return iterable
+from sitator.util.progress import tqdm
 
 def merge_points_soap_paths(tsoap,
                             pbcc,

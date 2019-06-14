@@ -2,14 +2,10 @@ import numpy as np
 
 from sitator.landmark import MultipleOccupancyError
 from sitator.util import PBCCalculator
+from sitator.util.progress import tqdm
 
-# From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
 import sys
-try:
-    from tqdm.autonotebook import tqdm
-except:
-    def tqdm(iterable, **kwargs):
-        return iterable
+
 
 import importlib
 import tempfile
