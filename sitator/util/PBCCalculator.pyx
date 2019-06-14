@@ -36,6 +36,21 @@ cdef class PBCCalculator(object):
     def cell_centroid(self):
       return self._cell_centroid
 
+    cpdef pairwise_distances(self, pts):
+        """Compute the pairwise distance matrix of `pts` with itself.
+
+        :returns ndarray (len(pts), len(pts)): distances
+        """
+        out = np.empty(shape = (len(pts), len(pts)), dtype = pts.dtype)
+
+        buf = pts.copy()
+
+        for i in xrange(len(pts)):
+            self.distances(pts[i], buf, in_place = True, out = out[i])
+            buf[:] = pts
+
+        return out
+
     cpdef distances(self, pt1, pts2, in_place = False, out = None):
         """Compute the Euclidean distances from pt1 to all points in pts2, using
         shift-and-wrap.

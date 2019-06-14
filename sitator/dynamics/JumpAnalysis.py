@@ -105,6 +105,14 @@ class JumpAnalysis(object):
         # Do mean
         avg_time_before_jump[msk] /= avg_time_before_jump_n[msk]
 
+        if st.site_network.has_attribute('n_ij'):
+            st.site_network.remove_attribute('n_ij')
+            st.site_network.remove_attribute('p_ij')
+            st.site_network.remove_attribute('jump_lag')
+            st.site_network.remove_attribute('residence_times')
+            st.site_network.remove_attribute('occupancy_freqs')
+            st.site_network.remove_attribute('total_corrected_residences')
+
         st.site_network.add_edge_attribute('jump_lag', avg_time_before_jump)
         st.site_network.add_edge_attribute('n_ij', n_ij)
         st.site_network.add_edge_attribute('p_ij', n_ij / total_time_spent_at_site)

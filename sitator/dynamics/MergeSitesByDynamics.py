@@ -7,13 +7,26 @@ from sitator.util import PBCCalculator
 import logging
 logger = logging.getLogger(__name__)
 
+class MergeSitesError(Exception):
+    pass
+
+class MergedSitesTooDistantError(MergeSitesError):
+    pass
+
+class TooFewMergedSitesError(MergeSitesError):
+    pass
+
+
+
 class MergeSitesByDynamics(object):
     """Merges sites using dynamical data.
 
     Given a SiteTrajectory, merges sites using Markov Clustering.
 
     :param float distance_threshold: Don't merge sites further than this
-        in real space.
+        in real space. Zeros out the connectivity_matrix at distances greater than
+        this; a hard, step function style cutoff. For a more gentle cutoff, try
+        changing `connectivity_matrix_generator` to incorporate distance.
     :param float post_check_thresh_factor: Throw an error if proposed merge sites
         are further than this * distance_threshold away. Only a sanity check; not
         a hard guerantee. Can be `None`; defaults to `1.5`. Can be loosely
@@ -28,16 +41,76 @@ class MergeSitesByDynamics(object):
         Valid keys are ``'inflation'``, ``'expansion'``, and ``'pruning_threshold'``.
     """
     def __init__(self,
+                 connectivity_matrix_generator = None,
                  distance_threshold = 1.0,
                  post_check_thresh_factor = 1.5,
                  check_types = True,
                  iterlimit = 100,
                  markov_parameters = {}):
+
+        if connectivity_matrix_generator is None:
+            connectivity_matrix_generator = MergeSitesByDynamics.connectivity_n_ij
+        assert callable(connectivity_matrix_generator)
+
+        self.connectivity_matrix_generator = connectivity_matrix_generator
         self.distance_threshold = distance_threshold
         self.post_check_thresh_factor = post_check_thresh_factor
         self.check_types = check_types
         self.iterlimit = iterlimit
         self.markov_parameters = markov_parameters
+
+    # Connectivity Matrix Generation Schemes:
+
+    @staticmethod
+    def connectivity_n_ij(sn):
+        """Basic default connectivity scheme: uses n_ij directly as connectivity matrix.
+
+        Works well for systems with sufficient statistics.
+        """
+        return sn.n_ij
+
+    @staticmethod
+    def connectivity_jump_lag_biased(jump_lag_coeff = 1.0,
+                                     jump_lag_sigma = 20.0,
+                                     jump_lag_cutoff = np.inf,
+                                     distance_coeff = 0.5,
+                                     distance_sigma = 1.0):
+        """Bias the typical connectivity matrix p_ij with jump lag and distance contributions.
+
+        The jump lag and distance are processed through Gaussian functions with
+        the given sigmas (i.e. higher jump lag/larger distance => lower
+        connectivity value). These matrixes are then added to p_ij, with a prefactor
+        of `jump_lag_coeff` and `distance_coeff`.
+
+        Site pairs with jump lags greater than `jump_lag_cutoff` have their bias
+        set to zero regardless of `jump_lag_sigma`. Defaults to `inf`.
+        """
+        def cfunc(sn):
+            jl = sn.jump_lag.copy()
+            jl -= 1.0 # Center it around 1 since that's the minimum lag, 1 frame
+            jl /= jump_lag_sigma
+            np.square(jl, out = jl)
+            jl *= -0.5
+            np.exp(jl, out = jl) # exp correctly takes the -infs to 0
+
+            jl[sn.jump_lag > jump_lag_cutoff] = 0.
+
+            # Distance term
+            pbccalc = PBCCalculator(sn.structure.cell)
+            dists = pbccalc.pairwise_distances(sn.centers)
+            dmat = dists.copy()
+
+            # We want to strongly boost the similarity of *very* close sites
+            dmat /= distance_sigma
+            np.square(dmat, out = dmat)
+            dmat *= -0.5
+            np.exp(dmat, out = dmat)
+
+            return sn.p_ij + jump_lag_coeff * jl + distance_coeff * dmat
+
+        return cfunc
+
+    # Real methods
 
     def run(self, st):
         """Takes a SiteTrajectory and returns a SiteTrajectory, including a new SiteNetwork."""
@@ -56,7 +129,7 @@ class MergeSitesByDynamics(object):
             site_types = st.site_network.site_types
 
         # -- Build connectivity_matrix
-        connectivity_matrix = st.site_network.n_ij.copy()
+        connectivity_matrix = self.connectivity_matrix_generator(st.site_network).copy()
         n_sites_before = st.site_network.n_sites
         assert n_sites_before == connectivity_matrix.shape[0]
 
@@ -94,6 +167,9 @@ class MergeSitesByDynamics(object):
 
         logger.info("After merge there will be %i sites" % new_n_sites)
 
+        if new_n_sites < np.sum(st.site_network.mobile_mask):
+            raise TooFewMergedSitesError("There are %i mobile atoms in this system, but only %i sites after merge" % (np.sum(st.site_network.mobile_mask), new_n_sites))
+
         if self.check_types:
             new_types = np.empty(shape = new_n_sites, dtype = np.int)
 
@@ -108,7 +184,7 @@ class MergeSitesByDynamics(object):
             if np.any(translation[mask] != -1):
                 # We've assigned a different cluster for this before... weird
                 # degeneracy
-                raise ValueError("Markov clustering tried to merge site(s) into more than one new site")
+                raise ValueError("Markov clustering tried to merge site(s) into more than one new site. This shouldn't happen.")
             translation[mask] = newsite
 
             to_merge = site_centers[mask]
@@ -116,8 +192,8 @@ class MergeSitesByDynamics(object):
             # Check distances
             if not self.post_check_thresh_factor is None:
                 dists = pbcc.distances(to_merge[0], to_merge[1:])
-                assert np.all(dists < self.post_check_thresh_factor * self.distance_threshold), \
-                            "Markov clustering tried to merge sites more than %f * %f apart. Lower your distance_threshold?" % (self.post_check_thresh_factor, self.distance_threshold)
+                if not np.all(dists < self.post_check_thresh_factor * self.distance_threshold):
+                    raise MergedSitesTooDistantError("Markov clustering tried to merge sites more than %f * %f apart. Lower your distance_threshold?" % (self.post_check_thresh_factor, self.distance_threshold))
 
             # New site center
             new_centers[newsite] = pbcc.average(to_merge)
@@ -141,6 +217,7 @@ class MergeSitesByDynamics(object):
             newst.set_real_traj(st.real_trajectory)
 
         return newst
+
 
     def _markov_clustering(self,
                            transition_matrix,

@@ -69,6 +69,6 @@ class NAvgsPerSite(object):
         sn.centers = centers[:current_idex]
         sn.site_types = types[:current_idex]
 
-        assert not (np.any(np.isnan(sn.centers)) or np.any(np.isnan(sn.site_types)))
+        assert not (np.isnan(np.sum(sn.centers)) or np.isnan(np.sum(sn.site_types)))
 
         return sn
