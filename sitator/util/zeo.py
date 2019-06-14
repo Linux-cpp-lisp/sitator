@@ -55,7 +55,7 @@ class Zeopy(object):
         outp = os.path.join(self._tmpdir, "out.nt2")
         v1out = os.path.join(self._tmpdir, "out.v1")
 
-        ase.io.write(inp, structure)
+        ase.io.write(inp, structure, parallel = False)
 
         # with open(inp, "w") as inf:
         #     inf.write(self.ase2cuc(structure))
@@ -70,7 +70,7 @@ class Zeopy(object):
                                              stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             logger.error("Zeo++ returned an error:")
-            logger.error(e.output)
+            logger.error(str(e.output))
             raise
 
         logger.debug(output)

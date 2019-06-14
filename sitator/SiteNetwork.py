@@ -113,7 +113,7 @@ class SiteNetwork(object):
         """Save this SiteNetwork to a tar archive."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # -- Write the structure
-            ase.io.write(os.path.join(tmpdir, self._STRUCT_FNAME), self.structure)
+            ase.io.write(os.path.join(tmpdir, self._STRUCT_FNAME), self.structure, parallel = False)
             # -- Write masks
             np.save(os.path.join(tmpdir, self._SMASK_FNAME), self.static_mask)
             np.save(os.path.join(tmpdir, self._MMASK_FNAME), self.mobile_mask)
