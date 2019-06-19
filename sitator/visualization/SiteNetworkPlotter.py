@@ -30,7 +30,7 @@ class SiteNetworkPlotter(object):
     DEFAULT_MARKERS = ['x', '+', 'v', '<', '^', '>', '*', 'd', 'h', 'p']
     DEFAULT_LINESTYLES = ['--', ':', '-.', '-']
 
-    EDGE_GROUP_COLORS = ['b', 'g', 'm', 'lightseagreen', 'crimson'] + ['gray'] # gray last for -1's
+    EDGE_GROUP_COLORS = ['b', 'g', 'm', 'crimson', 'lightseagreen', 'darkorange', 'sandybrown', 'gold', 'hotpink'] + ['gray'] # gray last for -1's
 
     def __init__(self,
                 site_mappings = DEFAULT_SITE_MAPPINGS,
