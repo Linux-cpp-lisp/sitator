@@ -18,6 +18,7 @@ cdef class PBCCalculator(object):
     cdef cell_precision [:] _cell_centroid
     cdef cell_precision [:, :] _cell
 
+
     def __init__(self, cell):
         """
         :param DxD ndarray: the unit cell -- an array of cell vectors, like the
@@ -32,9 +33,11 @@ cdef class PBCCalculator(object):
         self._cell_mat_inverse_array = np.asarray(cellmat.I)
         self._cell_centroid = np.sum(0.5 * cell, axis = 0)
 
+
     @property
     def cell_centroid(self):
       return self._cell_centroid
+
 
     cpdef pairwise_distances(self, pts):
         """Compute the pairwise distance matrix of `pts` with itself.
@@ -50,6 +53,7 @@ cdef class PBCCalculator(object):
             buf[:] = pts
 
         return out
+
 
     cpdef distances(self, pt1, pts2, in_place = False, out = None):
         """Compute the Euclidean distances from pt1 to all points in pts2, using
@@ -91,6 +95,7 @@ cdef class PBCCalculator(object):
         #return np.linalg.norm(self._cell_centroid - pts2, axis = 1)
         return np.sqrt(out, out = out)
 
+
     cpdef average(self, points, weights = None):
         """Average position of a "cloud" of points using the shift-and-wrap hack.
 
@@ -120,6 +125,7 @@ cdef class PBCCalculator(object):
         del ptbuf
 
         return out
+
 
     cpdef time_average(self, frames):
         """Do multiple PBC correct means. Frames is n_frames x n_pts x 3.
@@ -152,6 +158,7 @@ cdef class PBCCalculator(object):
         del posbuf
         return out
 
+
     cpdef void wrap_point(self, precision [:] pt):
         """Wrap a single point into the unit cell, IN PLACE. 3D only."""
         cdef cell_precision [:, :] cell = self._cell_mat_array
@@ -173,7 +180,8 @@ cdef class PBCCalculator(object):
 
         pt[0] = buf[0]; pt[1] = buf[1]; pt[2] = buf[2];
 
-    cpdef bint is_in_unit_cell(self, precision [:] pt):
+
+    cpdef bint is_in_unit_cell(self, const precision [:] pt):
         cdef cell_precision [:, :] cell = self._cell_mat_array
         cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
@@ -189,13 +197,15 @@ cdef class PBCCalculator(object):
         return (buf[0] < 1.0) and (buf[1] < 1.0) and (buf[2] < 1.0) and \
                (buf[0] >= 0.0) and (buf[1] >= 0.0) and (buf[2] >= 0.0)
 
-    cpdef bint all_in_unit_cell(self, precision [:, :] pts):
+
+    cpdef bint all_in_unit_cell(self, const precision [:, :] pts):
         for pt in pts:
             if not self.is_in_unit_cell(pt):
                 return False
         return True
 
-    cpdef bint is_in_image_of_cell(self, precision [:] pt, image):
+
+    cpdef bint is_in_image_of_cell(self, const precision [:] pt, image):
         cdef cell_precision [:, :] cell = self._cell_mat_array
         cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
@@ -213,6 +223,7 @@ cdef class PBCCalculator(object):
             out &= (buf[dim] >= image[dim]) and (buf[dim] < (image[dim] + 1))
 
         return out
+
 
     cpdef void to_cell_coords(self, precision [:, :] points):
         """Convert to cell coordinates in place."""
@@ -235,7 +246,8 @@ cdef class PBCCalculator(object):
             # Store into points
             points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
 
-    cpdef int min_image(self, precision [:] ref, precision [:] pt):
+
+    cpdef int min_image(self, const precision [:] ref, precision [:] pt):
         """Find the minimum image of `pt` relative to `ref`. In place in pt.
 
         Uses the brute force algorithm for correctness; returns the minimum image.
@@ -288,6 +300,7 @@ cdef class PBCCalculator(object):
 
         return 100 * minimg[0] + 10 * minimg[1] + 1 * minimg[2]
 
+
     cpdef void to_real_coords(self, precision [:, :] points):
         """Convert to real coords from crystal coords in place."""
         assert points.shape[1] == 3, "Points must be 3D"
@@ -308,6 +321,7 @@ cdef class PBCCalculator(object):
 
             # Store into points
             points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
+
 
     cpdef void wrap_points(self, precision [:, :] points):
         """Wrap `points` into a unit cell, IN PLACE. 3D only.
