@@ -9,17 +9,17 @@ A modular framework for conducting and visualizing site analysis of molecular dy
 
 `sitator` contains an efficient implementation of our method, landmark analysis, as well as visualization tools, generic data structures for site analysis, pre- and post-processing tools, and more.
 
-For details on the method and its application, please see our paper:
+For details on landmark analysis and its application, please see our paper:
 
 > L. Kahle, A. Musaelian, N. Marzari, and B. Kozinsky <br/>
 > [Unsupervised landmark analysis for jump detection in molecular dynamics simulations](https://doi.org/10.1103/PhysRevMaterials.3.055404) <br/>
 > Phys. Rev. Materials 3, 055404 – 21 May 2019
 
-If you use `sitator` in your research, please consider citing this paper. The BibTex citation can be found in [`CITATION.bib`](CITATION.bib).
+If you use `sitator` in your research, please consider citing this paper. The BibTeX citation can be found in [`CITATION.bib`](CITATION.bib).
 
 ## Installation
 
-`sitator` is currently built for Python 2.7. We recommend the use of a Python 2.7 virtual environment (`virtualenv`, `conda`, etc.). `sitator` has two external dependencies:
+`sitator` is currently built for Python 2.7. (The Python 3 port can be found in the `py3` branch which is under active development; once it has been further tested and improved it will become the stable version.) We recommend the use of a Python 2.7 virtual environment (`virtualenv`, `conda`, etc.). `sitator` has two external dependencies:
 
  - The `network` executable from [Zeo++](http://www.maciejharanczyk.info/Zeopp/examples.html) is required for computing the Voronoi decomposition. (It does *not* have to be installed in `PATH`; the path to it can be given with the `zeopp_path` option of `VoronoiSiteGenerator`.)
  - If you want to use the site type analysis features, a working installation of [Quippy](https://libatoms.github.io/QUIP/) with [GAP](http://www.libatoms.org/gap/gap_download.html) and Python bindings is required for computing SOAP descriptors.
