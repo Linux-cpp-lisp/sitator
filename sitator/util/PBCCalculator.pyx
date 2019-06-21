@@ -252,6 +252,9 @@ cdef class PBCCalculator(object):
 
         Uses the brute force algorithm for correctness; returns the minimum image.
 
+        Assumes that `ref` and `pt` are already in the *same* cell (though not
+        necessarily the <0,0,0> cell -- any periodic image will do).
+
         :returns int[3] minimg: Which image was the minimum image.
         """
         # # There are 27 possible minimum images

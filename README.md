@@ -9,22 +9,24 @@ A modular framework for conducting and visualizing site analysis of molecular dy
 
 `sitator` contains an efficient implementation of our method, landmark analysis, as well as visualization tools, generic data structures for site analysis, pre- and post-processing tools, and more.
 
-For details on the method and its application, please see our paper:
+For details on landmark analysis and its application, please see our paper:
 
 > L. Kahle, A. Musaelian, N. Marzari, and B. Kozinsky <br/>
 > [Unsupervised landmark analysis for jump detection in molecular dynamics simulations](https://doi.org/10.1103/PhysRevMaterials.3.055404) <br/>
 > Phys. Rev. Materials 3, 055404 – 21 May 2019
 
-If you use `sitator` in your research, please consider citing this paper. The BibTex citation can be found in [`CITATION.bib`](CITATION.bib).
+If you use `sitator` in your research, please consider citing this paper. The BibTeX citation can be found in [`CITATION.bib`](CITATION.bib).
 
 ## Installation
 
-`sitator` is built for Python >=3.2 (the older version supports Python 2.7). We recommend the use of a virtual environment (`virtualenv`, `conda`, etc.). `sitator` has one mandatory external dependency:
+`sitator` is built for Python >=3.2 (the older version supports Python 2.7). We recommend the use of a virtual environment (`virtualenv`, `conda`, etc.). `sitator` has a number of optional dependencies that enable various features:
 
- - The `network` executable from [Zeo++](http://www.maciejharanczyk.info/Zeopp/examples.html) is required for computing the Voronoi decomposition. (It does *not* have to be installed in `PATH`; the path to it can be given with the `zeopp_path` option of `VoronoiSiteGenerator`.)
-
-
-If you want to use the site type analysis features, the `quip` binary from an installation of [QUIP](https://libatoms.github.io/QUIP/) with [GAP](http://www.libatoms.org/gap/gap_download.html) can be used to compute the SOAP vectors. The Python 2.7 bindings (`quippy`) are **not** required. SOAP vectors can **also** be computed with [`DScribe`](https://singroup.github.io/dscribe/index.html) and the installation of QUIP avoided; note, however, that the descriptor vectors **differ** between QUIP and `DScribe` and one or the other may give better results depending on the system you are analyzing.
+ * **Landmark Analysis**
+     * The `network` executable from [Zeo++](http://www.maciejharanczyk.info/Zeopp/examples.html) is required for computing the Voronoi decomposition. (It does not have to be installed in `PATH`; the path to it can be given with the `zeopp_path` option of `VoronoiSiteGenerator`.)
+ * **Site Type Analysis**
+     * For computing SOAP vectors: the `quip` binary from [QUIP](https://libatoms.github.io/QUIP/) with [GAP](http://www.libatoms.org/gap/gap_download.html) **or** the [`DScribe`](https://singroup.github.io/dscribe/index.html) Python library.
+     <br/>
+     The Python 2.7 bindings for QUIP (`quippy`) are **not** required. Generally, `DScribe` is much simpler to install than QUIP. **Please note**, however, that the SOAP descriptor vectors **differ** between QUIP and `DScribe` and one or the other may give better results depending on the system you are analyzing.
 
 After downloading, the package is installed with `pip`:
 

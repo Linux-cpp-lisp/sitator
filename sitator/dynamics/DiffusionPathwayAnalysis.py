@@ -162,7 +162,7 @@ class DiffusionPathwayAnalysis(object):
             for from_site, to_site in external_connections:
                 buf[:] = pos[to_site]
                 to_mic = pbcc.min_image(pos[from_site], buf)
-                to_in_image = image + [to_mic // 10**(2 - i) % 10 for i in range(3)]
+                to_in_image = image + [(to_mic // 10**(2 - i) % 10) - 1 for i in range(3)]  # FIXME: is the -1 right
                 if not np.any(np.abs(to_in_image) > 1):
                     to_in_image = 100 * (to_in_image[0] + 1) + 10 * (to_in_image[1] + 1) + (to_in_image[2] + 1)
                     newmat[image_idex * n_sites + from_site,
@@ -171,33 +171,3 @@ class DiffusionPathwayAnalysis(object):
         assert np.sum(newmat) >= n_images * np.sum(internal_mat) # Lowest it can be is if every one is internal
 
         return newmat, mask_000
-
-    # def _is_pbc_connected(self, sn, connectivity_matrix, component_mask):
-    #     n_sites = np.sum(component_mask)
-    #     mat = connectivity_matrix[component_mask, component_mask]
-    #     pos = sn.centers[component_mask]
-    #
-    #     #mic_offsets = coo_matrix(shape = (n_sites, n_sites, 3), dtype = np.int)
-    #     mic_offsets = np.full(shape = (n_sites, n_sites, 3), fill_value = -20, dtype = np.int)
-    #     for from_site, to_site in zip(*np.where(mat)):
-    #         to_mic = pbcc.min_image(pos[from_site], pos[to_site])
-    #         mic_offsets[from_site, to_site] = [int(d) - 1 for d in str(to_mic)] # Get the individual digits
-    #
-    #     # We always have seen every site in the 000 image, so it's implicit
-    #     have_seen = {}
-    #
-    #     for from_site in range(n_sites):
-    #         # mark all images reachable from from_site as seen
-    #         can_reach = np.where(mat[from_site])[0]
-    #         reach_the_image = mic_offsets[from_site, can_reach]
-    #         have_seen.update(set(zip(can_reach, reach_the_image)))
-    #
-    #     for saw_site, as_image in have_seen:
-    #         # Can we reach anything new from it?
-    #         can_reach = np.where(mat[saw_site])[0]
-    #         reach_the_image = as_image + mic_offsets[saw_site, can_reach]
-    #
-    #         if any(p not in have_seen for p in zip(can_reach, reach_the_image)):
-    #             return True
-    #
-    #     return False
