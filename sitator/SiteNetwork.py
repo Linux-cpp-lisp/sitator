@@ -3,7 +3,7 @@ import numpy as np
 import re
 import os
 import tarfile
-from backports import tempfile
+import tempfile
 
 import ase.io
 
