@@ -43,8 +43,8 @@ class GenerateClampedTrajectory(object):
         Returns:
             ndarray (n_frames x n_atoms x 3)
         """
-        wrap = st.wrap
-        pass_through_unassigned = st.pass_through_unassigned
+        wrap = self.wrap
+        pass_through_unassigned = self.pass_through_unassigned
         cell = st._sn.structure.cell
         pbcc = PBCCalculator(cell)
 
