@@ -11,16 +11,28 @@ from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFA
 class SiteNetworkPlotter(object):
     """Plot a SiteNetwork.
 
-    site_mappings defines how to show different properties. Each entry maps a
-    visual aspect ('marker', 'color', 'size') to the name of a site attribute
-    including 'site_type'.
-
-    Likewise for edge_mappings, each key maps a visual property ('intensity', 'color',
-    'width', 'linestyle') to an edge attribute in the SiteNetwork.
-
     Note that for edges, the average of the edge property for i -> j and j -> i
     is often used for visual clarity; if your edge properties are not almost symmetric,
     the visualization might not be useful.
+
+    Params:
+        - site_mappings (dict): defines how to show different properties. Each
+            entry maps a visual aspect ('marker', 'color', 'size') to the name
+            of a site attribute including 'site_type'.
+        - edge_mappings (dict): each key maps a visual property ('intensity',
+            'color', 'width', 'linestyle') to an edge attribute in the SiteNetwork.
+        - markers (list of str): What `matplotlib` markers to use for sites.
+        - plot_points_params (dict): User options for plotting site points.
+        - minmax_linewidth (2-tuple): Minimum and maximum linewidth to use.
+        - minmax_edge_alpha (2-tuple): Similar, for edge line alphas.
+        - minmax_markersize (2-tuple): Similar, for markersize.
+        - min_color_threshold (float): Minimum (normalized) color intensity for
+            the corresponding line to be shown. Defaults to zero, i.e., all
+            nonzero edges will be drawn.
+        - min_width_threshold (float): Minimum normalized edge width for the
+            corresponding edge to be shown. Defaults to zero, i.e., all
+            nonzero edges will be drawn.
+        - title (str)
     """
 
     DEFAULT_SITE_MAPPINGS = {
@@ -40,8 +52,8 @@ class SiteNetworkPlotter(object):
                 minmax_linewidth = (1.5, 7),
                 minmax_edge_alpha = (0.15, 0.75),
                 minmax_markersize = (80.0, 180.0),
-                min_color_threshold = 0.005,
-                min_width_threshold = 0.005,
+                min_color_threshold = 0.0,
+                min_width_threshold = 0.0,
                 title = ""):
         self.site_mappings = site_mappings
         self.edge_mappings = edge_mappings
@@ -205,9 +217,9 @@ class SiteNetworkPlotter(object):
                 if done_already[i, j]:
                     continue
                 # Ignore anything below the threshold
-                if all_cs[i, j] < self.min_color_threshold:
+                if all_cs[i, j] <= self.min_color_threshold:
                     continue
-                if do_widths and all_linewidths[i, j] < self.min_width_threshold:
+                if do_widths and all_linewidths[i, j] <= self.min_width_threshold:
                     continue
 
                 segment = np.empty(shape = (2, 3), dtype = centers.dtype)
