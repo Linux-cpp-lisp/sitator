@@ -99,7 +99,6 @@ class DiffusionPathwayAnalysis(object):
                 site_counts = np.sum(path_mask.reshape((-1, sn.n_sites)).astype(np.int), axis = 0)
                 if not np.any(site_counts > 1):
                     # Not percolating; doesn't contain any site and its periodic image.
-                    print("Not percolating")
                     continue
 
                 cur_site_mask = site_counts > 0
@@ -115,20 +114,9 @@ class DiffusionPathwayAnalysis(object):
                    del site_masks[i]
                 # Add new (super)path
                 site_masks.append(path_mask)
-                # if np.any(cur_site_mask & seen_mask):
-                #     # We've seen this one before
-                #     # This is OK because either they are connected, in which
-                #     # case they aren't seperate components, or they include the
-                #     # same site but AREN'T connected, in which case they must be
-                #     # periodic images since otherwise they'd be connected.
-                #     print('seen it')
-                #     continue
-                # seen_mask |= cur_site_mask
 
                 new_ccs[path_mask] = new_n_ccs
                 new_n_ccs += 1
-
-            print(new_n_ccs)
 
             n_ccs = new_n_ccs
             ccs = new_ccs
