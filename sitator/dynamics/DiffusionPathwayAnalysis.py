@@ -7,6 +7,7 @@ import itertools
 from scipy.sparse import lil_matrix
 from scipy.sparse.csgraph import connected_components
 
+from sitator import SiteNetwork
 from sitator.util import PBCCalculator
 
 import logging
@@ -20,6 +21,10 @@ class DiffusionPathwayAnalysis(object):
         for it to be considered connected.
     :param int minimum_n_sites: The minimum number of sites that must be part of
         a pathway for it to be considered as such.
+    :param bool true_periodic_pathways: Whether only to return true periodic
+        pathways that include sites and their periodic images (i.e. conductive
+        in the bulk) rather than just connected components. If True, `minimum_n_sites`
+        is NOT respected.
     """
 
     NO_PATHWAY = -1
@@ -37,6 +42,15 @@ class DiffusionPathwayAnalysis(object):
     def run(self, sn, return_count = False):
         """
         Expects a SiteNetwork that has had a JumpAnalysis run on it.
+
+        Adds information to `sn` in place.
+
+        Args:
+            - sn (SiteNetwork): Must have jump statistics from a `JumpAnalysis()`.
+            - return_count (bool, default: False): Return the number of connected
+                pathways.
+        Returns:
+            sn, [n_pathways]
         """
         if not sn.has_attribute('n_ij'):
             raise ValueError("SiteNetwork has no `n_ij`; run a JumpAnalysis on it first.")
@@ -67,32 +81,61 @@ class DiffusionPathwayAnalysis(object):
             # is_pathway = np.ones(shape = n_ccs, dtype = np.bool)
             # We have to check that the pathways include a site and its periodic
             # image, and throw out those that don't
-
             new_n_ccs = 1
             new_ccs = np.zeros(shape = len(sn), dtype = np.int)
+
+            # Add a non-path (contains no sites, all False) so the broadcasting works
+            site_masks = [np.zeros(shape = len(sn), dtype = np.bool)]
+            #seen_mask = np.zeros(shape = len(sn), dtype = np.bool)
 
             for pathway_i in np.arange(n_ccs):
                 path_mask = ccs == pathway_i
 
                 if not np.any(path_mask & mask_000):
+                    # If the pathway is entirely outside the unit cell, we don't care
                     continue
 
-                sitenums = np.where(path_mask)[0] % len(sn) # Get unit cell site numbers of all sites in pathway
-                _, site_counts = np.unique(sitenums, return_counts = True)
-                if np.sum(site_counts) <= len(site_counts):
-                    # Not a percolating path
+                # Sum along each site's periodic images, giving a count site-by-site
+                site_counts = np.sum(path_mask.reshape((-1, sn.n_sites)).astype(np.int), axis = 0)
+                if not np.any(site_counts > 1):
+                    # Not percolating; doesn't contain any site and its periodic image.
+                    print("Not percolating")
                     continue
 
-                if len(site_counts) < self.minimum_n_sites:
-                    continue
+                cur_site_mask = site_counts > 0
 
-                new_ccs[sitenums] = new_n_ccs
+                intersects_with = np.where(np.any(np.logical_and(site_masks, cur_site_mask), axis = 1))[0]
+                # Merge them:
+                if len(intersects_with) > 0:
+                    path_mask = cur_site_mask | np.logical_or.reduce([site_masks[i] for i in intersects_with], axis = 0)
+                else:
+                    path_mask = cur_site_mask
+                # Remove individual merged paths
+                for i in intersects_with:
+                   del site_masks[i]
+                # Add new (super)path
+                site_masks.append(path_mask)
+                # if np.any(cur_site_mask & seen_mask):
+                #     # We've seen this one before
+                #     # This is OK because either they are connected, in which
+                #     # case they aren't seperate components, or they include the
+                #     # same site but AREN'T connected, in which case they must be
+                #     # periodic images since otherwise they'd be connected.
+                #     print('seen it')
+                #     continue
+                # seen_mask |= cur_site_mask
+
+                new_ccs[path_mask] = new_n_ccs
                 new_n_ccs += 1
+
+            print(new_n_ccs)
 
             n_ccs = new_n_ccs
             ccs = new_ccs
+            # Only actually take the ones that were assigned to in the end
+            # This will deal with the ones that were merged.
             is_pathway = np.in1d(np.arange(n_ccs), ccs)
-            is_pathway[0] = False # Cause this was the "unassigned" value
+            is_pathway[0] = False # Cause this was the "unassigned" value, we initialized with zeros up above
         else:
             is_pathway = counts >= self.minimum_n_sites
 
@@ -132,13 +175,14 @@ class DiffusionPathwayAnalysis(object):
         assert n_images == 27
 
         n_sites = len(sn)
-        pos = sn.centers.copy() # TODO: copy not needed after reinstall of sitator!
+        pos = sn.centers #.copy() # TODO: copy not needed after reinstall of sitator!
         n_total_sites = len(images) * n_sites
         newmat = lil_matrix((n_total_sites, n_total_sites), dtype = np.bool)
 
         mask_000 = np.zeros(shape = n_total_sites, dtype = np.bool)
         index_000 = image_to_idex[111]
         mask_000[index_000:index_000 + n_sites] = True
+        assert np.sum(mask_000) == len(sn)
 
         pbcc = PBCCalculator(sn.structure.cell)
         buf = np.empty(shape = 3)
@@ -150,8 +194,10 @@ class DiffusionPathwayAnalysis(object):
             if pbcc.min_image(pos[from_site], buf) == 111:
                 # If we're in the main image, keep the connection: it's internal
                 internal_mat[from_site, to_site] = True
+                #internal_mat[to_site, from_site] = True # fake FIXME
             else:
                 external_connections.append((from_site, to_site))
+                #external_connections.append((to_site, from_site)) # FAKE FIXME
 
         for image_idex, image in enumerate(images):
             # Make the block diagonal
@@ -163,8 +209,10 @@ class DiffusionPathwayAnalysis(object):
                 buf[:] = pos[to_site]
                 to_mic = pbcc.min_image(pos[from_site], buf)
                 to_in_image = image + [(to_mic // 10**(2 - i) % 10) - 1 for i in range(3)]  # FIXME: is the -1 right
+                assert to_in_image is not None, "%s" % to_in_image
+                assert np.max(np.abs(to_in_image)) <= 2
                 if not np.any(np.abs(to_in_image) > 1):
-                    to_in_image = 100 * (to_in_image[0] + 1) + 10 * (to_in_image[1] + 1) + (to_in_image[2] + 1)
+                    to_in_image = 100 * (to_in_image[0] + 1) + 10 * (to_in_image[1] + 1) + 1 * (to_in_image[2] + 1)
                     newmat[image_idex * n_sites + from_site,
                            image_to_idex[to_in_image] * n_sites + to_site] = True
 
