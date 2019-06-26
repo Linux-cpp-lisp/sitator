@@ -99,7 +99,7 @@ class DotProdClassifier(object):
 
         first_iter = True
 
-        for iteration in xrange(self._max_iters):
+        for iteration in tqdm(xrange(self._max_iters), desc = "Clustering iter.", total = float('inf')):
             # This iteration's centers
             # The first sample is always its own cluster
             cluster_centers[0] = old_centers[0]
@@ -107,7 +107,7 @@ class DotProdClassifier(object):
             n_assigned_to[0] = old_n_assigned[0]
             n_clusters = 1
             # skip the first sample which has already been accounted for
-            for i, vec in tqdm(zip(xrange(1, old_n_clusters), old_centers[1:old_n_clusters]), desc = "Iteration %i" % iteration):
+            for i, vec in zip(xrange(1, old_n_clusters), old_centers[1:old_n_clusters]):
 
                 assigned_to = -1
                 assigned_cosang = 0.0

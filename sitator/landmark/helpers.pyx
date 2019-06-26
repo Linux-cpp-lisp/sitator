@@ -47,7 +47,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
     cdef Py_ssize_t landmark_dim = self._landmark_dimension
     cdef Py_ssize_t current_landmark_i = 0
     # Iterate through time
-    for i, frame in enumerate(tqdm(frames, desc = "Frame")):
+    for i, frame in enumerate(tqdm(frames, desc = "Landmark Frame")):
 
         static_positions = frame[sn.static_mask]
 

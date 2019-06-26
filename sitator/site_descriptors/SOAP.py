@@ -287,7 +287,7 @@ class SOAPDescriptorAverages(SOAP):
         count_of_site = np.zeros(len(nr_of_descs), dtype=int)
         allowed = np.ones(nsit, dtype = np.bool)
 
-        for site_traj_t, pos in zip(tqdm(site_traj, desc="SOAP"), real_traj):
+        for site_traj_t, pos in zip(tqdm(site_traj, desc="SOAP Frame"), real_traj):
             # I update the host lattice positions here, once for every timestep
             structure.positions[:] = pos[soap_mask]
 
