@@ -73,9 +73,10 @@ class SiteNetworkPlotter(object):
     def __call__(self, sn, *args, **kwargs):
         # -- Plot actual SiteNetwork --
         l = [(plot_atoms,  {'atoms' : sn.static_structure})]
-        l += self._site_layers(sn, self.plot_points_params)
+        site_layer, normalization_params = self._site_layers(sn, self.plot_points_params)
+        l += site_layer
 
-        l += self._plot_edges(sn, *args, **kwargs)
+        l += self._plot_edges(sn, site_params = normalization_params, *args, **kwargs)
 
         # -- Some visual clean up --
         ax = kwargs['ax']
@@ -97,7 +98,7 @@ class SiteNetworkPlotter(object):
         # -- Put it all together --
         layers(*l, **kwargs)
 
-    def _site_layers(self, sn, plot_points_params):
+    def _site_layers(self, sn, plot_points_params, size_minmax = None, color_minmax = None):
         pts_arrays = {'points' : sn.centers}
         pts_params = {'cmap' : 'rainbow'}
 
@@ -112,11 +113,15 @@ class SiteNetworkPlotter(object):
                     markers = val.copy()
             elif key == 'color':
                 pts_arrays['c'] = val.copy()
-                pts_params['norm'] = matplotlib.colors.Normalize(vmin = np.min(val), vmax = np.max(val))
+                if color_minmax is None:
+                    color_minmax = (np.min(val), np.max(val))
+                pts_params['norm'] = matplotlib.colors.Normalize(vmin = color_minmax[0], vmax = color_minmax[1])
             elif key == 'size':
+                if size_minmax is None:
+                    size_minmax = (np.min(val), np.max(val))
                 s = val.copy()
-                s += np.min(s)
-                s /= np.max(s)
+                s -= size_minmax[0]
+                s /= size_minmax[1] - size_minmax[0]
                 s *= self.minmax_markersize[1]
                 s += self.minmax_markersize[0]
                 pts_arrays['s'] = s
@@ -153,9 +158,9 @@ class SiteNetworkPlotter(object):
             d.update(pts_params)
             pts_layers.append((plot_points, d))
 
-        return pts_layers
+        return pts_layers, {'size_minmax' : size_minmax, 'color_minmax' : color_minmax}
 
-    def _plot_edges(self, sn, ax = None, *args, **kwargs):
+    def _plot_edges(self, sn, site_params = {}, ax = None, *args, **kwargs):
         if not 'intensity' in self.edge_mappings:
             return []
 
@@ -285,7 +290,7 @@ class SiteNetworkPlotter(object):
                 sn2.update_centers(np.asarray(sites_to_plot_positions))
                 pts_params = dict(self.plot_points_params)
                 pts_params['alpha'] = 0.2
-                return self._site_layers(sn2, pts_params)
+                return self._site_layers(sn2, pts_params, **site_params)
             else:
                 return []
         else:
