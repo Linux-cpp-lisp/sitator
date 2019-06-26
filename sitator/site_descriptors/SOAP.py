@@ -265,6 +265,7 @@ class SOAPDescriptorAverages(SOAP):
             averaging = self._averaging
         else:
             averaging = int(np.floor(np.mean(counts) / self._avg_desc_per_site))
+        logger.debug("Will average %i SOAP vectors for every output vector" % averaging)
 
         if averaging == 0:
             logger.warning("Asking for too many average descriptors per site; got averaging = 0; setting averaging = 1")
@@ -275,39 +276,36 @@ class SOAPDescriptorAverages(SOAP):
         if np.any(insufficient):
             logger.warning("You're asking to average %i SOAP vectors, but at this stepsize, %i sites are insufficiently occupied. Num occ./averaging: %s" % (averaging, np.sum(insufficient), counts[insufficient] / averaging))
         nr_of_descs = np.maximum(nr_of_descs, 1) # If it's 0, just make one with whatever we've got
+        logger.debug("Minimum # of descriptors/site: %i; maximum: %i" % (np.min(nr_of_descs), np.max(nr_of_descs)))
         # This is where I load the descriptor:
         descs = np.zeros((np.sum(nr_of_descs), soaper.n_dim))
 
         # An array that tells  me the index I'm at for each site type
-        desc_index = [np.sum(nr_of_descs[:i]) for i in range(len(nr_of_descs))]
-        max_index = [np.sum(nr_of_descs[:i+1]) for i in range(len(nr_of_descs))]
+        desc_index = np.asarray([np.sum(nr_of_descs[:i]) for i in range(len(nr_of_descs))])
+        max_index = np.asarray([np.sum(nr_of_descs[:i+1]) for i in range(len(nr_of_descs))])
 
         count_of_site = np.zeros(len(nr_of_descs), dtype=int)
-        blocked = np.empty(nsit, dtype=bool)
-        blocked[:] = False
+        allowed = np.ones(nsit, dtype = np.bool)
 
         for site_traj_t, pos in zip(tqdm(site_traj, desc="SOAP"), real_traj):
             # I update the host lattice positions here, once for every timestep
             structure.positions[:] = pos[soap_mask]
 
-            for mob_idx, site_idx in enumerate(site_traj_t):
-                if site_idx >= 0 and not blocked[site_idx]:
-                    # Now, for every lithium that has been associated to a site of index site_idx,
-                    # I take my structure and load the position of this mobile atom:
-                    #There should only be one descriptor, since there should only be one mobile
-                    soapv = soaper(structure, [pos[mob_indices[mob_idx]]])[0]
+            to_describe = (site_traj_t != SiteTrajectory.SITE_UNKNOWN) & allowed[site_traj_t]
 
-                    # So, now I need to figure out where to load the soapv into desc
-                    idx_to_add_desc = desc_index[site_idx]
-                    descs[idx_to_add_desc,  :] += soapv / averaging
-                    count_of_site[site_idx] += 1
-                    # Now, if the count reaches the averaging I want, I augment
-                    if count_of_site[site_idx] == averaging:
-                        desc_index[site_idx] += 1
-                        count_of_site[site_idx] = 0
-                        # Now I check whether I have to block this site from accumulating more descriptors
-                        if max_index[site_idx] == desc_index[site_idx]:
-                            blocked[site_idx] = True
+            if np.any(to_describe):
+                soaps = soaper(structure, pos[mob_indices[to_describe]])
+                soaps /= averaging
+
+                idx_to_add_desc = desc_index[site_traj_t[to_describe]]
+                descs[idx_to_add_desc] += soaps
+                count_of_site[site_traj_t[to_describe]] += 1
+
+            # Reset and increment full averages
+            full_average = count_of_site == averaging
+            desc_index[full_average] += 1
+            count_of_site[full_average] = 0
+            allowed[max_index == desc_index] = False
 
         desc_to_site = np.repeat(list(range(nsit)), nr_of_descs)
         return descs, desc_to_site
