@@ -2,11 +2,13 @@
 import numpy as np
 from abc import ABCMeta, abstractmethod
 
-from sitator.SiteNetwork import SiteNetwork
-from sitator.SiteTrajectory import SiteTrajectory
+from sitator import SiteNetwork, SiteTrajectory
 from sitator.util.progress import tqdm
 
 from ase.data import atomic_numbers
+
+import logging
+logger = logging.getLogger(__name__)
 
 class SOAP(object, metaclass=ABCMeta):
     """Abstract base class for computing SOAP vectors in a SiteNetwork.
@@ -31,7 +33,9 @@ class SOAP(object, metaclass=ABCMeta):
     :param func backend: A function that can be called with `sn, soap_mask, tracer_atomic_number, environment_list` as
         parameters, returning a function that, given the current soap structure
         along with tracer atoms, returns SOAP vectors in a numpy array. (i.e.
-        its signature is `soap(structure, positions)`)
+        its signature is `soap(structure, positions)`). The returned function
+        can also have a property, `n_dim`, giving the length of a single SOAP
+        vector.
     """
 
     from .backend.quip import quip_soap_backend as backend_quip
@@ -71,7 +75,6 @@ class SOAP(object, metaclass=ABCMeta):
             self._environment = environment_list
         else:
             self._environment = None
-
 
     def get_descriptors(self, stn):
         """
@@ -149,7 +152,9 @@ class SOAPCenters(SOAP):
     Requires a SiteNetwork as input.
     """
     def _get_descriptors(self, sn, structure, tracer_atomic_number, soap_mask, soaper):
-        assert isinstance(sn, SiteNetwork), "SOAPCenters requires a SiteNetwork, not `%s`" % sn
+        if isinstance(sn, SiteTrajectory):
+            sn = sn.site_network
+        assert isinstance(sn, SiteNetwork), "SOAPCenters requires a SiteNetwork or SiteTrajectory, not `%s`" % sn
 
         pts = sn.centers
 
@@ -248,25 +253,30 @@ class SOAPDescriptorAverages(SOAP):
         mob_indices = np.where(site_trajectory.site_network.mobile_mask)[0]
         # real_traj is the real space positions, site_traj the site trajectory
         # (i.e. for every mobile species the site index)
-        # I load into new variable, only the steps I need (memory???)
         real_traj = site_trajectory._real_traj[::self._stepsize]
         site_traj = site_trajectory.traj[::self._stepsize]
 
         # Now, I need to allocate the output
         # so for each site, I count how much data there is!
-        counts = np.array([np.count_nonzero(site_traj==site_idx) for site_idx in range(nsit)], dtype=int)
+        # Add one to deal with -1 -> 0, then just ignore the count for 0
+        counts = np.bincount(site_traj.reshape(-1) + 1, minlength = nsit)[1:]
 
         if self._averaging is not None:
             averaging = self._averaging
         else:
             averaging = int(np.floor(np.mean(counts) / self._avg_desc_per_site))
 
-        nr_of_descs = counts // averaging
+        if averaging == 0:
+            logger.warning("Asking for too many average descriptors per site; got averaging = 0; setting averaging = 1")
+            averaging = 1
 
-        if np.any(nr_of_descs == 0):
-            raise ValueError("You are asking too much, averaging with {} gives a problem".format(averaging))
+        nr_of_descs = counts // averaging
+        insufficient = nr_of_descs == 0
+        if np.any(insufficient):
+            logger.warning("You're asking to average %i SOAP vectors, but at this stepsize, %i sites are insufficiently occupied. Num occ./averaging: %s" % (averaging, np.sum(insufficient), counts[insufficient] / averaging))
+        nr_of_descs = np.maximum(nr_of_descs, 1) # If it's 0, just make one with whatever we've got
         # This is where I load the descriptor:
-        descs = np.zeros((np.sum(nr_of_descs), self.n_dim))
+        descs = np.zeros((np.sum(nr_of_descs), soaper.n_dim))
 
         # An array that tells  me the index I'm at for each site type
         desc_index = [np.sum(nr_of_descs[:i]) for i in range(len(nr_of_descs))]
@@ -276,7 +286,7 @@ class SOAPDescriptorAverages(SOAP):
         blocked = np.empty(nsit, dtype=bool)
         blocked[:] = False
 
-        for site_traj_t, pos in tqdm(zip(site_traj, real_traj), desc="SOAP"):
+        for site_traj_t, pos in zip(tqdm(site_traj, desc="SOAP"), real_traj):
             # I update the host lattice positions here, once for every timestep
             structure.positions[:] = pos[soap_mask]
 
@@ -284,17 +294,12 @@ class SOAPDescriptorAverages(SOAP):
                 if site_idx >= 0 and not blocked[site_idx]:
                     # Now, for every lithium that has been associated to a site of index site_idx,
                     # I take my structure and load the position of this mobile atom:
-                    # calc_connect to calculated distance
-#                     structure.calc_connect()
                     #There should only be one descriptor, since there should only be one mobile
-                    # I also divide  by averaging, to avoid getting into large numbers.
-#                     soapv =  self._soaper.calc(structure)['descriptor'][0] / self._averaging
-                    soapv = soaper(structure, [pos[mob_indices[mob_idx]]])
+                    soapv = soaper(structure, [pos[mob_indices[mob_idx]]])[0]
 
-                    #~ soapv ,_,_ = get_fingerprints([structure], d)
                     # So, now I need to figure out where to load the soapv into desc
                     idx_to_add_desc = desc_index[site_idx]
-                    descs[idx_to_add_desc,  :] += soapv[0] / averaging
+                    descs[idx_to_add_desc,  :] += soapv / averaging
                     count_of_site[site_idx] += 1
                     # Now, if the count reaches the averaging I want, I augment
                     if count_of_site[site_idx] == averaging:
