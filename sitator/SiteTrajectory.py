@@ -139,6 +139,8 @@ class SiteTrajectory(object):
     def compute_site_occupancies(self):
         """Computes site occupancies and adds site attribute `occupancies` to site_network."""
         occ = np.true_divide(np.bincount(self._traj[self._traj >= 0], minlength = self._sn.n_sites), self.n_frames)
+        if self.site_network.has_attribute('occupancies'):
+            self.site_network.remove_attribute('occupancies')
         self.site_network.add_site_attribute('occupancies', occ)
         return occ
 
