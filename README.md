@@ -52,6 +52,8 @@ All individual classes and parameters are documented with docstrings in the sour
 
 `sitator` uses the `tqdm.autonotebook` tool to automatically produce the correct fancy progress bars for terminals and iPython notebooks. To disable all progress bars, run with the environment variable `SITATOR_PROGRESSBAR` set to `false`.
 
+The `SITATOR_ZEO_PATH` and `SITATOR_QUIP_PATH` environment variables can set the default paths to the Zeo++ `network` and QUIP `quip` executables, respectively.
+
 ## License
 
 This software is made available under the MIT License. See `LICENSE` for more details.

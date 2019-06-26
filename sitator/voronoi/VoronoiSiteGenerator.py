@@ -1,6 +1,8 @@
 
 import numpy as np
 
+import os
+
 from sitator import SiteNetwork
 from sitator.util import Zeopy
 
@@ -12,7 +14,9 @@ class VoronoiSiteGenerator(object):
         and should typically be, False.
     """
 
-    def __init__(self, zeopp_path = "network", radial = False):
+    def __init__(self,
+                 zeopp_path = os.getenv("SITATOR_ZEO_PATH", default = "network"),
+                 radial = False):
         self._radial = radial
         self._zeopy = Zeopy(zeopp_path)
 

@@ -4,6 +4,8 @@ quip.py: Compute SOAP vectors for given positions in a structure using the comma
 
 import numpy as np
 
+import os
+
 import ase
 
 from tempfile import NamedTemporaryFile
@@ -16,7 +18,7 @@ DEFAULT_SOAP_PARAMS = {
     'atom_sigma' : 0.4
 }
 
-def quip_soap_backend(soap_params = {}, quip_path = 'quip'):
+def quip_soap_backend(soap_params = {}, quip_path = os.getenv("SITATOR_QUIP_PATH", default = 'quip')):
     def backend(sn, soap_mask, tracer_atomic_number, environment_list):
 
         soap_opts = dict(DEFAULT_SOAP_PARAMS)
