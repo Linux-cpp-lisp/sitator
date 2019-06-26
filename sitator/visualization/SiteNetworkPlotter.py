@@ -73,10 +73,8 @@ class SiteNetworkPlotter(object):
     def __call__(self, sn, *args, **kwargs):
         # -- Plot actual SiteNetwork --
         l = [(plot_atoms,  {'atoms' : sn.static_structure})]
-        site_layer, normalization_params = self._site_layers(sn, self.plot_points_params)
-        l += site_layer
-
-        l += self._plot_edges(sn, site_params = normalization_params, *args, **kwargs)
+        l += self._site_layers(sn, self.plot_points_params)
+        l += self._plot_edges(sn, *args, **kwargs)
 
         # -- Some visual clean up --
         ax = kwargs['ax']
@@ -98,7 +96,7 @@ class SiteNetworkPlotter(object):
         # -- Put it all together --
         layers(*l, **kwargs)
 
-    def _site_layers(self, sn, plot_points_params, size_minmax = None, color_minmax = None):
+    def _site_layers(self, sn, plot_points_params, same_normalization = False):
         pts_arrays = {'points' : sn.centers}
         pts_params = {'cmap' : 'rainbow'}
 
@@ -113,12 +111,14 @@ class SiteNetworkPlotter(object):
                     markers = val.copy()
             elif key == 'color':
                 pts_arrays['c'] = val.copy()
-                if color_minmax is None:
-                    color_minmax = (np.min(val), np.max(val))
+                if not same_normalization:
+                    self._color_minmax = (np.min(val), np.max(val))
+                color_minmax = self._color_minmax
                 pts_params['norm'] = matplotlib.colors.Normalize(vmin = color_minmax[0], vmax = color_minmax[1])
             elif key == 'size':
-                if size_minmax is None:
-                    size_minmax = (np.min(val), np.max(val))
+                if not same_normalization:
+                    self._size_minmax = (np.min(val), np.max(val))
+                size_minmax = self._size_minmax
                 s = val.copy()
                 s -= size_minmax[0]
                 s /= size_minmax[1] - size_minmax[0]
@@ -136,10 +136,12 @@ class SiteNetworkPlotter(object):
         else:
             markers = self._make_discrete(markers)
             unique_markers = np.unique(markers)
-            marker_i = 0
+            if len(unique_markers) > len(self.markers):
+                raise ValueError("Too many distinct values of the site property mapped to markers (there are %i) for the %i markers in `self.markers`" % (len(unique_markers), len(self.markers)))
+            if not same_normalization:
+                self._marker_table = dict(zip(unique_markers, self.markers[:len(unique_markers)]))
             for um in unique_markers:
-                marker_layers[SiteNetworkPlotter.DEFAULT_MARKERS[marker_i]] = (markers == um)
-                marker_i += 1
+                marker_layers[self._marker_table[um]] = (markers == um)
 
         # -- Do plot
         # If no color info provided, a fallback
@@ -158,9 +160,9 @@ class SiteNetworkPlotter(object):
             d.update(pts_params)
             pts_layers.append((plot_points, d))
 
-        return pts_layers, {'size_minmax' : size_minmax, 'color_minmax' : color_minmax}
+        return pts_layers
 
-    def _plot_edges(self, sn, site_params = {}, ax = None, *args, **kwargs):
+    def _plot_edges(self, sn, ax = None, *args, **kwargs):
         if not 'intensity' in self.edge_mappings:
             return []
 
@@ -267,6 +269,8 @@ class SiteNetworkPlotter(object):
             # Group colors
             if do_groups:
                 for i in range(len(cs)):
+                    if groups[i] >= len(SiteNetworkPlotter.EDGE_GROUP_COLORS) - 1:
+                        raise ValueError("Too many groups, not enough group colors")
                     lccolors[i] = matplotlib.colors.to_rgba(SiteNetworkPlotter.EDGE_GROUP_COLORS[groups[i]])
             else:
                 lccolors[:] = matplotlib.colors.to_rgba(SiteNetworkPlotter.EDGE_GROUP_COLORS[0])
@@ -290,7 +294,7 @@ class SiteNetworkPlotter(object):
                 sn2.update_centers(np.asarray(sites_to_plot_positions))
                 pts_params = dict(self.plot_points_params)
                 pts_params['alpha'] = 0.2
-                return self._site_layers(sn2, pts_params, **site_params)
+                return self._site_layers(sn2, pts_params, same_normalization = True)
             else:
                 return []
         else:
