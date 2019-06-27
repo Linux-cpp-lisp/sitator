@@ -135,6 +135,9 @@ class LandmarkAnalysis(object):
         The input SiteNetwork is a network of predicted sites; it's sites will
         be used as the "basis" for the landmark vectors.
 
+        Wraps a copy of `frames` into the unit cell; if you know `frames` is already
+        wrapped, set `do_wrap = False` to avoid the copy.
+
         Takes a SiteNetwork and returns a SiteTrajectory.
         """
         assert isinstance(sn, SiteNetwork)
@@ -154,6 +157,16 @@ class LandmarkAnalysis(object):
 
         # Create PBCCalculator
         self._pbcc = PBCCalculator(sn.structure.cell)
+
+        # -- Step 0: Wrap to Unit Cell
+        orig_frames = frames # Keep a reference around
+        frames = frames.copy()
+        # Flatten to list of points for wrapping
+        orig_frame_shape = frames.shape
+        frames.shape = (orig_frame_shape[0] * orig_frame_shape[1], 3)
+        self._pbcc.wrap_points(frames)
+        # Back to list of frames
+        frames.shape = orig_frame_shape
 
         # -- Step 1: Compute site-to-vertex distances
         self._landmark_dimension = sn.n_sites
@@ -256,7 +269,7 @@ class LandmarkAnalysis(object):
         assert out_sn.vertices is None
 
         out_st = SiteTrajectory(out_sn, lmk_lbls, lmk_confs)
-        out_st.set_real_traj(frames)
+        out_st.set_real_traj(orig_frames)
         self._has_run = True
 
         return out_st
