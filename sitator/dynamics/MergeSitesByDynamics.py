@@ -38,7 +38,10 @@ class MergeSitesByDynamics(MergeSites):
                  iterlimit = 100,
                  markov_parameters = {}):
 
-        super().__init__(post_check_thresh_factor * distance_threshold)
+        super().__init__(
+            maximum_merge_distance = post_check_thresh_factor * distance_threshold,
+            check_types = check_types
+        )
 
         if connectivity_matrix_generator is None:
             connectivity_matrix_generator = MergeSitesByDynamics.connectivity_n_ij
@@ -106,7 +109,7 @@ class MergeSitesByDynamics(MergeSites):
 
     def _get_sites_to_merge(self, st):
         # -- Compute jump statistics
-        if not st.site_network.has_attribute('p_ij'):
+        if not st.site_network.has_attribute('n_ij'):
             ja = JumpAnalysis()
             ja.run(st)
 

@@ -2,6 +2,7 @@ import numpy as np
 
 import abc
 
+from sitator.util import PBCCalculator
 from sitator import SiteNetwork, SiteTrajectory
 
 import logging
@@ -47,7 +48,7 @@ class MergeSites(abc.ABC):
 
         new_n_sites = len(clusters)
 
-        logger.info("After merge there will be %i sites for %i mobile particles" % (new_n_sites, st.site_network.n_mobile))
+        logger.info("After merging %i sites there will be %i sites for %i mobile particles" % (len(site_centers), new_n_sites, st.site_network.n_mobile))
 
         if new_n_sites < st.site_network.n_mobile:
             raise TooFewMergedSitesError("There are %i mobile atoms in this system, but only %i sites after merge" % (np.sum(st.site_network.mobile_mask), new_n_sites))
@@ -75,7 +76,7 @@ class MergeSites(abc.ABC):
             if not self.maximum_merge_distance is None:
                 dists = pbcc.distances(to_merge[0], to_merge[1:])
                 if not np.all(dists <= self.maximum_merge_distance):
-                    raise MergedSitesTooDistantError("Markov clustering tried to merge sites more than %f * %f apart. Lower your distance_threshold?" % (self.post_check_thresh_factor, self.distance_threshold))
+                    raise MergedSitesTooDistantError("Markov clustering tried to merge sites more than %.2f apart. Lower your distance_threshold?" % self.maximum_merge_distance)
 
             # New site center
             new_centers[newsite] = pbcc.average(to_merge)
