@@ -212,6 +212,43 @@ class SiteTrajectory(object):
         return res
 
 
+    def jumps(self, unknown_as_jump = False):
+        """Generator to iterate over all jumps in the trajectory.
+
+        A jump is considered to occur "at the frame" when it first acheives its
+        new site. Ex:
+        Frame 0: Atom 1 at site 4 --> Frame 1: Atom 1 at site 5
+        will yield a jump (1, 1, 4, 5).
+
+        Yields tuples of the form:
+
+            (frame_number, mobile_atom_number, from_site, to_site)
+
+        Args:
+            - unknown_as_jump (bool): If True, moving from a site to unknown
+                (or vice versa) is considered a jump; if False, unassigned mobile
+                atoms are considered to be at their last known sites.
+        """
+        traj = self.traj
+        n_mobile = self.site_network.n_mobile
+        assert n_mobile == traj.shape[1]
+        last_known = traj[0].copy()
+        known = np.ones(shape = len(last_known), dtype = np.bool)
+        jumped = np.zeros(shape = len(last_known), dtype = np.bool)
+        for frame_i in range(1, self.n_frames):
+            if not unknown_as_jump:
+                np.not_equal(traj[frame_i], SiteTrajectory.SITE_UNKNOWN, out = known)
+
+            np.not_equal(traj[frame_i], last_known, out = jumped)
+            jumped &= known # Must be currently known to have jumped
+
+            for atom_i in range(n_mobile):
+                if jumped[atom_i]:
+                    yield frame_i, atom_i, last_known[atom_i], traj[frame_i, atom_i]
+
+            last_known[known] = traj[frame_i, known]
+
+
     # ---- Plotting code
     def plot_frame(self, *args, **kwargs):
         if self._default_plotter is None:
