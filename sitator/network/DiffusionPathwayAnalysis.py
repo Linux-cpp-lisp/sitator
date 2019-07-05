@@ -110,8 +110,9 @@ class DiffusionPathwayAnalysis(object):
                 else:
                     path_mask = cur_site_mask
                 # Remove individual merged paths
-                for i in intersects_with:
-                   del site_masks[i]
+                # Going in reverse order means indexes don't become invalid as deletes happen
+                for i in sorted(intersects_with, reverse=True):
+                    del site_masks[i]
                 # Add new (super)path
                 site_masks.append(path_mask)
 
