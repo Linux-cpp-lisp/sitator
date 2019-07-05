@@ -137,12 +137,42 @@ class SiteTrajectory(object):
 
 
     def compute_site_occupancies(self):
-        """Computes site occupancies and adds site attribute `occupancies` to site_network."""
+        """Computes site occupancies and adds site attribute `occupancies` to site_network.
+
+        In cases of multiple occupancy, this will be higher than the number of
+        frames in which the site is occupied and could be over 1.0.
+        """
         occ = np.true_divide(np.bincount(self._traj[self._traj >= 0], minlength = self._sn.n_sites), self.n_frames)
         if self.site_network.has_attribute('occupancies'):
             self.site_network.remove_attribute('occupancies')
         self.site_network.add_site_attribute('occupancies', occ)
         return occ
+
+
+    def check_multiple_occupancy(self, max_mobile_per_site = 1):
+        """Count cases of "multiple occupancy" where more than one mobile share the same site at the same time.
+
+        These cases usually indicate bad site analysis.
+
+        Returns:
+            - n_multiple_assignments (int): the total number of multiple assignment
+                incidents.
+            - avg_mobile_per_site (float): the average number of mobile atoms
+        """
+        from sitator.landmark.errors import MultipleOccupancyError
+        n_more_than_ones = 0
+        avg_mobile_per_site = 0
+        divisor = 0
+        for frame_i, site_frame in enumerate(self._traj):
+            _, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
+            count_msk = counts > max_mobile_per_site
+            if np.any(count_msk):
+                raise MultipleOccupancyError("%i mobile particles were assigned to only %i site(s) (%s) at frame %i." % (np.sum(counts[count_msk]), np.sum(count_msk), np.where(count_msk)[0], frame_i))
+            n_more_than_ones += np.sum(counts > 1)
+            avg_mobile_per_site += np.sum(counts)
+            divisor += len(counts)
+        avg_mobile_per_site /= divisor
+        return n_more_than_ones, avg_mobile_per_site
 
 
     def assign_to_last_known_site(self, frame_threshold = 1):

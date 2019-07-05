@@ -1,11 +1,9 @@
 import numpy as np
 
-from sitator.landmark import MultipleOccupancyError
 from sitator.util import PBCCalculator
 from sitator.util.progress import tqdm
 
 import sys
-
 
 import importlib
 import tempfile
@@ -116,7 +114,7 @@ class LandmarkAnalysis(object):
 
     @property
     def cutoff(self):
-      return self._cutoff
+        return self._cutoff
 
     @analysis_result
     def landmark_vectors(self):
@@ -233,23 +231,6 @@ class LandmarkAnalysis(object):
 
         logging.info("    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts))
 
-        # Check that multiple particles are never assigned to one site at the
-        # same time, cause that would be wrong.
-        n_more_than_ones = 0
-        avg_mobile_per_site = 0
-        divisor = 0
-        for frame_i, site_frame in enumerate(lmk_lbls):
-            _, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
-            count_msk = counts > self.max_mobile_per_site
-            if np.any(count_msk):
-                raise MultipleOccupancyError("%i mobile particles were assigned to only %i site(s) (%s) at frame %i." % (np.sum(counts[count_msk]), np.sum(count_msk), np.where(count_msk)[0], frame_i))
-            n_more_than_ones += np.sum(counts > 1)
-            avg_mobile_per_site += np.sum(counts)
-            divisor += len(counts)
-
-        self.n_multiple_assignments = n_more_than_ones
-        self.avg_mobile_per_site = avg_mobile_per_site / float(divisor)
-
         # -- Do output
         # - Compute site centers
         site_centers = np.empty(shape = (n_sites, 3), dtype = frames.dtype)
@@ -269,6 +250,13 @@ class LandmarkAnalysis(object):
         assert out_sn.vertices is None
 
         out_st = SiteTrajectory(out_sn, lmk_lbls, lmk_confs)
+
+        # Check that multiple particles are never assigned to one site at the
+        # same time, cause that would be wrong.
+        self.n_multiple_assignments, self.avg_mobile_per_site = out_st.check_multiple_occupancy(
+            max_mobile_per_site = self.max_mobile_per_site
+        )
+
         out_st.set_real_traj(orig_frames)
         self._has_run = True
 
@@ -277,11 +265,11 @@ class LandmarkAnalysis(object):
     # -------- "private" methods --------
 
     def _do_peak_evening(self):
-      if self._peak_evening == 'none':
-          return
-      elif self._peak_evening == 'clip':
-          lvec_peaks = np.max(self._landmark_vectors, axis = 1)
-          # Clip all peaks to the lowest "normal" (stdev.) peak
-          lvec_clip = np.mean(lvec_peaks) - np.std(lvec_peaks)
-          # Do the clipping
-          self._landmark_vectors[self._landmark_vectors > lvec_clip] = lvec_clip
+        if self._peak_evening == 'none':
+            return
+        elif self._peak_evening == 'clip':
+            lvec_peaks = np.max(self._landmark_vectors, axis = 1)
+            # Clip all peaks to the lowest "normal" (stdev.) peak
+            lvec_clip = np.mean(lvec_peaks) - np.std(lvec_peaks)
+            # Do the clipping
+            self._landmark_vectors[self._landmark_vectors > lvec_clip] = lvec_clip
