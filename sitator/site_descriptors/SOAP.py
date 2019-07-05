@@ -258,8 +258,10 @@ class SOAPDescriptorAverages(SOAP):
 
         # Now, I need to allocate the output
         # so for each site, I count how much data there is!
-        # Add one to deal with -1 -> 0, then just ignore the count for 0
-        counts = np.bincount(site_traj.reshape(-1) + 1, minlength = nsit)[1:]
+        counts = np.zeros(shape = nsit + 1, dtype = np.int)
+        for frame in site_traj:
+            counts[frame] += 1 # A duplicate in `frame` will still only cause a single addition due to Python rules.
+        counts = counts[:-1]
 
         if self._averaging is not None:
             averaging = self._averaging
@@ -275,10 +277,13 @@ class SOAPDescriptorAverages(SOAP):
         insufficient = nr_of_descs == 0
         if np.any(insufficient):
             logger.warning("You're asking to average %i SOAP vectors, but at this stepsize, %i sites are insufficiently occupied. Num occ./averaging: %s" % (averaging, np.sum(insufficient), counts[insufficient] / averaging))
+        averagings = np.full(shape = len(nr_of_descs), fill_value = averaging)
+        averagings[insufficient] = counts[insufficient]
         nr_of_descs = np.maximum(nr_of_descs, 1) # If it's 0, just make one with whatever we've got
+        assert np.all(nr_of_descs >= 1)
         logger.debug("Minimum # of descriptors/site: %i; maximum: %i" % (np.min(nr_of_descs), np.max(nr_of_descs)))
         # This is where I load the descriptor:
-        descs = np.zeros((np.sum(nr_of_descs), soaper.n_dim))
+        descs = np.zeros(shape = (np.sum(nr_of_descs), soaper.n_dim))
 
         # An array that tells  me the index I'm at for each site type
         desc_index = np.asarray([np.sum(nr_of_descs[:i]) for i in range(len(nr_of_descs))])
@@ -294,18 +299,20 @@ class SOAPDescriptorAverages(SOAP):
             to_describe = (site_traj_t != SiteTrajectory.SITE_UNKNOWN) & allowed[site_traj_t]
 
             if np.any(to_describe):
+                sites_to_describe = site_traj_t[to_describe]
                 soaps = soaper(structure, pos[mob_indices[to_describe]])
-                soaps /= averaging
-
-                idx_to_add_desc = desc_index[site_traj_t[to_describe]]
+                soaps /= averagings[sites_to_describe][:, np.newaxis]
+                idx_to_add_desc = desc_index[sites_to_describe]
                 descs[idx_to_add_desc] += soaps
-                count_of_site[site_traj_t[to_describe]] += 1
+                count_of_site[sites_to_describe] += 1
 
             # Reset and increment full averages
-            full_average = count_of_site == averaging
+            full_average = count_of_site == averagings
             desc_index[full_average] += 1
             count_of_site[full_average] = 0
             allowed[max_index == desc_index] = False
+
+        assert not np.any(allowed) # We should have maxed out all of them after processing all frames.
 
         desc_to_site = np.repeat(list(range(nsit)), nr_of_descs)
         return descs, desc_to_site
