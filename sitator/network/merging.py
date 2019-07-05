@@ -24,12 +24,19 @@ class MergeSites(abc.ABC):
     :param bool check_types: If True, only sites of the same type are candidates to
         be merged; if false, type information is ignored. Merged sites will only
         be assigned types if this is True.
+    :param float maximum_merge_distance: Maximum distance between two sites
+        that are in a merge group, above which an error will be raised.
+    :param bool set_merged_into: If True, a site attribute `"merged_into"` will
+        be added to the original `SiteNetwork` indicating which new site
+        each old site was merged into.
     """
     def __init__(self,
                  check_types = True,
-                 maximum_merge_distance = None):
+                 maximum_merge_distance = None,
+                 set_merged_into = False):
         self.check_types = check_types
         self.maximum_merge_distance = maximum_merge_distance
+        self.set_merged_into = set_merged_into
 
 
     def run(self, st, **kwargs):
@@ -98,6 +105,11 @@ class MergeSites(abc.ABC):
 
         if not st.real_trajectory is None:
             newst.set_real_traj(st.real_trajectory)
+
+        if self.set_merged_into:
+            if st.site_network.has_attribute("merged_into"):
+                st.site_network.remove_attribute("merged_into")
+            st.site_network.add_site_attribute("merged_into", translation)
 
         return newst
 
