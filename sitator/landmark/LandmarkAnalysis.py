@@ -210,7 +210,9 @@ class LandmarkAnalysis(object):
             self._do_peak_evening()
 
             #  - Cluster -
-            cluster_func = importlib.import_module("..cluster." + self._cluster_algo, package = __name__).do_landmark_clustering
+            clustermod = importlib.import_module("..cluster." + self._cluster_algo, package = __name__)
+            importlib.reload(clustermod)
+            cluster_func = clustermod.do_landmark_clustering
 
             cluster_counts, lmk_lbls, lmk_confs = \
                 cluster_func(self._landmark_vectors,
