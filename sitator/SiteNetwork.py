@@ -5,6 +5,7 @@ import os
 import tarfile
 import tempfile
 
+import ase
 import ase.io
 
 import matplotlib
@@ -113,6 +114,26 @@ class SiteNetwork(object):
             raise ValueError("This SiteNetwork has no sites of type %i" % stype)
 
         return self[self._types == stype]
+
+    def get_structure_with_sites(self, site_atomic_number = None):
+        """Get an `ase.Atoms` with the sites included.
+
+        Args:
+            - site_atomic_number: If `None`, the species of the first mobile atom
+                will be used.
+        Returns:
+            ase.Atoms and final `site_atomic_number`
+        """
+        out = self.static_structure.copy()
+        if site_atomic_number is None:
+            site_atomic_number = self.structure.get_atomic_numbers()[mobile_mask][0]
+        numbers = np.full(len(self), site_atomic_number)
+        sites_atoms = ase.Atoms(
+            positions = self.centers,
+            numbers = numbers
+        )
+        out.extend(sites_atoms)
+        return out, site_atomic_number
 
     @property
     def n_sites(self):
