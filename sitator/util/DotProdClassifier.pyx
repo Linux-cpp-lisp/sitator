@@ -88,7 +88,7 @@ class DotProdClassifier(object):
 
         # -- filter out low counts
         if not self._min_samples is None:
-            self._cluster_counts = np.bincount(labels[labels >= 0])
+            self._cluster_counts = np.bincount(labels[labels >= 0], minlength = len(self._cluster_centers))
 
             assert len(self._cluster_counts) == len(self._cluster_centers)
 

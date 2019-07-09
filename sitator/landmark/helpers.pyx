@@ -9,32 +9,6 @@ from sitator.landmark import StaticLatticeError, ZeroLandmarkError
 
 ctypedef double precision
 
-# This is nearly a covariance matrix...
-def _cross_correlation_matrix(const precision [:, :] lvecs):
-    n_lvecs = len(lvecs)
-    n_components = lvecs.shape[1]
-    # -- Construct similarity matrix
-    graph_np = np.zeros(shape = (n_components, n_components))
-    divisors_np = np.zeros(shape = n_components)
-    cdef precision [:] divisors = divisors_np
-    cdef precision [:, :] graph = graph_np
-    cdef precision coeff
-
-    # The matrix is the ensemble average cross correlations between all
-    # landmark vector components (landmarks).
-    for lvec_idex in xrange(n_lvecs):
-        for component in xrange(n_components):
-            coeff = lvecs[lvec_idex, component]
-            if coeff > 0:
-                for i in range(n_components):
-                    graph[component, i] += coeff * lvecs[lvec_idex, i]
-                divisors[component] += 1
-
-    #graph /= n_lvecs
-    graph_np /= divisors_np
-
-    return graph_np
-
 def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_for_zeros = True, tqdm = lambda i: i, logger = None):
     if self._landmark_dimension is None:
         raise ValueError("_fill_landmark_vectors called before Voronoi!")
