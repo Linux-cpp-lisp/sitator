@@ -41,8 +41,7 @@ def do_landmark_clustering(landmark_vectors,
     n_clusters = len(clusters)
     centers = np.zeros(shape = (n_clusters, landmark_vectors.shape[1]))
     for i, cluster in enumerate(clusters):
-        centers[i, list(cluster)] = 1.0 # Set the peaks
-        #centers[i] = np.sum(cor[list(cluster)], axis = 0)
+        centers[i, list(cluster)] = 1 / len(cluster) # Set the peaks
 
     landmark_classifier = \
         DotProdClassifier(threshold = np.nan, # We're not fitting
@@ -53,6 +52,7 @@ def do_landmark_clustering(landmark_vectors,
     lmk_lbls, lmk_confs = \
         landmark_classifier.fit_predict(landmark_vectors,
                                         predict_threshold = predict_threshold,
+                                        predict_normed = False,
                                         verbose = verbose)
 
     return landmark_classifier.cluster_counts, lmk_lbls, lmk_confs

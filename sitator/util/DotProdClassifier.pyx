@@ -64,7 +64,7 @@ class DotProdClassifier(object):
     def n_clusters(self):
         return len(self._cluster_counts)
 
-    def fit_predict(self, X, verbose = True, predict_threshold = None, return_info = False):
+    def fit_predict(self, X, verbose = True, predict_threshold = None, predict_normed = True, return_info = False):
         """ Fit the data vectors X and return their cluster labels.
         """
 
@@ -82,7 +82,7 @@ class DotProdClassifier(object):
             self.fit_centers(X)
 
         # Run a predict now:
-        labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
+        labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold, predict_normed = predict_normed)
 
         total_n_assigned = np.sum(labels >= 0)
 
@@ -113,7 +113,7 @@ class DotProdClassifier(object):
                     (np.sum(~count_mask), len(count_mask), self._min_samples, min_samples, len(self._cluster_counts)))
 
             # Do another predict -- this could be more efficient, but who cares?
-            labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold)
+            labels, confs = self.predict(X, return_confidences = True, verbose = verbose, threshold = predict_threshold, predict_normed = predict_normed)
 
         if return_info:
             info = {
@@ -123,7 +123,7 @@ class DotProdClassifier(object):
         else:
             return labels, confs
 
-    def predict(self, X, return_confidences = False, threshold = None, verbose = True, ignore_zeros = True):
+    def predict(self, X, return_confidences = False, threshold = None, predict_normed = True, verbose = True, ignore_zeros = True):
         """Return a predicted cluster label for vectors X.
 
         :param float threshold: alternate threshold. Defaults to None, when self.threshold
@@ -150,9 +150,12 @@ class DotProdClassifier(object):
 
         zeros_count = 0
 
-        center_norms = np.linalg.norm(self._cluster_centers, axis = 1)
-        normed_centers = self._cluster_centers.copy()
-        normed_centers /= center_norms[:, np.newaxis]
+        if predict_normed:
+            center_norms = np.linalg.norm(self._cluster_centers, axis = 1)
+            normed_centers = self._cluster_centers.copy()
+            normed_centers /= center_norms[:, np.newaxis]
+        else:
+            normed_centers = self._cluster_centers
 
         # preallocate buffers
         diffs = np.empty(shape = len(center_norms), dtype = np.float)
@@ -167,11 +170,9 @@ class DotProdClassifier(object):
                 else:
                     raise ValueError("Data %i is all zeros!" % i)
 
-            # diffs = np.sum(x * self._cluster_centers, axis = 1)
-            # diffs /= np.linalg.norm(x) * center_norms
             np.dot(normed_centers, x, out = diffs)
-            diffs /= np.linalg.norm(x)
-            #diffs /= center_norms
+            if predict_normed:
+                diffs /= np.linalg.norm(x)
 
             assigned_to = np.argmax(diffs)
             assignment_confidence = diffs[assigned_to]
