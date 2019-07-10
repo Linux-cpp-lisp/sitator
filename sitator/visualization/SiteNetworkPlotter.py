@@ -4,6 +4,7 @@ import itertools
 
 import matplotlib
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
+from matplotlib.textpath import TextPath
 
 from sitator.util import PBCCalculator
 from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS, set_axes_equal
@@ -18,7 +19,9 @@ class SiteNetworkPlotter(object):
     Params:
         - site_mappings (dict): defines how to show different properties. Each
             entry maps a visual aspect ('marker', 'color', 'size') to the name
-            of a site attribute including 'site_type'.
+            of a site attribute including 'site_type'. The markers can also be
+            arbitrary text (key `"text"`) in which case the value can also be a
+            2-tuple of an attribute name and a `%` format string.
         - edge_mappings (dict): each key maps a visual property ('intensity',
             'color', 'width', 'linestyle') to an edge attribute in the SiteNetwork.
         - markers (list of str): What `matplotlib` markers to use for sites.
@@ -56,6 +59,7 @@ class SiteNetworkPlotter(object):
                 min_width_threshold = 0.0,
                 title = ""):
         self.site_mappings = site_mappings
+        assert not ("marker" in site_mappings and "text" in site_mappings)
         self.edge_mappings = edge_mappings
         self.markers = markers
         self.plot_points_params = plot_points_params
@@ -105,10 +109,21 @@ class SiteNetworkPlotter(object):
         markers = None
 
         for key in self.site_mappings:
-            val = getattr(sn, self.site_mappings[key])
+            val = self.site_mappings[key]
+            if isinstance(val, tuple):
+                val, param = val
+            else:
+                param = None
+            val = getattr(sn, val)
             if key == 'marker':
                 if not val is None:
                     markers = val.copy()
+                istextmarker = False
+            elif key == 'text':
+                istextmarker = True
+                format_str = "%s" if param is None else param
+                format_str = "$" + format_str + "$"
+                markers = val.copy()
             elif key == 'color':
                 pts_arrays['c'] = val.copy()
                 if not same_normalization:
@@ -136,10 +151,14 @@ class SiteNetworkPlotter(object):
         else:
             markers = self._make_discrete(markers)
             unique_markers = np.unique(markers)
-            if len(unique_markers) > len(self.markers):
-                raise ValueError("Too many distinct values of the site property mapped to markers (there are %i) for the %i markers in `self.markers`" % (len(unique_markers), len(self.markers)))
             if not same_normalization:
-                self._marker_table = dict(zip(unique_markers, self.markers[:len(unique_markers)]))
+                if istextmarker:
+                    self._marker_table = dict(zip(unique_markers, (format_str % um for um in unique_markers)))
+                else:
+                    if len(unique_markers) > len(self.markers):
+                        raise ValueError("Too many distinct values of the site property mapped to markers (there are %i) for the %i markers in `self.markers`" % (len(unique_markers), len(self.markers)))
+                    self._marker_table = dict(zip(unique_markers, self.markers[:len(unique_markers)]))
+
             for um in unique_markers:
                 marker_layers[self._marker_table[um]] = (markers == um)
 
