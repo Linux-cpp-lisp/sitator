@@ -99,6 +99,7 @@ class DotProdClassifier(object):
                 min_samples = int(np.floor(self._min_samples * total_n_assigned))
             else:
                 raise ValueError("Invalid value `%s` for min_samples; must be integral or float." % self._min_samples)
+            min_samples = max(min_samples, 1)
 
             count_mask = self._cluster_counts >= min_samples
 
@@ -158,7 +159,7 @@ class DotProdClassifier(object):
             normed_centers = self._cluster_centers
 
         # preallocate buffers
-        diffs = np.empty(shape = len(center_norms), dtype = np.float)
+        diffs = np.empty(shape = len(normed_centers), dtype = np.float)
 
         for i, x in enumerate(tqdm(X, desc = "Sample")):
 
