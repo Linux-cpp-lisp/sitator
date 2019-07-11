@@ -118,7 +118,8 @@ class DotProdClassifier(object):
 
         if return_info:
             info = {
-                'clusters_below_min_samples' : np.sum(~count_mask)
+                'clusters_below_min_samples' : np.sum(~count_mask),
+                'kept_clusters_mask' : count_mask
             }
             return labels, confs, info
         else:

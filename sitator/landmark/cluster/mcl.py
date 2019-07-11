@@ -3,7 +3,6 @@ import numpy as np
 from sitator.util.progress import tqdm
 from sitator.util.mcl import markov_clustering
 from sitator.util import DotProdClassifier
-from ..helpers import _cross_correlation_matrix
 
 from sklearn.covariance import empirical_covariance
 
@@ -13,7 +12,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 DEFAULT_PARAMS = {
-    'assignment_threshold' : 0.9
+    'inflation' : 4,
+    'assignment_threshold' : 0.7,
 }
 
 def cov2corr( A ):
@@ -55,8 +55,7 @@ def do_landmark_clustering(landmark_vectors,
         else:
             # PCA inspired:
             eigenval, eigenvec = eigsh(cov[cluster][:, cluster], k = 1)
-            # abs cause all our data is in the first "octant"
-            centers[i, cluster] = np.abs(eigenvec.T)
+            centers[i, cluster] = eigenvec.T
 
 
     landmark_classifier = \
@@ -65,10 +64,19 @@ def do_landmark_clustering(landmark_vectors,
 
     landmark_classifier.set_cluster_centers(centers)
 
-    lmk_lbls, lmk_confs = \
+    lmk_lbls, lmk_confs, info = \
         landmark_classifier.fit_predict(landmark_vectors,
                                         predict_threshold = predict_threshold,
                                         predict_normed = True,
-                                        verbose = verbose)
+                                        verbose = verbose,
+                                        return_info = True)
 
-    return landmark_classifier.cluster_counts, lmk_lbls, lmk_confs
+    msk = info['kept_clusters_mask']
+    clusters = [c for i, c in enumerate(clusters) if msk[i]] # Only need the ones above the threshold
+
+    return (
+        landmark_classifier.cluster_counts,
+        lmk_lbls,
+        lmk_confs,
+        clusters
+    )
