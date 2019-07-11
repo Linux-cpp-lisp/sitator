@@ -12,6 +12,7 @@ from . import helpers
 from sitator import SiteNetwork, SiteTrajectory
 from .errors import MultipleOccupancyError
 
+
 import logging
 logger = logging.getLogger(__name__)
 
