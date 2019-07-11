@@ -16,6 +16,9 @@ def markov_clustering(transition_matrix,
 
     assert transition_matrix.shape[0] == transition_matrix.shape[1]
 
+    # Check for nonzero diagonal -- self loops needed to avoid div by zero and NaNs
+    assert np.count_nonzero(transition_matrix.diagonal()) == len(transition_matrix)
+
     m1 = transition_matrix.copy()
 
     # Normalize (though it should be close already)
