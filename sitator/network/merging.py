@@ -53,6 +53,7 @@ class MergeSites(abc.ABC):
 
         clusters = self._get_sites_to_merge(st, **kwargs)
 
+        old_n_sites = st.site_network.n_sites
         new_n_sites = len(clusters)
 
         logger.info("After merging %i sites there will be %i sites for %i mobile particles" % (len(site_centers), new_n_sites, st.site_network.n_mobile))
@@ -62,6 +63,9 @@ class MergeSites(abc.ABC):
 
         if self.check_types:
             new_types = np.empty(shape = new_n_sites, dtype = np.int)
+        merge_verts = st.site_network.vertices is not None
+        if merge_verts:
+            new_verts = []
 
         # -- Merge Sites
         new_centers = np.empty(shape = (new_n_sites, 3), dtype = st.site_network.centers.dtype)
@@ -90,11 +94,15 @@ class MergeSites(abc.ABC):
             if self.check_types:
                 assert np.all(site_types[mask] == site_types[mask][0])
                 new_types[newsite] = site_types[mask][0]
+            if merge_verts:
+                new_verts.append(set.union(*[set(st.site_network.vertices[i]) for i in mask]))
 
         newsn = st.site_network.copy()
         newsn.centers = new_centers
         if self.check_types:
             newsn.site_types = new_types
+        if merge_verts:
+            newsn.vertices = new_verts
 
         newtraj = translation[st._traj]
         newtraj[st._traj == SiteTrajectory.SITE_UNKNOWN] = SiteTrajectory.SITE_UNKNOWN

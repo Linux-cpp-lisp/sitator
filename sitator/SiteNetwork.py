@@ -180,6 +180,13 @@ class SiteNetwork(object):
         self._vertices = value
 
     @property
+    def number_of_vertices(self):
+        if self._vertices is None:
+            return None
+        else:
+            return [len(v) for v in self._vertices]
+
+    @property
     def site_types(self):
         if self._types is None:
             return None

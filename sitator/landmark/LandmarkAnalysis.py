@@ -10,6 +10,8 @@ import tempfile
 
 from . import helpers
 from sitator import SiteNetwork, SiteTrajectory
+from .errors import MultipleOccupancyError
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -93,7 +95,7 @@ class LandmarkAnalysis(object):
         self._clustering_params = clustering_params
 
         if not peak_evening in ['none', 'clip']:
-          raise ValueError("Invalid value `%s` for peak_evening" % peak_evening)
+            raise ValueError("Invalid value `%s` for peak_evening" % peak_evening)
         self._peak_evening = peak_evening
 
         self.verbose = verbose
@@ -210,13 +212,25 @@ class LandmarkAnalysis(object):
             self._do_peak_evening()
 
             #  - Cluster -
-            cluster_func = importlib.import_module("..cluster." + self._cluster_algo, package = __name__).do_landmark_clustering
+            # FIXME: remove reload after development done
+            clustermod = importlib.import_module("..cluster." + self._cluster_algo, package = __name__)
+            importlib.reload(clustermod)
+            cluster_func = clustermod.do_landmark_clustering
 
-            cluster_counts, lmk_lbls, lmk_confs = \
+            clustering = \
                 cluster_func(self._landmark_vectors,
                              clustering_params = self._clustering_params,
                              min_samples = self._minimum_site_occupancy / float(sn.n_mobile),
                              verbose = self.verbose)
+
+        if len(clustering) == 3:
+            cluster_counts, lmk_lbls, lmk_confs = clustering
+            landmark_clusters = None
+        elif len(clustering) == 4:
+            cluster_counts, lmk_lbls, lmk_confs, landmark_clusters = clustering
+            assert len(cluster_counts) == len(landmark_clusters)
+        else:
+            raise ValueError("Clustering function returned invalid result %s" % clustering)
 
         logging.info("    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls))))
 
@@ -232,9 +246,9 @@ class LandmarkAnalysis(object):
         logging.info("    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts))
 
         # -- Do output
+        out_sn = sn.copy()
         # - Compute site centers
         site_centers = np.empty(shape = (n_sites, 3), dtype = frames.dtype)
-
         for site in range(n_sites):
             mask = lmk_lbls == site
             pts = frames[:, sn.mobile_mask][mask]
@@ -242,12 +256,13 @@ class LandmarkAnalysis(object):
                 site_centers[site] = self._pbcc.average(pts, weights = lmk_confs[mask])
             else:
                 site_centers[site] = self._pbcc.average(pts)
-
-        # Build output obejcts
-        out_sn = sn.copy()
-
         out_sn.centers = site_centers
-        assert out_sn.vertices is None
+        # - If clustering gave us that, compute site vertices
+        if landmark_clusters is not None:
+            vertices = []
+            for lclust in landmark_clusters:
+                vertices.append(set.union(*[set(sn.vertices[l]) for l in lclust]))
+            out_sn.vertices = vertices
 
         out_st = SiteTrajectory(out_sn, lmk_lbls, lmk_confs)
 
