@@ -4,7 +4,6 @@ import itertools
 
 import matplotlib
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
-from matplotlib.textpath import TextPath
 
 from sitator.util import PBCCalculator
 from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS, set_axes_equal

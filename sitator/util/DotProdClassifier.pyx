@@ -174,6 +174,7 @@ class DotProdClassifier(object):
             np.dot(normed_centers, x, out = diffs)
             if predict_normed:
                 diffs /= np.linalg.norm(x)
+            np.abs(diffs, out = diffs)
 
             assigned_to = np.argmax(diffs)
             assignment_confidence = diffs[assigned_to]

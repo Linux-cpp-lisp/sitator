@@ -7,6 +7,8 @@ from ..helpers import _cross_correlation_matrix
 
 from sklearn.covariance import empirical_covariance
 
+from scipy.sparse.linalg import eigsh
+
 import logging
 logger = logging.getLogger(__name__)
 

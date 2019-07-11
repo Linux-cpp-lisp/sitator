@@ -94,7 +94,7 @@ class LandmarkAnalysis(object):
         self._clustering_params = clustering_params
 
         if not peak_evening in ['none', 'clip']:
-          raise ValueError("Invalid value `%s` for peak_evening" % peak_evening)
+            raise ValueError("Invalid value `%s` for peak_evening" % peak_evening)
         self._peak_evening = peak_evening
 
         self.verbose = verbose
