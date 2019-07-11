@@ -64,9 +64,10 @@ class MergeSitesByThreshold(MergeSites):
         if self.forbid_multiple_occupancy:
             n_mobile = sn.n_mobile
             for frame in st.traj:
-                for mob in range(n_mobile):
+                frame = [s for s in frame if s >= 0]
+                for site in frame: # only known
                     # can't merge occupied site with other simulatanious occupied sites
-                    connmat[frame[mob], frame] = False
+                    connmat[site, frame] = False
 
         # Everything is always mergable with itself.
         np.fill_diagonal(connmat, True)
