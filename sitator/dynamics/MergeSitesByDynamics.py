@@ -3,6 +3,7 @@ import numpy as np
 from sitator.dynamics import JumpAnalysis
 from sitator.util import PBCCalculator
 from sitator.network.merging import MergeSites
+from sitator.util.mcl import markov_clustering
 
 import logging
 logger = logging.getLogger(__name__)
@@ -35,7 +36,6 @@ class MergeSitesByDynamics(MergeSites):
                  distance_threshold = 1.0,
                  post_check_thresh_factor = 1.5,
                  check_types = True,
-                 iterlimit = 100,
                  markov_parameters = {}):
 
         super().__init__(
@@ -149,63 +149,5 @@ class MergeSitesByDynamics(MergeSites):
                            "  This may or may not be a problem; but if `distance_threshold` is low, consider raising it." % n_alarming_ignored_edges)
 
         # -- Do Markov Clustering
-        clusters = self._markov_clustering(connectivity_matrix, **self.markov_parameters)
+        clusters = markov_clustering(connectivity_matrix, **self.markov_parameters)
         return clusters
-
-
-    def _markov_clustering(self,
-                           transition_matrix,
-                           expansion = 2,
-                           inflation = 2,
-                           pruning_threshold = 0.00001):
-        """
-        See https://micans.org/mcl/.
-
-        Because we're dealing with matrixes that are stochastic already,
-        there's no need to add artificial loop values.
-
-        Implementation inspired by https://github.com/GuyAllard/markov_clustering
-        """
-
-        assert transition_matrix.shape[0] == transition_matrix.shape[1]
-
-        m1 = transition_matrix.copy()
-
-        # Normalize (though it should be close already)
-        m1 /= np.sum(m1, axis = 0)
-
-        allcols = np.arange(m1.shape[1])
-
-        converged = False
-        for i in range(self.iterlimit):
-            # -- Expansion
-            m2 = np.linalg.matrix_power(m1, expansion)
-            # -- Inflation
-            np.power(m2, inflation, out = m2)
-            m2 /= np.sum(m2, axis = 0)
-            # -- Prune
-            to_prune = m2 < pruning_threshold
-            # Exclude the max of every column
-            to_prune[np.argmax(m2, axis = 0), allcols] = False
-            m2[to_prune] = 0.0
-            # -- Check converged
-            if np.allclose(m1, m2):
-                converged = True
-                logger.info("Markov Clustering converged in %i iterations" % i)
-                break
-
-            m1[:] = m2
-
-        if not converged:
-            raise ValueError("Markov Clustering couldn't converge in %i iterations" % self.iterlimit)
-
-        # -- Get clusters
-        attractors = m2.diagonal().nonzero()[0]
-
-        clusters = set()
-
-        for a in attractors:
-            cluster = tuple(m2[a].nonzero()[0])
-            clusters.add(cluster)
-
-        return list(clusters)

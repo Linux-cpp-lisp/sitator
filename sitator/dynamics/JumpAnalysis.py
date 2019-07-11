@@ -62,7 +62,7 @@ class JumpAnalysis(object):
             unassigned = frame == SiteTrajectory.SITE_UNKNOWN
             # Reassign unassigned
             frame[unassigned] = last_known[unassigned]
-            fknown = frame >= 0
+            fknown = (frame >= 0) & (last_known >= 0)
 
             if np.any(~fknown):
                 logger.warning("  at frame %i, %i uncorrectable unassigned particles" % (i, np.sum(~fknown)))
