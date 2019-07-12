@@ -53,7 +53,7 @@ class SiteNetworkPlotter(object):
                 plot_points_params = {},
                 minmax_linewidth = (1.5, 7),
                 minmax_edge_alpha = (0.15, 0.75),
-                minmax_markersize = (80.0, 180.0),
+                minmax_markersize = (20.0, 80.0),
                 min_color_threshold = 0.0,
                 min_width_threshold = 0.0,
                 title = ""):
@@ -101,7 +101,7 @@ class SiteNetworkPlotter(object):
 
     def _site_layers(self, sn, plot_points_params, same_normalization = False):
         pts_arrays = {'points' : sn.centers}
-        pts_params = {'cmap' : 'copper'}
+        pts_params = {'cmap' : 'cividis'}
 
         # -- Apply mapping
         # - other mappings
@@ -166,6 +166,9 @@ class SiteNetworkPlotter(object):
         # If no color info provided, a fallback
         if not 'color' in pts_params and not 'c' in pts_arrays:
             pts_params['color'] = 'k'
+        # If no color info provided, a fallback
+        if not 's' in pts_params and not 's' in pts_arrays:
+            pts_params['s'] = sum(self.minmax_markersize) / 2
         # Add user options for `plot_points`
         pts_params.update(plot_points_params)
 
