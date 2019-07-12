@@ -12,6 +12,9 @@ try:
 except ImportError:
     has_pymatgen = False
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class SiteCoordinationEnvironment(object):
     """Determine site types based on local coordination environments.
@@ -43,6 +46,7 @@ class SiteCoordinationEnvironment(object):
         coord_envs = []
         vertices = []
 
+        logger.info("Running site coordination environment analysis...")
         # Do this once.
         # __init__ here defaults to disabling structure refinement, so all this
         # method is doing is making a copy of the structure and setting some
@@ -73,9 +77,13 @@ class SiteCoordinationEnvironment(object):
         unique_envs = list(set(env['ce_symbol'] for env in coord_envs))
         site_types = np.array([unique_envs.index(env['ce_symbol']) for env in coord_envs])
         # The closer to 1 this is, the better
-        site_type_confidences = np.array([unique_envs.index(env[0]['ce_fraction']) for env in coord_envs])
+        site_type_confidences = np.array([env['ce_fraction'] for env in coord_envs])
         coordination_numbers = np.array([int(env['ce_symbol'].split(':')[1]) for env in coord_envs])
         assert np.all(coordination_numbers == [len(v) for v in vertices])
+
+        n_types = len(unique_envs)
+        logger.info(("             " + "Type {:<2} " * n_types).format(*range(n_types)))
+        logger.info(("# of sites   " + "{:<8}" * n_types).format(*np.bincount(site_types)))
 
         sn.site_types = site_types
         sn.vertices = vertices

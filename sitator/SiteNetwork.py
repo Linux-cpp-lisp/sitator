@@ -134,7 +134,7 @@ class SiteNetwork(object):
         )
         site_idexes = len(out) + np.arange(self.n_sites)
         out.extend(sites_atoms)
-        return out, site_idexes, ite_atomic_number
+        return out, site_idexes, site_atomic_number
 
     @property
     def n_sites(self):
