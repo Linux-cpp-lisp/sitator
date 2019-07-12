@@ -3,16 +3,28 @@ import numpy as np
 from scipy.spatial import ConvexHull
 from scipy.spatial.qhull import QhullError
 
-from sitator import SiteTrajectory
+from sitator import SiteNetwork, SiteTrajectory
 from sitator.util import PBCCalculator
 
 import logging
 logger = logging.getLogger(__name__)
 
+class InsufficientCoordinatingAtomsError(Exception):
+    pass
+
 class SiteVolumes(object):
-    """Compute the volumes of sites."""
-    def __init__(self):
-        pass
+    """Compute the volumes of sites.
+
+    Args:
+        - error_on_insufficient_coord (bool, default: True): To compute an
+            ideal site volume (`compute_volumes()`), at least 4 coordinating
+            atoms (because we are in 3D space) must be specified in `vertices`.
+            If True, an error will be thrown when a site with less than four
+            vertices is encountered; if False, a volume of 0  and surface area
+            of NaN will be returned.
+    """
+    def __init__(self, error_on_insufficient_coord = True):
+        self.error_on_insufficient_coord = error_on_insufficient_coord
 
 
     def compute_accessable_volumes(self, st, n_recenterings = 8):
@@ -30,6 +42,7 @@ class SiteVolumes(object):
                 resulting volume; this deals with cases where there is one outlier
                 where recentering around it gives very bad results.)
         """
+        assert isinstance(st, SiteTrajectory)
         vols = np.empty(shape = st.site_network.n_sites, dtype = np.float)
         areas = np.empty(shape = st.site_network.n_sites, dtype = np.float)
 
@@ -76,16 +89,25 @@ class SiteVolumes(object):
         Args:
             - sn (SiteNetwork)
         """
+        assert isinstance(sn, SiteNetwork)
         if sn.vertices is None:
             raise ValueError("SiteNetwork must have verticies to compute volumes!")
 
-        vols = np.empty(shape = st.site_network.n_sites, dtype = np.float)
-        areas = np.empty(shape = st.site_network.n_sites, dtype = np.float)
+        vols = np.empty(shape = sn.n_sites, dtype = np.float)
+        areas = np.empty(shape = sn.n_sites, dtype = np.float)
 
-        pbcc = PBCCalculator(st.site_network.structure.cell)
+        pbcc = PBCCalculator(sn.structure.cell)
 
-        for site in range(st.site_network.n_sites):
+        for site in range(sn.n_sites):
             pos = sn.static_structure.positions[sn.vertices[site]]
+            if len(pos) < 4:
+                if self.error_on_insufficient_coord:
+                    raise InsufficientCoordinatingAtomsError("Site %i had only %i vertices (less than needed 4)" % (site, len(pos)))
+                else:
+                    vols[site] = 0
+                    areas[site] = np.nan
+                    continue
+
             assert pos.flags['OWNDATA'] # It should since we're indexing with index lists
             # Recenter
             offset = pbcc.cell_centroid - sn.centers[site]
