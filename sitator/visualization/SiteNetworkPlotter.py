@@ -148,7 +148,8 @@ class SiteNetworkPlotter(object):
             # Just one layer with all points and one marker
             marker_layers[SiteNetworkPlotter.DEFAULT_MARKERS[0]] = np.ones(shape = sn.n_sites, dtype = np.bool)
         else:
-            markers = self._make_discrete(markers)
+            if not istextmarker:
+                markers = self._make_discrete(markers)
             unique_markers = np.unique(markers)
             if not same_normalization:
                 if istextmarker:

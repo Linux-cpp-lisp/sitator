@@ -122,7 +122,7 @@ class SiteNetwork(object):
             - site_atomic_number: If `None`, the species of the first mobile atom
                 will be used.
         Returns:
-            ase.Atoms and final `site_atomic_number`
+            ase.Atoms, indices of sites in the returned structure, and final `site_atomic_number`
         """
         out = self.static_structure.copy()
         if site_atomic_number is None:
@@ -132,8 +132,9 @@ class SiteNetwork(object):
             positions = self.centers,
             numbers = numbers
         )
+        site_idexes = len(out) + np.arange(self.n_sites)
         out.extend(sites_atoms)
-        return out, site_atomic_number
+        return out, site_idexes, ite_atomic_number
 
     @property
     def n_sites(self):

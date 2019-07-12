@@ -19,7 +19,7 @@ except ImportError:
     raise ImportError("SiteTypeAnalysis requires the `pydpc` package")
 
 class SiteTypeAnalysis(object):
-    """Cluster sites into types using a descriptor and Density Peak Clustering.
+    """Cluster sites into types using a continuous descriptor and Density Peak Clustering.
 
     -- descriptor --
     Some kind of object implementing:
