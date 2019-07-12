@@ -87,6 +87,7 @@ class SiteCoordinationEnvironment(object):
 
         sn.site_types = site_types
         sn.vertices = vertices
+        sn.add_site_attribute("coordination_environments", [env['ce_symbol'] for env in coord_envs])
         sn.add_site_attribute("site_type_confidences", site_type_confidences)
         sn.add_site_attribute("coordination_numbers", coordination_numbers)
 
