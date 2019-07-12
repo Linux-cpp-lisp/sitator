@@ -126,7 +126,7 @@ class SiteNetwork(object):
         """
         out = self.static_structure.copy()
         if site_atomic_number is None:
-            site_atomic_number = self.structure.get_atomic_numbers()[mobile_mask][0]
+            site_atomic_number = self.structure.get_atomic_numbers()[self.mobile_mask][0]
         numbers = np.full(len(self), site_atomic_number)
         sites_atoms = ase.Atoms(
             positions = self.centers,

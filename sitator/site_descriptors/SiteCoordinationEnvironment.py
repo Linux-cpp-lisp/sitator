@@ -34,7 +34,7 @@ class SiteCoordinationEnvironment(object):
 
     def run(self, sn):
         # -- Determine local environments
-        # Get an ASE structure with a single mobile atom that we'll move around
+        # Get an ASE structure with a single mobile site that we'll move around
         site_struct, idexes, site_species = sn[0:1].get_structure_with_sites()
         pymat_struct = AseAtomsAdaptor.get_structure(site_struct)
         lgf = cgf.LocalGeometryFinder()
@@ -53,7 +53,7 @@ class SiteCoordinationEnvironment(object):
             # Update the position of the site
             lgf.structure[index].coords = sn.centers[site]
             # Compute structure environments for the site
-            struct_envs = lgf.compute_structure_environments(only_indices = [index])
+            struct_envs = lgf.compute_structure_environments(only_indices = [index], **self._kwargs)
             struct_envs = LightStructureEnvironments.from_structure_environments(
                 strategy=cgf.LocalGeometryFinder.DEFAULT_STRATEGY,
                 structure_environments=struct_envs

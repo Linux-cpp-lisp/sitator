@@ -21,15 +21,16 @@ If you use `sitator` in your research, please consider citing this paper. The Bi
 
 `sitator` is built for Python >=3.2 (the older version supports Python 2.7). We recommend the use of a virtual environment (`virtualenv`, `conda`, etc.). `sitator` has a number of optional dependencies that enable various features:
 
- * **Landmark Analysis**
-     * The `network` executable from [Zeo++](http://www.maciejharanczyk.info/Zeopp/examples.html) is required for computing the Voronoi decomposition. (It does not have to be installed in `PATH`; the path to it can be given with the `zeopp_path` option of `VoronoiSiteGenerator`.)
- * **Site Type Analysis**
-     * For computing SOAP vectors: the `quip` binary from [QUIP](https://libatoms.github.io/QUIP/) with [GAP](http://www.libatoms.org/gap/gap_download.html) **or** the [`DScribe`](https://singroup.github.io/dscribe/index.html) Python library.
-     * The Python 2.7 bindings for QUIP (`quippy`) are **not** required. Generally, `DScribe` is much simpler to install than QUIP. **Please note**, however, that the SOAP descriptor vectors **differ** between QUIP and `DScribe` and one or the other may give better results depending on the system you are analyzing.
+* Landmark Analysis
+ * The `network` executable from [Zeo++](http://www.maciejharanczyk.info/Zeopp/examples.html) is required for computing the Voronoi decomposition. (It does not have to be installed in `PATH`; the path to it can be given with the `zeopp_path` option of `VoronoiSiteGenerator`.)
+* Site Type Analysis
+ * For SOAP-based site types: either the `quip` binary from [QUIP](https://libatoms.github.io/QUIP/) with [GAP](http://www.libatoms.org/gap/gap_download.html) **or** the [`DScribe`](https://singroup.github.io/dscribe/index.html) Python library.
+    * The Python 2.7 bindings for QUIP (`quippy`) are **not** required. Generally, `DScribe` is much simpler to install than QUIP. **Please note**, however, that the SOAP descriptor vectors **differ** between QUIP and `DScribe` and one or the other may give better results depending on the system you are analyzing.
+ * For coordination environment analysis (`sitator.site_descriptors.SiteCoordinationEnvironment`), we integrate the `pymatgen.analysis.chemenv` package; a somewhat recent installation of `pymatgen` is required.
 
 After downloading, the package is installed with `pip`:
 
-```
+```bash
 # git clone ... OR unzip ... OR ...
 cd sitator
 pip install .
@@ -37,7 +38,7 @@ pip install .
 
 To enable site type analysis, add the `[SiteTypeAnalysis]` option (this adds two dependencies -- Python packages `pydpc` and `dscribe`):
 
-```
+```bash
 pip install ".[SiteTypeAnalysis]"
 ```
 
