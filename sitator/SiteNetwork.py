@@ -118,6 +118,9 @@ class SiteNetwork(object):
     def get_structure_with_sites(self, site_atomic_number = None):
         """Get an `ase.Atoms` with the sites included.
 
+        Sites are appended to the static structure; the first `np.sum(static_mask)`
+        atoms in the returned object are the static structure.
+
         Args:
             - site_atomic_number: If `None`, the species of the first mobile atom
                 will be used.
@@ -134,7 +137,7 @@ class SiteNetwork(object):
         )
         site_idexes = len(out) + np.arange(self.n_sites)
         out.extend(sites_atoms)
-        return out, site_idexes, site_atomic_number
+        return out, site_atomic_number
 
     @property
     def n_sites(self):

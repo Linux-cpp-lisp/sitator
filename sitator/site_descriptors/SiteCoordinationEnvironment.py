@@ -8,6 +8,7 @@ try:
     from pymatgen.analysis.chemenv.coordination_environments.structure_environments import \
         LightStructureEnvironments
     from pymatgen.analysis.chemenv.utils.defs_utils import AdditionalConditions
+    from pymatgen.analysis.bond_valence import BVAnalyzer
     has_pymatgen = True
 except ImportError:
     has_pymatgen = False
@@ -30,21 +31,40 @@ class SiteCoordinationEnvironment(object):
     Args:
         **kwargs: passed to `compute_structure_environments`.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, guess_ionic_bonds = True, **kwargs):
         if not has_pymatgen:
             raise ImportError("Pymatgen (or a recent enough version including `pymatgen.analysis.chemenv.coordination_environments`) cannot be imported.")
         self._kwargs = kwargs
+        self._guess_ionic_bonds = guess_ionic_bonds
 
     def run(self, sn):
         # -- Determine local environments
         # Get an ASE structure with a single mobile site that we'll move around
-        site_struct, idexes, site_species = sn[0:1].get_structure_with_sites()
+        site_struct, site_species = sn[0:1].get_structure_with_sites()
         pymat_struct = AseAtomsAdaptor.get_structure(site_struct)
         lgf = cgf.LocalGeometryFinder()
-        index = idexes[0]
+        site_atom_index = len(site_struct) - 1
 
         coord_envs = []
         vertices = []
+
+        valences = 'undefined'
+        if self._guess_ionic_bonds:
+            sim_struct = AseAtomsAdaptor.get_structure(sn.structure)
+            valences = np.zeros(shape = len(site_struct), dtype = np.int)
+            bv = BVAnalyzer()
+            try:
+                struct_valences = np.asarray(bv.get_valences(sim_struct))
+            except ValueError as ve:
+                logger.warning("Failed to compute bond valences: %s" % ve)
+            else:
+                valences = np.zeros(shape = len(site_struct), dtype = np.int)
+                valences[:site_atom_index] = struct_valences[sn.static_mask]
+                mob_val = struct_valences[sn.mobile_mask]
+                if np.any(mob_val != mob_val[0]):
+                    logger.warning("Mobile atom estimated valences (%s) not uniform; arbitrarily taking first." % mob_val)
+                valences[site_atom_index] = mob_val[0]
+                valences = list(valences)
 
         logger.info("Running site coordination environment analysis...")
         # Do this once.
@@ -55,19 +75,29 @@ class SiteCoordinationEnvironment(object):
 
         for site in tqdm(range(sn.n_sites), desc = 'Site'):
             # Update the position of the site
-            lgf.structure[index].coords = sn.centers[site]
+            lgf.structure[site_atom_index].coords = sn.centers[site]
             # Compute structure environments for the site
-            struct_envs = lgf.compute_structure_environments(only_indices = [index], **self._kwargs)
+            struct_envs = lgf.compute_structure_environments(
+                only_indices = [site_atom_index],
+                valences = valences,
+                additional_conditions = [AdditionalConditions.ONLY_ANION_CATION_BONDS],
+                **self._kwargs
+            )
             struct_envs = LightStructureEnvironments.from_structure_environments(
-                strategy=cgf.LocalGeometryFinder.DEFAULT_STRATEGY,
-                structure_environments=struct_envs
+                strategy = cgf.LocalGeometryFinder.DEFAULT_STRATEGY,
+                structure_environments = struct_envs
             )
             # Store the results
             # We take the first environment for each site since it's the most likely
-            coord_envs.append(struct_envs.coordination_environments[index][0])
-            vertices.append(
-                [n['index'] for n in struct_envs.neighbors_sets[index][0].neighb_indices_and_images]
-            )
+            this_site_envs = struct_envs.coordination_environments[site_atom_index]
+            if len(this_site_envs) > 0:
+                coord_envs.append(this_site_envs[0])
+                vertices.append(
+                    [n['index'] for n in struct_envs.neighbors_sets[site_atom_index][0].neighb_indices_and_images]
+                )
+            else:
+                coord_envs.append({'ce_symbol' : 'BAD:0', 'ce_fraction' : 0.})
+                vertices.append([])
 
         del lgf
         del struct_envs
@@ -82,7 +112,7 @@ class SiteCoordinationEnvironment(object):
         assert np.all(coordination_numbers == [len(v) for v in vertices])
 
         n_types = len(unique_envs)
-        logger.info(("             " + "Type {:<2} " * n_types).format(*range(n_types)))
+        logger.info(("Type         " + "{:<8}" * n_types).format(*unique_envs))
         logger.info(("# of sites   " + "{:<8}" * n_types).format(*np.bincount(site_types)))
 
         sn.site_types = site_types
