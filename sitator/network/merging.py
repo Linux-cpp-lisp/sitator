@@ -29,14 +29,18 @@ class MergeSites(abc.ABC):
     :param bool set_merged_into: If True, a site attribute `"merged_into"` will
         be added to the original `SiteNetwork` indicating which new site
         each old site was merged into.
+    :param bool weighted_spatial_average: If True, the spatial average giving
+        the position of the merged site will be weighted by occupancy.
     """
     def __init__(self,
                  check_types = True,
                  maximum_merge_distance = None,
-                 set_merged_into = False):
+                 set_merged_into = False,
+                 weighted_spatial_average = True):
         self.check_types = check_types
         self.maximum_merge_distance = maximum_merge_distance
         self.set_merged_into = set_merged_into
+        self.weighted_spatial_average = weighted_spatial_average
 
 
     def run(self, st, **kwargs):
@@ -90,7 +94,12 @@ class MergeSites(abc.ABC):
                     raise MergedSitesTooDistantError("Markov clustering tried to merge sites more than %.2f apart. Lower your distance_threshold?" % self.maximum_merge_distance)
 
             # New site center
-            new_centers[newsite] = pbcc.average(to_merge)
+            if self.weighted_spatial_average:
+                new_centers[newsite] = pbcc.average(to_merge)
+            else:
+                occs = st.site_network.occupancies[mask]
+                new_centers[newsite] = pbcc.average(to_merge, weights = occs)
+
             if self.check_types:
                 assert np.all(site_types[mask] == site_types[mask][0])
                 new_types[newsite] = site_types[mask][0]
