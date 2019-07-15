@@ -99,7 +99,7 @@ class SiteVolumes(object):
         pbcc = PBCCalculator(sn.structure.cell)
 
         for site in range(sn.n_sites):
-            pos = sn.static_structure.positions[sn.vertices[site]]
+            pos = sn.static_structure.positions[list(sn.vertices[site])]
             if len(pos) < 4:
                 if self.error_on_insufficient_coord:
                     raise InsufficientCoordinatingAtomsError("Site %i had only %i vertices (less than needed 4)" % (site, len(pos)))
