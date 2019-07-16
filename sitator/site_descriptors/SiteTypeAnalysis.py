@@ -13,10 +13,12 @@ import itertools
 import logging
 logger = logging.getLogger(__name__)
 
+has_pydpc = False
 try:
     import pydpc
+    has_pydpc = True
 except ImportError:
-    raise ImportError("SiteTypeAnalysis requires the `pydpc` package")
+    pass
 
 class SiteTypeAnalysis(object):
     """Cluster sites into types using a continuous descriptor and Density Peak Clustering.
@@ -39,6 +41,9 @@ class SiteTypeAnalysis(object):
     def __init__(self, descriptor,
                 min_pca_variance = 0.9, min_pca_dimensions = 2,
                 n_site_types_max = 20):
+        if not has_pydpc:
+            raise ImportError("SiteTypeAnalysis requires the `pydpc` package")
+
         self.descriptor = descriptor
         self.min_pca_variance = min_pca_variance
         self.min_pca_dimensions = min_pca_dimensions
