@@ -120,7 +120,7 @@ class RemoveShortJumps(object):
         logger.info(
             "Short jump statistics:\n" +
             "\n".join(
-                "    removed {1[1]:3}x {0[0]:2} -> {0[1]:2} -> {0[2]:2}; avg. residence at {0[1]:2} of {1[0]} frames".format(
+                "    removed {1[1]:3}x  {0[0]:2} -> {0[1]:2} -> {0[2]:2}; avg. residence at {0[1]:2} of {1[0]} frames".format(
                     k, v
                 ) for k, v in short_jump_info.items()
             )
