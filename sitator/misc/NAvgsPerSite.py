@@ -5,15 +5,15 @@ from sitator import SiteNetwork, SiteTrajectory
 from sitator.util import PBCCalculator
 
 class NAvgsPerSite(object):
-    """Given a SiteTrajectory, return a SiteNetwork containing n avg. positions per site.
+    """Given a ``SiteTrajectory``, return a ``SiteNetwork`` containing n avg. positions per site.
 
-    The `types` of sites in the output are the index of the site in the input that generated
-    that average.
+    The ``site_types`` of sites in the output are the index of the site in the
+    input that generated that average.
 
     :param int n: How many averages to take
     :param bool error_on_insufficient: Whether to throw an error if n points cannot
         be provided for a site, or just take all that are available.
-    :param bool weighted: Use SiteTrajectory confidences to weight the averages.
+    :param bool weighted: Use ``SiteTrajectory`` confidences to weight the averages.
     """
 
     def __init__(self, n,
@@ -25,6 +25,12 @@ class NAvgsPerSite(object):
         self.weighted = weighted
 
     def run(self, st):
+        """
+        Args:
+            st (SiteTrajectory)
+        Returns:
+            A ``SiteNetwork``.
+        """
         assert isinstance(st, SiteTrajectory)
         if st.real_trajectory is None:
             raise ValueError("SiteTrajectory must have associated real trajectory.")

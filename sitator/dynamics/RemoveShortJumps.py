@@ -16,7 +16,7 @@ class RemoveShortJumps(object):
     jumped from.
 
     Args:
-        - only_returning_jumps (bool, default: True): If True, only short jumps
+        only_returning_jumps (bool): If True, only short jumps
             where the mobile atom returns to its initial site will be removed.
     """
     def __init__(self,
@@ -30,12 +30,15 @@ class RemoveShortJumps(object):
             st,
             threshold,
             return_stats = False):
-        """Returns a copy of `st` with short jumps removed.
+        """Returns a copy of ``st`` with short jumps removed.
 
         Args:
-            - st (SiteTrajectory): Unassigned considered to be last known.
-            - threshold (int): The largest number of frames the mobile atom
+            st (SiteTrajectory): Unassigned considered to be last known.
+            threshold (int): The largest number of frames the mobile atom
                 can spend at a site while the jump is still considered short.
+
+        Returns:
+            A ``SiteTrajectory``.
         """
         n_mobile = st.site_network.n_mobile
         n_frames = st.n_frames

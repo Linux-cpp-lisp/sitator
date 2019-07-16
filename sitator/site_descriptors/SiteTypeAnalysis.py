@@ -21,11 +21,20 @@ except ImportError:
 class SiteTypeAnalysis(object):
     """Cluster sites into types using a continuous descriptor and Density Peak Clustering.
 
-    -- descriptor --
-    Some kind of object implementing:
-         - get_descriptors(site_traj or site_network): returns an array of descriptor vectors
-            of dimension (M, n_dim) and an array of length M indicating which
-            descriptor vectors correspond to which sites in (site_traj.)site_network.
+    Computes descriptor vectors, processes them with Principal Component Analysis,
+    and then clusters using Density Peak Clustering.
+
+    Args:
+        descriptor (object): Must implement ``get_descriptors(st|sn)``, which
+            returns an array of descriptor vectors of dimension (M, n_dim) and
+            an array of length M indicating which descriptor vectors correspond
+            to which sites in (``site_traj.``)``site_network``.
+        min_pca_variance (float): The minimum proportion of the total variance
+            that the taken principal components of the descriptor must explain.
+        min_pca_dimensions (int): Force taking at least this many principal
+            components.
+        n_site_types_max (int): Maximum number of clusters. Must be set reasonably
+            for the automatic selection of cluster number to work.
     """
     def __init__(self, descriptor,
                 min_pca_variance = 0.9, min_pca_dimensions = 2,
@@ -38,6 +47,12 @@ class SiteTypeAnalysis(object):
         self._n_dvecs = None
 
     def run(self, descriptor_input, **kwargs):
+        """
+        Args:
+            descriptor_input (SiteNetwork or SiteTrajectory)
+        Returns:
+            ``SiteNetwork``
+        """
         if not self._n_dvecs is None:
             raise ValueError("Can't run SiteTypeAnalysis more than once!")
 

@@ -23,8 +23,8 @@ class DiffusionPathwayAnalysis(object):
         a pathway for it to be considered as such.
     :param bool true_periodic_pathways: Whether only to return true periodic
         pathways that include sites and their periodic images (i.e. conductive
-        in the bulk) rather than just connected components. If True, `minimum_n_sites`
-        is NOT respected.
+        in the bulk) rather than just connected components. If ``True``,
+        ``minimum_n_sites`` is NOT respected.
     """
 
     NO_PATHWAY = -1
@@ -41,14 +41,13 @@ class DiffusionPathwayAnalysis(object):
 
     def run(self, sn, return_count = False):
         """
-        Expects a SiteNetwork that has had a JumpAnalysis run on it.
+        Expects a ``SiteNetwork`` that has had a ``JumpAnalysis`` run on it.
 
-        Adds information to `sn` in place.
+        Adds information to ``sn`` in place.
 
         Args:
-            - sn (SiteNetwork): Must have jump statistics from a `JumpAnalysis()`.
-            - return_count (bool, default: False): Return the number of connected
-                pathways.
+            sn (SiteNetwork): Must have jump statistics from a ``JumpAnalysis``.
+            return_count (bool): Return the number of connected pathways.
         Returns:
             sn, [n_pathways]
         """

@@ -12,13 +12,13 @@ class JumpAnalysis(object):
     """Given a SiteTrajectory, compute various statistics about the jumps it contains.
 
     Adds these edge attributes to the SiteTrajectory's SiteNetwork:
-     - `n_ij`: total number of jumps from i to j.
-     - `p_ij`: being at i, the probability of jumping to j.
-     - `jump_lag`: The average number of frames a particle spends at i before jumping
+     - ``n_ij``: total number of jumps from i to j.
+     - ``p_ij``: being at i, the probability of jumping to j.
+     - ``jump_lag``: The average number of frames a particle spends at i before jumping
         to j. Can be +inf if no such jumps every occur.
     And these site attributes:
-     - `residence_times`: Avg. number of frames a particle spends at a site before jumping.
-     - `total_corrected_residences`: Total number of frames when a particle was at the site,
+     - ``residence_times``: Avg. number of frames a particle spends at a site before jumping.
+     - ``total_corrected_residences``: Total number of frames when a particle was at the site,
         *including* frames when an unassigned particle's last known site was this site.
     """
     def __init__(self):
@@ -27,7 +27,13 @@ class JumpAnalysis(object):
     def run(self, st):
         """Run the analysis.
 
-        Adds edge attributes to st's SiteNetwork and returns st.
+        Adds edge attributes to ``st``'s ``SiteNetwork``.
+
+        Args:
+            st (SiteTrajectory)
+
+        Returns:
+            ``st``
         """
         assert isinstance(st, SiteTrajectory)
 
@@ -135,18 +141,23 @@ class JumpAnalysis(object):
     def jump_lag_by_type(self,
                          sn,
                          return_counts = False):
-        """Given a SiteNetwork with jump_lag info, compute avg. residence times by type
+        """Given a SiteNetwork with jump_lag info, compute avg. residence times by type.
 
         Computes the average number of frames a mobile particle spends at each
         type of site before jumping to each other type of site.
 
-        Returns an (n_types, n_types) matrix. If no jumps of a given type occured,
+        Args:
+            sn (SiteNetwork)
+            return_counts (bool): Whether to also return a matrix giving the
+            number of each type of jump that occured.
+
+
+        Returns:
+            An (n_types, n_types) matrix. If no jumps of a given type occured,
         the corresponding entry is +inf.
 
-        If ``return_counts``, then also returns a matrix giving the number of
-        each type of jump that occured.
+            If ``return_counts``, two such matrixes.
         """
-
         if sn.site_types is None:
             raise ValueError("SiteNetwork has no type information.")
 
@@ -182,13 +193,11 @@ class JumpAnalysis(object):
         """Plot the jump lag of a site network.
 
         :param SiteNetwork sn:
-        :param str mode: If 'site', show jump lag between individual sites.
-            If 'type', show jump lag between types of sites (see :func:jump_lag_by_type)
-            Default: 'site'
+        :param str mode: If ``'site'``, show jump lag between individual sites.
+            If ``'type'``, show jump lag between types of sites (see :func:jump_lag_by_type)
         :param int min_n_events: Minimum number of jump events of a given type
             (i -> j or type -> type) to show a jump lag. If a given jump has
-            occured less than min_n_events times, no jump lag will be shown.
-            Default: 1
+            occured less than ``min_n_events`` times, no jump lag will be shown.
         """
         if mode == 'site':
             mat = np.copy(sn.jump_lag)

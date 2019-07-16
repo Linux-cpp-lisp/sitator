@@ -9,32 +9,32 @@ from sitator.util import PBCCalculator
 from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS, set_axes_equal
 
 class SiteNetworkPlotter(object):
-    """Plot a SiteNetwork.
+    """Plot a ``SiteNetwork``.
 
     Note that for edges, the average of the edge property for i -> j and j -> i
     is often used for visual clarity; if your edge properties are not almost symmetric,
     the visualization might not be useful.
 
-    Params:
-        - site_mappings (dict): defines how to show different properties. Each
+    Args:
+        site_mappings (dict): defines how to show different properties. Each
             entry maps a visual aspect ('marker', 'color', 'size') to the name
             of a site attribute including 'site_type'. The markers can also be
             arbitrary text (key `"text"`) in which case the value can also be a
             2-tuple of an attribute name and a `%` format string.
-        - edge_mappings (dict): each key maps a visual property ('intensity',
+        edge_mappings (dict): each key maps a visual property ('intensity',
             'color', 'width', 'linestyle') to an edge attribute in the SiteNetwork.
-        - markers (list of str): What `matplotlib` markers to use for sites.
-        - plot_points_params (dict): User options for plotting site points.
-        - minmax_linewidth (2-tuple): Minimum and maximum linewidth to use.
-        - minmax_edge_alpha (2-tuple): Similar, for edge line alphas.
-        - minmax_markersize (2-tuple): Similar, for markersize.
-        - min_color_threshold (float): Minimum (normalized) color intensity for
+        markers (list of str): What `matplotlib` markers to use for sites.
+        plot_points_params (dict): User options for plotting site points.
+        minmax_linewidth (2-tuple): Minimum and maximum linewidth to use.
+        minmax_edge_alpha (2-tuple): Similar, for edge line alphas.
+        minmax_markersize (2-tuple): Similar, for markersize.
+        min_color_threshold (float): Minimum (normalized) color intensity for
             the corresponding line to be shown. Defaults to zero, i.e., all
             nonzero edges will be drawn.
-        - min_width_threshold (float): Minimum normalized edge width for the
+        min_width_threshold (float): Minimum normalized edge width for the
             corresponding edge to be shown. Defaults to zero, i.e., all
             nonzero edges will be drawn.
-        - title (str)
+        title (str): Title for the figure.
     """
 
     DEFAULT_SITE_MAPPINGS = {

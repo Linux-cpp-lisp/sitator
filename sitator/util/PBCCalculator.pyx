@@ -11,7 +11,7 @@ ctypedef double precision
 ctypedef double cell_precision
 
 cdef class PBCCalculator(object):
-    """Performs calculations on collections of 3D points under PBC"""
+    """Performs calculations on collections of 3D points under PBC."""
 
     cdef cell_precision [:, :] _cell_mat_array
     cdef cell_precision [:, :] _cell_mat_inverse_array
@@ -40,7 +40,7 @@ cdef class PBCCalculator(object):
 
 
     cpdef pairwise_distances(self, pts):
-        """Compute the pairwise distance matrix of `pts` with itself.
+        """Compute the pairwise distance matrix of ``pts`` with itself.
 
         :returns ndarray (len(pts), len(pts)): distances
         """
@@ -56,10 +56,11 @@ cdef class PBCCalculator(object):
 
 
     cpdef distances(self, pt1, pts2, in_place = False, out = None):
-        """Compute the Euclidean distances from pt1 to all points in pts2, using
-        shift-and-wrap.
+        """
+        Compute the Euclidean distances from ``pt1`` to all points in
+        ``pts2``, using shift-and-wrap.
 
-        Makes a copy of pts2 unless in_place == True.
+        Makes a copy of ``pts2`` unless ``in_place == True``.
 
         :returns ndarray len(pts2): distances
         """
@@ -248,11 +249,11 @@ cdef class PBCCalculator(object):
 
 
     cpdef int min_image(self, const precision [:] ref, precision [:] pt):
-        """Find the minimum image of `pt` relative to `ref`. In place in pt.
+        """Find the minimum image of ``pt`` relative to ``ref``. In place in pt.
 
         Uses the brute force algorithm for correctness; returns the minimum image.
 
-        Assumes that `ref` and `pt` are already in the *same* cell (though not
+        Assumes that ``ref`` and ``pt`` are already in the *same* cell (though not
         necessarily the <0,0,0> cell -- any periodic image will do).
 
         :returns int[3] minimg: Which image was the minimum image.
@@ -327,7 +328,7 @@ cdef class PBCCalculator(object):
 
 
     cpdef void wrap_points(self, precision [:, :] points):
-        """Wrap `points` into a unit cell, IN PLACE. 3D only.
+        """Wrap ``points`` into a unit cell, IN PLACE. 3D only.
         """
 
         assert points.shape[1] == 3, "Points must be 3D"

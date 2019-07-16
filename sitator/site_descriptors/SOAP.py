@@ -20,21 +20,22 @@ class SOAP(object, metaclass=ABCMeta):
         of the environment to consider. I.e. for Li2CO3, can be set to ['O']  or [8]
         for oxygen only, or ['C', 'O'] / ['C', 8] / [6,8] if carbon and oxygen
         are considered an environment.
-        Defaults to `None`, in which case all non-mobile atoms are considered
+        Defaults to ``None``, in which case all non-mobile atoms are considered
         regardless of species.
-    :param soap_mask: Which atoms in the SiteNetwork's structure
+    :param soap_mask: Which atoms in the ``SiteNetwork``'s structure
         to use in SOAP calculations.
         Can be either a boolean mask ndarray or a tuple of species.
-        If `None`, the entire static_structure of the SiteNetwork will be used.
+        If ``None``, the entire ``static_structure`` of the ``SiteNetwork`` will be used.
         Mobile atoms cannot be used for the SOAP host structure.
         Even not masked, species not considered in environment will be not accounted for.
-        For ideal performance: Specify environment and soap_mask correctly!
+        For ideal performance: Specify environment and ``soap_mask`` correctly!
     :param dict soap_params = {}: Any custom SOAP params.
-    :param func backend: A function that can be called with `sn, soap_mask, tracer_atomic_number, environment_list` as
+    :param func backend: A function that can be called with
+        ``sn, soap_mask, tracer_atomic_number, environment_list`` as
         parameters, returning a function that, given the current soap structure
         along with tracer atoms, returns SOAP vectors in a numpy array. (i.e.
-        its signature is `soap(structure, positions)`). The returned function
-        can also have a property, `n_dim`, giving the length of a single SOAP
+        its signature is ``soap(structure, positions)``). The returned function
+        can also have a property, ``n_dim``, giving the length of a single SOAP
         vector.
     """
 
@@ -77,11 +78,13 @@ class SOAP(object, metaclass=ABCMeta):
             self._environment = None
 
     def get_descriptors(self, stn):
-        """
-        Get the descriptors.
-        :param stn: A valid instance of SiteTrajectory or SiteNetwork
-        :returns: an array of descriptor vectors and an equal length array of
-            labels indicating which descriptors correspond to which sites.
+        """Get the descriptors.
+
+        Args:
+            stn (SiteTrajectory or SiteNetwork)
+        Returns:
+            An array of descriptor vectors and an equal length array of labels
+            indicating which descriptors correspond to which sites.
         """
         # Build SOAP host structure
         if isinstance(stn, SiteTrajectory):
@@ -149,7 +152,7 @@ class SOAP(object, metaclass=ABCMeta):
 class SOAPCenters(SOAP):
     """Compute the SOAPs of the site centers in the fixed host structure.
 
-    Requires a SiteNetwork as input.
+    Requires a ``SiteNetwork`` as input.
     """
     def _get_descriptors(self, sn, structure, tracer_atomic_number, soap_mask, soaper):
         if isinstance(sn, SiteTrajectory):
@@ -164,21 +167,20 @@ class SOAPCenters(SOAP):
 
 
 class SOAPSampledCenters(SOAPCenters):
-    """Compute the SOAPs of representative points for each site, as determined by `sampling_transform`.
+    """Compute the SOAPs of representative points for each site, as determined by ``sampling_transform``.
 
-    Takes either a SiteNetwork or SiteTrajectory as input; requires that
-    `sampling_transform` produce a SiteNetwork where `site_types` indicates
-    which site in the original SiteNetwork/SiteTrajectory it was sampled from.
+    Takes either a ``SiteNetwork`` or ``SiteTrajectory`` as input; requires that
+    ``sampling_transform`` produce a ``SiteNetwork`` where ``site_types`` indicates
+    which site in the original ``SiteNetwork``/``SiteTrajectory`` it was sampled from.
 
-    Typical sampling transforms are `sitator.misc.NAvgsPerSite` (for a SiteTrajectory)
-    and `sitator.misc.GenerateAroundSites` (for a SiteNetwork).
+    Typical sampling transforms are ``sitator.misc.NAvgsPerSite`` (for a ``SiteTrajectory``)
+    and ``sitator.misc.GenerateAroundSites`` (for a ``SiteNetwork``).
     """
     def __init__(self, *args, **kwargs):
         self.sampling_transform = kwargs.pop('sampling_transform', 1)
         super(SOAPSampledCenters, self).__init__(*args, **kwargs)
 
     def get_descriptors(self, stn):
-
         # Do sampling
         sampled = self.sampling_transform.run(stn)
         assert isinstance(sampled, SiteNetwork), "Sampling transform returned `%s`, not a SiteNetwork" % sampled
@@ -203,7 +205,7 @@ class SOAPDescriptorAverages(SOAP):
 
     :param int stepsize: Stride (in frames) when computing SOAPs. Default 1.
     :param int averaging: Number of SOAP vectors to average for each output vector.
-    :param int avg_descriptors_per_site: Can be specified instead of `averaging`.
+    :param int avg_descriptors_per_site: Can be specified instead of ``averaging``.
         Specifies the _average_ number of average SOAP vectors to compute for each
         site. This does not guerantee that number of SOAP vectors for any site,
         rather, it allows a trajectory-size agnostic way to specify approximately

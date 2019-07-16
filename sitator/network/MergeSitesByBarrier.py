@@ -19,32 +19,33 @@ class MergeSitesByBarrier(MergeSites):
 
     Uses a cheap coordinate driving system; this may not be sophisticated enough
     for complex cases. For each pair of sites within the pairwise distance cutoff,
-    a linear spatial interpolation is applied to produce `n_driven_images`.
+    a linear spatial interpolation is applied to produce ``n_driven_images``.
     Two sites are considered mergable if their energies are within
-    `final_initial_energy_threshold` and the barrier between them is below
-    `barrier_threshold`. The barrier is defined as the maximum image energy minus
+    ``final_initial_energy_threshold`` and the barrier between them is below
+    ``barrier_threshold``. The barrier is defined as the maximum image energy minus
     the average of the initial and final energy.
 
     The energies of the mobile atom are calculated in a static lattice given
-    by `coordinating_mask`; if `None`, this is set to the systems `static_mask`.
+    by ``coordinating_mask``; if ``None``, this is set to the system's
+    ``static_mask``.
 
-    For resonable performance, `calculator` should be something simple like
-    `ase.calculators.lj.LennardJones`.
+    For resonable performance, ``calculator`` should be something simple like
+    ``ase.calculators.lj.LennardJones``.
 
     Takes species of first mobile atom as mobile species.
 
     Args:
-        - calculator (ase.Calculator): For computing total potential energies.
-        - barrier_threshold (float, eV): The barrier value above which two sites
+        calculator (ase.Calculator): For computing total potential energies.
+        barrier_threshold (float, eV): The barrier value above which two sites
             are not mergable.
-        - n_driven_images (int, default: None): The number of evenly distributed
+        n_driven_images (int, default: None): The number of evenly distributed
             driven images to use.
-        - maximum_pairwise_distance (float, Angstrom): The maximum distance
+        maximum_pairwise_distance (float, Angstrom): The maximum distance
             between two sites for them to be considered for merging.
-        - minimum_jumps_mergable (int): The minimum number of observed jumps
+        minimum_jumps_mergable (int): The minimum number of observed jumps
             between two sites for their merging to be considered. Setting this
             higher can avoid unnecessary computations.
-        - maximum_merge_distance (float, Angstrom): The maxiumum pairwise distance
+        maximum_merge_distance (float, Angstrom): The maxiumum pairwise distance
             among a group of sites chosed to be merged.
     """
     def __init__(self,

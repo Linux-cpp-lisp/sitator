@@ -4,7 +4,12 @@ from sitator import SiteNetwork
 from sitator.util import PBCCalculator
 
 class GenerateAroundSites(object):
-    """Generate n normally distributed sites around each input site"""
+    """Generate ``n`` normally distributed sites around each site.
+
+    Args:
+        n (int): How many sites to produce for each input site.
+        sigma (float): Standard deviation of the spatial Gaussian.
+    """
     def __init__(self, n, sigma):
         self.n = n
         self.sigma = sigma

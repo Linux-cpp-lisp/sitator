@@ -5,7 +5,7 @@ def markov_clustering(transition_matrix,
                       inflation = 2,
                       pruning_threshold = 0.00001,
                       iterlimit = 100):
-    """
+    """Compute the Markov Clustering of a graph.
     See https://micans.org/mcl/.
 
     Because we're dealing with matrixes that are stochastic already,

@@ -21,15 +21,15 @@ class TooFewMergedSitesError(MergeSitesError):
 class MergeSites(abc.ABC):
     """Abstract base class for merging sites.
 
-    :param bool check_types: If True, only sites of the same type are candidates to
-        be merged; if false, type information is ignored. Merged sites will only
-        be assigned types if this is True.
+    :param bool check_types: If ``True``, only sites of the same type are candidates to
+        be merged; if ``False``, type information is ignored. Merged sites will only
+        be assigned types if this is ``True``.
     :param float maximum_merge_distance: Maximum distance between two sites
         that are in a merge group, above which an error will be raised.
-    :param bool set_merged_into: If True, a site attribute `"merged_into"` will
-        be added to the original `SiteNetwork` indicating which new site
+    :param bool set_merged_into: If ``True``, a site attribute ``"merged_into"``
+        will be added to the original ``SiteNetwork`` indicating which new site
         each old site was merged into.
-    :param bool weighted_spatial_average: If True, the spatial average giving
+    :param bool weighted_spatial_average: If ``True``, the spatial average giving
         the position of the merged site will be weighted by occupancy.
     """
     def __init__(self,
@@ -44,7 +44,7 @@ class MergeSites(abc.ABC):
 
 
     def run(self, st, **kwargs):
-        """Takes a SiteTrajectory and returns a SiteTrajectory, including a new SiteNetwork."""
+        """Takes a ``SiteTrajectory`` and returns a new ``SiteTrajectory``."""
 
         if self.check_types and st.site_network.site_types is None:
             raise ValueError("Cannot run a check_types=True MergeSites on a SiteTrajectory without type information.")

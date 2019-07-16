@@ -18,7 +18,7 @@ class RecenterTrajectory(object):
         ``static_mask``, IN PLACE.
 
         Args:
-            structure (ASE Atoms): An atoms representing the structure of the
+            structure (ase.Atoms): An atoms representing the structure of the
                 simulation.
             static_mask (ndarray): Boolean mask indicating which atoms to recenter on
             positions (ndarray): (n_frames, n_atoms, 3), modified in place

@@ -7,8 +7,16 @@ from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFA
 
 
 class SiteTrajectoryPlotter(object):
+    """Produce various plots of a ``SiteTrajectory``."""
+
     @plotter(is3D = True)
     def plot_frame(self, st, frame, **kwargs):
+        """Plot sites and instantaneous positions from a given frame.
+
+        Args:
+            st (SiteTrajectory)
+            frame (int)
+        """
         sites_of_frame = np.unique(st._traj[frame])
         frame_sn = st._sn[sites_of_frame]
 
@@ -26,6 +34,12 @@ class SiteTrajectoryPlotter(object):
 
     @plotter(is3D = True)
     def plot_site(self, st, site, **kwargs):
+        """Plot all real space positions associated with a site.
+
+        Args:
+            st (SiteTrajectory)
+            site (int)
+        """
         pbcc = PBCCalculator(st._sn.structure.cell)
         pts = st.real_positions_for_site(site).copy()
         offset = pbcc.cell_centroid - pts[3]
@@ -54,6 +68,12 @@ class SiteTrajectoryPlotter(object):
 
     @plotter(is3D = False)
     def plot_particle_trajectory(self, st, particle, ax = None, fig = None, **kwargs):
+        """Plot the sites occupied by a mobile particle over time.
+
+        Args:
+            st (SiteTrajectory)
+            particle (int)
+        """
         types = not st._sn.site_types is None
         if types:
             type_height_percent = 0.1

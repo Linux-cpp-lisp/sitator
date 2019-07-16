@@ -54,23 +54,27 @@ class SiteTrajectory(object):
 
     @property
     def traj(self):
-        """The underlying trajectory."""
+        """The site assignments over time."""
         return self._traj
 
     @property
     def n_frames(self):
+        """The number of frames in the trajectory."""
         return len(self._traj)
 
     @property
     def n_unassigned(self):
+        """The total number of times a mobile particle is unassigned."""
         return np.sum(self._traj < 0)
 
     @property
     def n_assigned(self):
+        """The total number of times a mobile particle was assigned to a site."""
         return self._sn.n_mobile * self.n_frames - self.n_unassigned
 
     @property
     def percent_unassigned(self):
+        """Proportion of particle positions that are unassigned over all time."""
         return float(self.n_unassigned) / (self._sn.n_mobile * self.n_frames)
 
     @property
@@ -86,9 +90,15 @@ class SiteTrajectory(object):
 
     @property
     def real_trajectory(self):
+        """The real-space trajectory this ``SiteTrajectory`` is based on."""
         return self._real_traj
 
     def copy(self, with_computed = True):
+        """Return a copy.
+
+        Args:
+            with_computed (bool): See ``SiteNetwork.copy()``.
+        """
         st = self[:]
         st.site_network = st.site_network.copy(with_computed = with_computed)
         return st
@@ -96,7 +106,10 @@ class SiteTrajectory(object):
     def set_real_traj(self, real_traj):
         """Assocaite this SiteTrajectory with a trajectory of points in real space.
 
-        The trajectory is not copied, and should have shape (n_frames, n_total)
+        The trajectory is not copied.
+
+        Args:
+            real_traj (ndarray of shape (n_frames, n_total))
         """
         expected_shape = (self.n_frames, self._sn.n_total, 3)
         if not real_traj.shape == expected_shape:
@@ -111,7 +124,15 @@ class SiteTrajectory(object):
 
 
     def trajectory_for_particle(self, i, return_confidences = False):
-        """Returns the array of sites particle i is assigned to over time."""
+        """Returns the array of sites particle i is assigned to over time.
+
+        Args:
+            i (int)
+            return_confidences (bool): If ``True``, also return the confidences
+                with which those assignments were made.
+        Returns:
+            ndarray (int) of length ``n_frames``[, ndarray (float) length ``n_frames``]
+        """
         if return_confidences and self._confs is None:
             raise ValueError("This SiteTrajectory has no confidences")
         if return_confidences:
@@ -121,6 +142,17 @@ class SiteTrajectory(object):
 
 
     def real_positions_for_site(self, site, return_confidences = False):
+        """Get all real-space positions assocated with a site.
+
+        Args:
+            site (int)
+            return_confidences (bool): If ``True``, the confidences with which
+                each real-space position was assigned to ``site`` are also
+                returned.
+
+        Returns:
+            ndarray (N, 3)[, ndarray (N)]
+        """
         if self._real_traj is None:
             raise ValueError("This SiteTrajectory has no real trajectory")
         if return_confidences and self._confs is None:
@@ -139,10 +171,15 @@ class SiteTrajectory(object):
 
 
     def compute_site_occupancies(self):
-        """Computes site occupancies and adds site attribute `occupancies` to site_network.
+        """Computes site occupancies.
+
+        Adds site attribute ``occupancies`` to ``site_network``.
 
         In cases of multiple occupancy, this will be higher than the number of
         frames in which the site is occupied and could be over 1.0.
+
+        Returns:
+            ndarray of occupancies (length ``n_sites``)
         """
         occ = np.true_divide(np.bincount(self._traj[self._traj >= 0], minlength = self._sn.n_sites), self.n_frames)
         if self.site_network.has_attribute('occupancies'):
@@ -157,9 +194,8 @@ class SiteTrajectory(object):
         These cases usually indicate bad site analysis.
 
         Returns:
-            - n_multiple_assignments (int): the total number of multiple assignment
-                incidents.
-            - avg_mobile_per_site (float): the average number of mobile atoms
+            int: the total number of multiple assignment incidents; and
+            float: the average number of mobile atoms at any site at any one time.
         """
         from sitator.landmark.errors import MultipleOccupancyError
         n_more_than_ones = 0
@@ -178,10 +214,15 @@ class SiteTrajectory(object):
 
 
     def assign_to_last_known_site(self, frame_threshold = 1):
-        """Assign unassigned mobile particles to their last known site within
-            `frame_threshold` frames.
+        """Assign unassigned mobile particles to their last known site.
 
-        :returns: information dictionary of debugging/diagnostic information.
+        Args:
+            frame_threshold (int): The maximum number of frames between the last
+                known site and the present frame up to which the last known site
+                can be used.
+
+        Returns:
+            information dictionary of debugging/diagnostic information.
         """
         total_unknown = self.n_unassigned
 
@@ -248,18 +289,19 @@ class SiteTrajectory(object):
         """Generator to iterate over all jumps in the trajectory.
 
         A jump is considered to occur "at the frame" when it first acheives its
-        new site. Ex:
-        Frame 0: Atom 1 at site 4 --> Frame 1: Atom 1 at site 5
-        will yield a jump (1, 1, 4, 5).
+        new site. For example,
 
-        Yields tuples of the form:
-
-            (frame_number, mobile_atom_number, from_site, to_site)
+         - Frame 0: Atom 1 at site 4
+         - Frame 1: Atom 1 at site 5
+        
+        will yield a jump ``(1, 1, 4, 5)``.
 
         Args:
-            - unknown_as_jump (bool): If True, moving from a site to unknown
-                (or vice versa) is considered a jump; if False, unassigned mobile
-                atoms are considered to be at their last known sites.
+            unknown_as_jump (bool): If ``True``, moving from a site to unknown
+                (or vice versa) is considered a jump; if ``False``, unassigned
+                mobile atoms are considered to be at their last known sites.
+        Yields:
+            tuple: (frame_number, mobile_atom_number, from_site, to_site)
         """
         traj = self.traj
         n_mobile = self.site_network.n_mobile

@@ -9,9 +9,9 @@ from sitator.util import Zeopy
 class VoronoiSiteGenerator(object):
     """Given an empty SiteNetwork, use the Voronoi decomposition to predict/generate sites.
 
-    :param str zeopp_path: Path to the Zeo++ `network` executable
+    :param str zeopp_path: Path to the Zeo++ ``network`` executable
     :param bool radial: Whether to use the radial Voronoi transform. Defaults to,
-        and should typically be, False.
+        and should typically be, ``False``.
     """
 
     def __init__(self,
@@ -21,7 +21,13 @@ class VoronoiSiteGenerator(object):
         self._zeopy = Zeopy(zeopp_path)
 
     def run(self, sn):
-        """SiteNetwork -> SiteNetwork"""
+        """
+        Args:
+            sn (SiteNetwork): Any sites will be ignored; needed for structure
+                and static mask.
+        Returns:
+            A ``SiteNetwork``.
+        """
         assert isinstance(sn, SiteNetwork)
 
         with self._zeopy:

@@ -25,18 +25,19 @@ class OneValueListlike(object):
 class DotProdClassifier(object):
     """Assign vectors to clusters indicated by a representative vector using a cosine metric.
 
-    Cluster centers can be given through `set_cluster_centers()` or approximated
+    Cluster centers can be given through ``set_cluster_centers()`` or approximated
     using the custom method described in the appendix of the main landmark
-    analysis paper (`fit_centers()`).
+    analysis paper (``fit_centers()``).
 
-    :param float threshold: Similarity threshold for joining a cluster.
-        In cos-of-angle-between-vectors (i.e. 1 is exactly the same, 0 is orthogonal)
-    :param int max_converge_iters: Maximum number of iterations. If the algorithm hasn't converged
-        by then, it will exit with a warning.
-    :param int|float min_samples: filter out clusters with low sample counts.
-        If an int, filters out clusters with fewer samples than this.
-        If a float, filters out clusters with fewer than floor(min_samples * n_assigned_samples)
-            samples assigned to them.
+    Args:
+        threshold (float): Similarity threshold for joining a cluster.
+            In cos-of-angle-between-vectors (i.e. 1 is exactly the same, 0 is orthogonal)
+        max_converge_iters (int): Maximum number of iterations. If the algorithm
+            hasn't converged by then, it will exit with a warning.
+        min_samples (float or int): filter out clusters with low sample counts.
+            If an int, filters out clusters with fewer samples than this.
+            If a float, filters out clusters with fewer than
+            floor(min_samples * n_assigned_samples) samples assigned to them.
     """
     def __init__(self,
                  threshold = 0.9,

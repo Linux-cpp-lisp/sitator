@@ -22,14 +22,27 @@ class SiteCoordinationEnvironment(object):
 
     Determine site types using the method from the following paper:
 
-        David Waroquiers, Xavier Gonze, Gian-Marco Rignanese, Cathrin Welker-Nieuwoudt, Frank Rosowski, Michael Goebel, Stephan Schenk, Peter Degelmann, Rute Andre, Robert Glaum, and Geoffroy Hautier,
-        “Statistical analysis of coordination environments in oxides”,
+        David Waroquiers, Xavier Gonze, Gian-Marco Rignanese,
+        Cathrin Welker-Nieuwoudt, Frank Rosowski, Michael Goebel, Stephan Schenk,
+        Peter Degelmann, Rute Andre, Robert Glaum, and Geoffroy Hautier
+
+        Statistical analysis of coordination environments in oxides
+
         Chem. Mater., 2017, 29 (19), pp 8346–8360, DOI: 10.1021/acs.chemmater.7b02766
 
-    as implement in `pymatgen`'s `pymatgen.analysis.chemenv.coordination_environments`.
+    as implement in ``pymatgen``'s
+    ``pymatgen.analysis.chemenv.coordination_environments``.
+
+    Adds three site attributes:
+     - ``coordination_environments``: The name of the coordination environment,
+        as returned by ``pymatgen``. Example: ``"T:4"`` (tetrahedral, coordination
+        of 4).
+     - ``site_type_confidences``: The ``ce_fraction`` of the best match chemical
+        environment (from 0 to 1).
+     - ``coordination_numbers``: The coordination number of the site.
 
     Args:
-        **kwargs: passed to `compute_structure_environments`.
+        **kwargs: passed to ``compute_structure_environments``.
     """
     def __init__(self, guess_ionic_bonds = True, **kwargs):
         if not has_pymatgen:
@@ -38,6 +51,12 @@ class SiteCoordinationEnvironment(object):
         self._guess_ionic_bonds = guess_ionic_bonds
 
     def run(self, sn):
+        """
+        Args:
+            sn (SiteNetwork)
+        Returns:
+            ``sn``, with type information.
+        """
         # -- Determine local environments
         # Get an ASE structure with a single mobile site that we'll move around
         site_struct, site_species = sn[0:1].get_structure_with_sites()

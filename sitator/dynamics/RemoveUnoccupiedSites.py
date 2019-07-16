@@ -7,14 +7,18 @@ logger = logging.getLogger(__name__)
 
 
 class RemoveUnoccupiedSites(object):
+    """Remove unoccupied sites."""
     def __init__(self):
         pass
 
     def run(self, st, return_kept_sites = False):
         """
+        Args:
+            return_kept_sites (bool): If ``True``, a list of the sites from ``st``
+                that were kept will be returned.
 
-        Can return `st` unmodified if all sites are at some point occupied.
-
+        Returns:
+            A ``SiteTrajectory``, or ``st`` itself if it has no unoccupied sites.
         """
         assert isinstance(st, SiteTrajectory)
 

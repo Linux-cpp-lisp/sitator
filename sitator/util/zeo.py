@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # TODO: benchmark CUC vs CIF
 
 class Zeopy(object):
-    """A wrapper for the Zeo++ `network` tool.
+    """A wrapper for the Zeo++ ``network`` tool.
 
     :warning: Do not use a single instance of Zeopy in parallel.
     """
@@ -30,7 +30,7 @@ class Zeopy(object):
     def __init__(self, path_to_zeo):
         """Create a Zeopy.
 
-        :param str path_to_zeo: Path to the `network` executable.
+        :param str path_to_zeo: Path to the ``network`` executable.
         """
         if not (os.path.exists(path_to_zeo) and os.access(path_to_zeo, os.X_OK)):
             raise ValueError("`%s` doesn't seem to be the path to an executable file." % path_to_zeo)

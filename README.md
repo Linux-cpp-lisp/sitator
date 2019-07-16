@@ -46,6 +46,9 @@ pip install ".[SiteTypeAnalysis]"
 
 Two example Jupyter notebooks for conducting full landmark analyses of LiAlSiO4 and Li12La3Zr2O12, including data files, can be found [on Materials Cloud](https://archive.materialscloud.org/2019.0008/).
 
+`sitator` generally assumes units of femtoseconds for time, Angstroms for space,
+and Cartesian (not crystal) coordinates.
+
 All individual classes and parameters are documented with docstrings in the source code.
 
 ## Global Options

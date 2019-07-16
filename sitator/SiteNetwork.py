@@ -14,9 +14,9 @@ from sitator.visualization import SiteNetworkPlotter
 class SiteNetwork(object):
     """A network of mobile particle sites in a static lattice.
 
-    Stores the locations of sites (`centers`) for some indicated mobile atoms
-    (`mobile_mask`) in a structure (`structure`). Optionally includes their
-    defining static atoms (`vertices`) and "types" (`site_types`).
+    Stores the locations of sites (``centers``) for some indicated mobile atoms
+    (``mobile_mask``) in a structure (``structure``). Optionally includes their
+    defining static atoms (``vertices``) and "types" (``site_types``).
 
     Arbitrary data can also be associated with each site and with each edge
     between sites. Site data can be any array of length n_sites; edge data can be
@@ -24,9 +24,9 @@ class SiteNetwork(object):
     edge from site i to site j (edge attributes can be asymmetric).
 
     Attributes can be marked as "computed"; this is a hint that the attribute
-    was computed based on a `SiteTrajectory`. Most `sitator` algorithms that
-    modify/process `SiteTrajectory`s will clear "computed" attrbutes,
-    assuming that they are invalidated by the changes to the `SiteTrajectory`.
+    was computed based on a ``SiteTrajectory``. Most ``sitator`` algorithms that
+    modify/process ``SiteTrajectory``s will clear "computed" attrbutes,
+    assuming that they are invalidated by the changes to the ``SiteTrajectory``.
 
     Attributes:
         centers (ndarray): (n_sites, 3) coordinates of each site.
@@ -35,7 +35,7 @@ class SiteNetwork(object):
         site_types (ndarray, optional): (n_sites,) values grouping sites into types.
 
     Args:
-        structure (Atoms): an ASE/Quippy ``Atoms`` containging whatever atoms exist
+        structure (ase.Atoms): an ASE ``Atoms`` containging whatever atoms exist
             in the MD trajectory.
         static_mask (ndarray): Boolean mask indicating which atoms make up the
             host lattice.
@@ -76,7 +76,14 @@ class SiteNetwork(object):
         self._attr_computed = {}
 
     def copy(self, with_computed = True):
-        """Returns a (shallowish) copy of self."""
+        """Returns a (shallowish) copy of self.
+
+        Args:
+            with_computed (bool): If ``False``, attributes marked "computed" will
+                not be included in the copy.
+        Returns:
+            A ``SiteNetwork``.
+        """
         # Use a mask to force a copy
         msk = np.ones(shape = self.n_sites, dtype = np.bool)
         sn = self[msk]
@@ -114,7 +121,13 @@ class SiteNetwork(object):
         return sn
 
     def of_type(self, stype):
-        """Returns a "view" to this SiteNetwork with only sites of a certain type."""
+        """Returns a subset of this ``SiteNetwork`` with only sites of a certain type.
+
+        Args:
+            stype (int)
+        Returns:
+            A ``SiteNetwork``.
+        """
         if self._types is None:
             raise ValueError("This SiteNetwork has no type information.")
 
@@ -124,16 +137,16 @@ class SiteNetwork(object):
         return self[self._types == stype]
 
     def get_structure_with_sites(self, site_atomic_number = None):
-        """Get an `ase.Atoms` with the sites included.
+        """Get an ``ase.Atoms`` with the sites included.
 
-        Sites are appended to the static structure; the first `np.sum(static_mask)`
+        Sites are appended to the static structure; the first ``np.sum(static_mask)``
         atoms in the returned object are the static structure.
 
         Args:
-            - site_atomic_number: If `None`, the species of the first mobile atom
-                will be used.
+            site_atomic_number: If ``None``, the species of the first mobile
+                atom will be used.
         Returns:
-            ase.Atoms, indices of sites in the returned structure, and final `site_atomic_number`
+            ``ase.Atoms`` and final ``site_atomic_number``
         """
         out = self.static_structure.copy()
         if site_atomic_number is None:
@@ -149,16 +162,19 @@ class SiteNetwork(object):
 
     @property
     def n_sites(self):
+        """The number of sites."""
         if self._centers is None:
             return 0
         return len(self._centers)
 
     @property
     def n_total(self):
+        """The total number of atoms in the system."""
         return len(self.static_mask)
 
     @property
     def centers(self):
+        """The positions of the sites."""
         view = self._centers.view()
         view.flags.writeable = False
         return view
@@ -177,13 +193,18 @@ class SiteNetwork(object):
         self._centers = value
 
     def update_centers(self, newcenters):
-        """Update the SiteNetwork's centers *without* reseting all other information."""
+        """Update the ``SiteNetwork``'s centers *without* reseting all other information.
+
+        Args:
+            newcenters (ndarray): Must have same length as current number of sites.
+        """
         if newcenters.shape != self._centers.shape:
             raise ValueError("New `centers` must have same shape as old; try using the setter `.centers = ...`")
         self._centers = newcenters
 
     @property
     def vertices(self):
+        """The static atoms defining each site."""
         return self._vertices
 
     @vertices.setter
@@ -194,6 +215,7 @@ class SiteNetwork(object):
 
     @property
     def number_of_vertices(self):
+        """The number of vertices of each site."""
         if self._vertices is None:
             return None
         else:
@@ -201,6 +223,7 @@ class SiteNetwork(object):
 
     @property
     def site_types(self):
+        """The type IDs of each site."""
         if self._types is None:
             return None
         view = self._types.view()
@@ -215,24 +238,40 @@ class SiteNetwork(object):
 
     @property
     def n_types(self):
+        """The number of site types in the ``SiteNetwork``."""
         return len(np.unique(self.site_types))
 
     @property
     def types(self):
+        """The unique site type IDs in the ``SiteNetwork``."""
         return np.unique(self.site_types)
 
     @property
     def site_attributes(self):
+        """The names of the ``SiteNetwork``'s site attributes."""
         return list(self._site_attrs.keys())
 
     @property
     def edge_attributes(self):
+        """The names of the ``SiteNetwork``'s edge attributes."""
         return list(self._edge_attrs.keys())
 
     def has_attribute(self, attr):
+        """Whether the ``SiteNetwork`` has a given site or edge attrbute.
+
+        Args:
+            attr (str)
+        Returns:
+            bool
+        """
         return (attr in self._site_attrs) or (attr in self._edge_attrs)
 
     def remove_attribute(self, attr):
+        """Remove a site or edge attribute.
+
+        Args:
+            attr (str)
+        """
         if attr in self._site_attrs:
             del self._site_attrs[attr]
         elif attr in self._edge_attrs:
@@ -241,10 +280,12 @@ class SiteNetwork(object):
             raise AttributeError("This SiteNetwork has no site or edge attribute `%s`" % attr)
 
     def clear_attributes(self):
+        """Remove all site and edge attributes."""
         self._site_attrs = {}
         self._edge_attrs = {}
 
     def clear_computed_attributes(self):
+        """Remove all attributes marked "computed"."""
         for k, computed in self._attr_computed.items():
             if computed:
                 self.remove_attribute(k)
@@ -296,6 +337,13 @@ class SiteNetwork(object):
         return out
 
     def add_site_attribute(self, name, attr, computed = True):
+        """Add a site attribute.
+
+        Args:
+            name (str)
+            attr (ndarray): Must be of length ``n_sites``.
+            computed (bool): Whether to mark this attribute as "computed".
+        """
         self._check_name(name)
         attr = np.asarray(attr)
         if not attr.shape[0] == self.n_sites:
@@ -305,6 +353,13 @@ class SiteNetwork(object):
         self._attr_computed[name] = computed
 
     def add_edge_attribute(self, name, attr, computed = True):
+        """Add an edge attribute.
+
+        Args:
+            name (str)
+            attr (ndarray): Must be of shape ``(n_sites, n_sites)``.
+            computed (bool): Whether to mark this attribute as "computed".
+        """
         self._check_name(name)
         attr = np.asarray(attr)
         if not (attr.shape[0] == attr.shape[1] == self.n_sites):
@@ -322,6 +377,6 @@ class SiteNetwork(object):
             raise ValueError("Attribute name `%s` reserved." % name)
 
     def plot(self, *args, **kwargs):
-        """Convenience method -- constructs a defualt SiteNetworkPlotter and calls it."""
+        """Convenience method -- constructs a defualt ``SiteNetworkPlotter`` and calls it."""
         p = SiteNetworkPlotter(title = "Sites")
         p(self, *args, **kwargs)

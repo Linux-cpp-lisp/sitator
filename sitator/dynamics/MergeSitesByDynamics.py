@@ -75,10 +75,10 @@ class MergeSitesByDynamics(MergeSites):
         The jump lag and distance are processed through Gaussian functions with
         the given sigmas (i.e. higher jump lag/larger distance => lower
         connectivity value). These matrixes are then added to p_ij, with a prefactor
-        of `jump_lag_coeff` and `distance_coeff`.
+        of ``jump_lag_coeff`` and ``distance_coeff``.
 
-        Site pairs with jump lags greater than `jump_lag_cutoff` have their bias
-        set to zero regardless of `jump_lag_sigma`. Defaults to `inf`.
+        Site pairs with jump lags greater than ``jump_lag_cutoff`` have their bias
+        set to zero regardless of ``jump_lag_sigma``. Defaults to ``inf``.
         """
         def cfunc(sn):
             jl = sn.jump_lag.copy()

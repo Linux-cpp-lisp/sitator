@@ -7,18 +7,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ConfigurationalEntropy(object):
-    """Compute the S~ configurational entropy.
+    """Compute the S~ (S tilde) configurational entropy.
 
     If the SiteTrajectory lacks type information, the summation is taken over
     the sites rather than the site types.
 
-    Ref:
-        Structural, Chemical, and Dynamical Frustration: Origins of Superionic Conductivity in closo-Borate Solid Electrolytes
-        Kyoung E. Kweon, Joel B. Varley, Patrick Shea, Nicole Adelstein, Prateek Mehta, Tae Wook Heo, Terrence J. Udovic, Vitalie Stavila, and Brandon C. Wood
+    Reference:
+        Structural, Chemical, and Dynamical Frustration: Origins of Superionic
+        Conductivity in closo-Borate Solid Electrolytes
+
+        Kyoung E. Kweon, Joel B. Varley, Patrick Shea, Nicole Adelstein,
+        Prateek Mehta, Tae Wook Heo, Terrence J. Udovic, Vitalie Stavila,
+        and Brandon C. Wood
+
         Chemistry of Materials 2017 29 (21), 9142-9153
         DOI: 10.1021/acs.chemmater.7b02902
     """
-    def __init__(self, acceptable_overshoot = 0.0001):
+    def __init__(self, acceptable_overshoot = 0.0):
         self.acceptable_overshoot = acceptable_overshoot
 
     def compute(self, st):

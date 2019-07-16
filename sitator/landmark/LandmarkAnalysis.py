@@ -27,8 +27,49 @@ def analysis_result(func):
     return wrapper
 
 class LandmarkAnalysis(object):
-    """Track a mobile species through a fixed lattice using landmark vectors."""
+    """Site analysis of mobile atoms in a static lattice with landmark analysis.
 
+    :param double cutoff_center: The midpoint for the logistic function used
+        as the landmark cutoff function. (unitless)
+    :param double cutoff_steepness: Steepness of the logistic cutoff function.
+    :param double minimum_site_occupancy = 0.1: Minimum occupancy (% of time occupied)
+        for a site to qualify as such.
+    :param dict clustering_params: Parameters for the chosen ``clustering_algorithm``.
+    :param str peak_evening: Whether and what kind of peak "evening" to apply;
+        that is, processing that makes all large peaks in the landmark vector
+        more similar in magnitude. This can help in site clustering.
+
+        Valid options: 'none', 'clip'
+    :param bool weighted_site_positions: When computing site positions, whether
+        to weight the average by assignment confidence.
+    :param bool check_for_zero_landmarks: Whether to check for and raise exceptions
+        when all-zero landmark vectors are computed.
+    :param float static_movement_threshold: (Angstrom) the maximum allowed
+        distance between an instantanous static atom position and it's ideal position.
+    :param bool dynamic_lattice_mapping: Whether to dynamically decide each
+        frame which static atom represents each average lattice position;
+        this allows the LandmarkAnalysis to deal with, say, a rare exchage of
+        two static atoms that does not change the structure of the lattice.
+
+        It does NOT allow LandmarkAnalysis to deal with lattices whose structures
+        actually change over the course of the trajectory.
+
+        In certain cases this is better delt with by ``MergeSitesByDynamics``.
+    :param int max_mobile_per_site: The maximum number of mobile atoms that can
+        be assigned to a single site without throwing an error. Regardless of the
+        value, assignments of more than one mobile atom to a single site will
+        be recorded and reported.
+
+        Setting this to 2 can be necessary for very diffusive, liquid-like
+        materials at high temperatures.
+
+        Statistics related to this are reported in ``self.avg_mobile_per_site``
+        and ``self.n_multiple_assignments``.
+    :param bool force_no_memmap: if True, landmark vectors will be stored only in memory.
+        Only useful if access to landmark vectors after the analysis has run is desired.
+    :param bool verbose: Verbosity for the ``clustering_algorithm``. Other output
+        controlled through ``logging``.
+    """
     def __init__(self,
                  clustering_algorithm = 'dotprod',
                  clustering_params = {},
@@ -44,49 +85,6 @@ class LandmarkAnalysis(object):
                  max_mobile_per_site = 1,
                  force_no_memmap = False,
                  verbose = True):
-        """
-        :param double cutoff_center: The midpoint for the logistic function used
-            as the landmark cutoff function. (unitless)
-        :param double cutoff_steepness: Steepness of the logistic cutoff function.
-        :param double minimum_site_occupancy = 0.1: Minimum occupancy (% of time occupied)
-            for a site to qualify as such.
-        :param dict clustering_params: Parameters for the chosen clustering_algorithm
-        :param str peak_evening: Whether and what kind of peak "evening" to apply;
-            that is, processing that makes all large peaks in the landmark vector
-            more similar in magnitude. This can help in site clustering.
-
-            Valid options: 'none', 'clip'
-        :param bool weighted_site_positions: When computing site positions, whether
-            to weight the average by assignment confidence.
-        :param bool check_for_zero_landmarks: Whether to check for and raise exceptions
-            when all-zero landmark vectors are computed.
-        :param float static_movement_threshold: (Angstrom) the maximum allowed
-            distance between an instantanous static atom position and it's ideal position.
-        :param bool dynamic_lattice_mapping: Whether to dynamically decide each
-            frame which static atom represents each average lattice position;
-            this allows the LandmarkAnalysis to deal with, say, a rare exchage of
-            two static atoms that does not change the structure of the lattice.
-
-            It does NOT allow LandmarkAnalysis to deal with lattices whose structures
-            actually change over the course of the trajectory.
-
-            In certain cases this is better delt with by MergeSitesByDynamics.
-        :param int max_mobile_per_site: The maximum number of mobile atoms that can
-            be assigned to a single site without throwing an error. Regardless of the
-            value, assignments of more than one mobile atom to a single site will
-            be recorded and reported.
-
-            Setting this to 2 can be necessary for very diffusive, liquid-like
-            materials at high temperatures.
-
-            Statistics related to this are reported in self.avg_mobile_per_site
-            and self.n_multiple_assignments.
-        :param bool force_no_memmap: if True, landmark vectors will be stored only in memory.
-            Only useful if access to landmark vectors after the analysis has run is desired.
-        :param bool verbose: If `True`, progress bars will be printed to stdout.
-            Other output is handled seperately through the `logging` module.
-        """
-
         self._cutoff_midpoint = cutoff_midpoint
         self._cutoff_steepness = cutoff_steepness
         self._minimum_site_occupancy = minimum_site_occupancy
@@ -120,25 +118,30 @@ class LandmarkAnalysis(object):
 
     @analysis_result
     def landmark_vectors(self):
+        """Landmark vectors from the last invocation of ``run()``"""
         view = self._landmark_vectors[:]
         view.flags.writeable = False
         return view
 
     @analysis_result
     def landmark_dimension(self):
+        """Number of components in a single landmark vector."""
         return self._landmark_dimension
-
 
     def run(self, sn, frames):
         """Run the landmark analysis.
 
-        The input SiteNetwork is a network of predicted sites; it's sites will
+        The input ``SiteNetwork`` is a network of predicted sites; it's sites will
         be used as the "basis" for the landmark vectors.
 
-        Wraps a copy of `frames` into the unit cell; if you know `frames` is already
-        wrapped, set `do_wrap = False` to avoid the copy.
+        Wraps a copy of ``frames`` into the unit cell.
 
-        Takes a SiteNetwork and returns a SiteTrajectory.
+        Args:
+            sn (SiteNetwork): The landmark basis. Each site is a landmark defined
+                by its vertex static atoms, as indicated by `sn.vertices`.
+                (Typically from ``VoronoiSiteGenerator``.)
+            frames (ndarray n_frames x n_atoms x 3): A trajectory. Can be unwrapped;
+                a copy will be wrapped before the analysis.
         """
         assert isinstance(sn, SiteNetwork)
 

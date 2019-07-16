@@ -12,12 +12,12 @@ class GenerateClampedTrajectory(object):
     positions of the current site/their fixed static position.
 
     Args:
-        - wrap (bool, default: False): If True, all clamped positions will be in
-            the unit cell; if False, the clamped position will be the minimum
+        wrap (bool): If ``True``, all clamped positions will be in
+            the unit cell; if ``False``, the clamped position will be the minimum
             image of the clamped position with respect to the real-space position.
             (This can generate a clamped, unwrapped real-space trajectory
             from an unwrapped real space trajectory.)
-        - pass_through_unassigned (bool, default: False): If True, when a
+        pass_through_unassigned (bool): If ``True``, when a
             mobile atom is supposed to be clamped but is unassigned at some
             frame, its real-space position will be passed through from the
             real trajectory. If False, an error will be raised.
@@ -30,16 +30,16 @@ class GenerateClampedTrajectory(object):
     def run(self, st, clamp_mask = None):
         """Create a real-space trajectory with the fixed site/static structure positions.
 
-        Generate a real-space trajectory where the atoms indicated in `clamp_mask` --
+        Generate a real-space trajectory where the atoms indicated in ``clamp_mask`` --
         any mixture of static and mobile -- are clamped to: (1) the fixed position of
         their current site, if mobile, or (2) the corresponding fixed position in
-        the `SiteNetwork`'s static structure, if static.
+        the ``SiteNetwork``'s static structure, if static.
 
-        Atoms not indicated in `clamp_mask` will have their positions from `real_traj`
-        passed through.
+        Atoms not indicated in ``clamp_mask`` will have their positions from
+        ``real_traj`` passed through.
 
         Args:
-            - clamp_mask (ndarray, len(sn.structure))
+            clamp_mask (ndarray, len(sn.structure))
         Returns:
             ndarray (n_frames x n_atoms x 3)
         """

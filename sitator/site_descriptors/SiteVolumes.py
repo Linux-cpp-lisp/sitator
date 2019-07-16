@@ -16,11 +16,11 @@ class SiteVolumes(object):
     """Compute the volumes of sites.
 
     Args:
-        - error_on_insufficient_coord (bool, default: True): To compute an
-            ideal site volume (`compute_volumes()`), at least 4 coordinating
-            atoms (because we are in 3D space) must be specified in `vertices`.
-            If True, an error will be thrown when a site with less than four
-            vertices is encountered; if False, a volume of 0  and surface area
+        error_on_insufficient_coord (bool): To compute an ideal
+            site volume (``compute_volumes()``), at least 4 coordinating
+            atoms (because we are in 3D space) must be specified in ``vertices``.
+            If ``True``, an error will be thrown when a site with less than four
+            vertices is encountered; if ``False``, a volume of 0  and surface area
             of NaN will be returned.
     """
     def __init__(self, error_on_insufficient_coord = True):
@@ -33,11 +33,11 @@ class SiteVolumes(object):
         Uses the shift-and-wrap trick for dealing with periodicity, so sites that
         take up the majority of the unit cell may give bogus results.
 
-        Adds the `accessable_site_volumes` attribute to the SiteNetwork.
+        Adds the ``accessable_site_volumes`` attribute to the ``SiteNetwork``.
 
         Args:
-            - st (SiteTrajectory)
-            - n_recenterings (int): How many different recenterings to try (the
+            st (SiteTrajectory)
+            n_recenterings (int): How many different recenterings to try (the
                 algorithm will recenter around n of the points and take the minimal
                 resulting volume; this deals with cases where there is one outlier
                 where recentering around it gives very bad results.)
@@ -84,7 +84,7 @@ class SiteVolumes(object):
 
         Requires vertex information in the SiteNetwork.
 
-        Adds the `site_volumes` and `site_surface_areas` attributes.
+        Adds the ``site_volumes`` and ``site_surface_areas`` attributes.
 
         Args:
             - sn (SiteNetwork)
@@ -123,6 +123,5 @@ class SiteVolumes(object):
 
 
     def run(self, st):
-        """For backwards compatability.
-        """
+        """For backwards compatability."""
         self.compute_accessable_volumes(st)

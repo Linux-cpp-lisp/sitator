@@ -11,19 +11,19 @@ from sitator.network.merging import MergeSites
 class MergeSitesByThreshold(MergeSites):
     """Merge sites using a strict threshold on any edge property.
 
-    Takes the edge property matrix given by `attrname`, applys `relation` to it
-    with `threshold`, and merges all connected components in the graph represented
+    Takes the edge property matrix given by ``attrname``, applys ``relation`` to it
+    with ``threshold``, and merges all connected components in the graph represented
     by the resulting boolean adjacency matrix.
 
-    Threshold is given by a keyword argument to `run()`.
+    Threshold is given by a keyword argument to ``run()``.
 
     Args:
-        - attrname (str): Name of the edge attribute to merge on.
-        - relation (func, default: operator.ge): The relation to use for the
+        attrname (str): Name of the edge attribute to merge on.
+        relation (func, default: ``operator.ge``): The relation to use for the
             thresholding.
-        - directed, connection (bool, str): Parameters for scipy.sparse.csgraph's
-            `connected_components`.
-        - **kwargs: Passed to `MergeSites`.
+        directed, connection (bool, str): Parameters for ``scipy.sparse.csgraph``'s
+            ``connected_components``.
+        **kwargs: Passed to ``MergeSites``.
     """
     def __init__(self,
                  attrname,
