@@ -35,11 +35,6 @@ class LandmarkAnalysis(object):
     :param double minimum_site_occupancy = 0.1: Minimum occupancy (% of time occupied)
         for a site to qualify as such.
     :param dict clustering_params: Parameters for the chosen ``clustering_algorithm``.
-    :param str peak_evening: Whether and what kind of peak "evening" to apply;
-        that is, processing that makes all large peaks in the landmark vector
-        more similar in magnitude. This can help in site clustering.
-
-        Valid options: 'none', 'clip'
     :param bool weighted_site_positions: When computing site positions, whether
         to weight the average by assignment confidence.
     :param bool check_for_zero_landmarks: Whether to check for and raise exceptions
@@ -76,7 +71,6 @@ class LandmarkAnalysis(object):
                  cutoff_midpoint = 1.5,
                  cutoff_steepness = 30,
                  minimum_site_occupancy = 0.01,
-                 peak_evening = 'none',
                  weighted_site_positions = True,
                  check_for_zero_landmarks = True,
                  static_movement_threshold = 1.0,
@@ -91,10 +85,6 @@ class LandmarkAnalysis(object):
 
         self._cluster_algo = clustering_algorithm
         self._clustering_params = clustering_params
-
-        if not peak_evening in ['none', 'clip']:
-            raise ValueError("Invalid value `%s` for peak_evening" % peak_evening)
-        self._peak_evening = peak_evening
 
         self.verbose = verbose
         self.check_for_zero_landmarks = check_for_zero_landmarks
@@ -211,8 +201,6 @@ class LandmarkAnalysis(object):
 
             # -- Step 3: Cluster landmark vectors
             logger.info("  - clustering landmark vectors -")
-            #  - Preprocess -
-            self._do_peak_evening()
 
             #  - Cluster -
             # FIXME: remove reload after development done
@@ -279,15 +267,3 @@ class LandmarkAnalysis(object):
         self._has_run = True
 
         return out_st
-
-    # -------- "private" methods --------
-
-    def _do_peak_evening(self):
-        if self._peak_evening == 'none':
-            return
-        elif self._peak_evening == 'clip':
-            lvec_peaks = np.max(self._landmark_vectors, axis = 1)
-            # Clip all peaks to the lowest "normal" (stdev.) peak
-            lvec_clip = np.mean(lvec_peaks) - np.std(lvec_peaks)
-            # Do the clipping
-            self._landmark_vectors[self._landmark_vectors > lvec_clip] = lvec_clip
