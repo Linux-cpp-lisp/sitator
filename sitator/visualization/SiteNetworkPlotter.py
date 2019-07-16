@@ -101,7 +101,7 @@ class SiteNetworkPlotter(object):
 
     def _site_layers(self, sn, plot_points_params, same_normalization = False):
         pts_arrays = {'points' : sn.centers}
-        pts_params = {'cmap' : 'cividis'}
+        pts_params = {'cmap' : 'winter'}
 
         # -- Apply mapping
         # - other mappings
