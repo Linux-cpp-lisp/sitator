@@ -49,7 +49,7 @@ Two example Jupyter notebooks for conducting full landmark analyses of LiAlSiO4 
 `sitator` generally assumes units of femtoseconds for time, Angstroms for space,
 and Cartesian (not crystal) coordinates.
 
-All individual classes and parameters are documented with docstrings in the source code.
+Documentation can be found at [ReadTheDocs](https://sitator.readthedocs.io/en/py3/).
 
 ## Global Options
 
