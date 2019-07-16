@@ -14,19 +14,33 @@ from sitator.visualization import SiteNetworkPlotter
 class SiteNetwork(object):
     """A network of mobile particle sites in a static lattice.
 
-    Stores the locations of sites (`centers`), their defining static atoms (`vertices`),
-    and their "types" (`site_types`).
+    Stores the locations of sites (`centers`) for some indicated mobile atoms
+    (`mobile_mask`) in a structure (`structure`). Optionally includes their
+    defining static atoms (`vertices`) and "types" (`site_types`).
 
     Arbitrary data can also be associated with each site and with each edge
     between sites. Site data can be any array of length n_sites; edge data can be
     any matrix of shape (n_sites, n_sites) where entry i, j is the value for the
-    edge from site i to site j.
+    edge from site i to site j (edge attributes can be asymmetric).
+
+    Attributes can be marked as "computed"; this is a hint that the attribute
+    was computed based on a `SiteTrajectory`. Most `sitator` algorithms that
+    modify/process `SiteTrajectory`s will clear "computed" attrbutes,
+    assuming that they are invalidated by the changes to the `SiteTrajectory`.
 
     Attributes:
         centers (ndarray): (n_sites, 3) coordinates of each site.
         vertices (list, optional): list of lists of indexes of static atoms defining each
             site.
         site_types (ndarray, optional): (n_sites,) values grouping sites into types.
+
+    Args:
+        structure (Atoms): an ASE/Quippy ``Atoms`` containging whatever atoms exist
+            in the MD trajectory.
+        static_mask (ndarray): Boolean mask indicating which atoms make up the
+            host lattice.
+        mobile_mask (ndarray): Boolean mask indicating which atoms' movement we
+            are interested in.
     """
 
     ATTR_NAME_REGEX = re.compile("^[a-zA-Z][a-zA-Z0-9_]*$")
@@ -35,16 +49,6 @@ class SiteNetwork(object):
                  structure,
                  static_mask,
                  mobile_mask):
-        """
-        Args:
-            structure (Atoms): an ASE/Quippy ``Atoms`` containging whatever atoms exist
-                in the MD trajectory.
-            static_mask (ndarray): Boolean mask indicating which atoms make up the
-                host lattice.
-            mobile_mask (ndarray): Boolean mask indicating which atoms' movement we
-                are interested in.
-        """
-
         assert static_mask.ndim == mobile_mask.ndim == 1, "The masks must be one-dimensional"
         assert len(structure) == len(static_mask) == len(mobile_mask), "The masks must have the same length as the # of atoms in the strucutre."
 
@@ -69,12 +73,16 @@ class SiteNetwork(object):
 
         self._site_attrs = {}
         self._edge_attrs = {}
+        self._attr_computed = {}
 
-    def copy(self):
+    def copy(self, with_computed = True):
         """Returns a (shallowish) copy of self."""
         # Use a mask to force a copy
         msk = np.ones(shape = self.n_sites, dtype = np.bool)
-        return self[msk]
+        sn = self[msk]
+        if not with_computed:
+            sn.clear_computed_attributes()
+        return sn
 
     def __len__(self):
         return self.n_sites
@@ -164,6 +172,7 @@ class SiteNetwork(object):
         self._types = None
         self._site_attrs = {}
         self._edge_attrs = {}
+        self._attr_computed = {}
         # Set centers
         self._centers = value
 
@@ -231,6 +240,15 @@ class SiteNetwork(object):
         else:
             raise AttributeError("This SiteNetwork has no site or edge attribute `%s`" % attr)
 
+    def clear_attributes(self):
+        self._site_attrs = {}
+        self._edge_attrs = {}
+
+    def clear_computed_attributes(self):
+        for k, computed in self._attr_computed.items():
+            if computed:
+                self.remove_attribute(k)
+
     def __getattr__(self, attrkey):
         v = vars(self)
         if '_site_attrs' in v and attrkey in self._site_attrs:
@@ -277,21 +295,23 @@ class SiteNetwork(object):
 
         return out
 
-    def add_site_attribute(self, name, attr):
+    def add_site_attribute(self, name, attr, computed = True):
         self._check_name(name)
         attr = np.asarray(attr)
         if not attr.shape[0] == self.n_sites:
             raise ValueError("Attribute array has only %i entries; need one for all %i sites." % (len(attr), self.n_sites))
 
         self._site_attrs[name] = attr
+        self._attr_computed[name] = computed
 
-    def add_edge_attribute(self, name, attr):
+    def add_edge_attribute(self, name, attr, computed = True):
         self._check_name(name)
         attr = np.asarray(attr)
         if not (attr.shape[0] == attr.shape[1] == self.n_sites):
             raise ValueError("Attribute matrix has shape %s; need first two dimensions to be %i" % (attr.shape, self.n_sites))
 
         self._edge_attrs[name] = attr
+        self._attr_computed[name] = computed
 
     def _check_name(self, name):
         if not SiteNetwork.ATTR_NAME_REGEX.match(name):

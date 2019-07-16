@@ -123,7 +123,7 @@ class RemoveShortJumps(object):
             )
         )
 
-        st = st.copy()
+        st = st.copy(with_computed = False)
         st._traj = out
         if self.remove_unoccupied_sites:
             # Removing short jumps could have made some sites completely unoccupied

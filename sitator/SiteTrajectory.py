@@ -88,8 +88,10 @@ class SiteTrajectory(object):
     def real_trajectory(self):
         return self._real_traj
 
-    def copy(self):
-        return self[:]
+    def copy(self, with_computed = True):
+        st = self[:]
+        st.site_network = st.site_network.copy(with_computed = with_computed)
+        return st
 
     def set_real_traj(self, real_traj):
         """Assocaite this SiteTrajectory with a trajectory of points in real space.

@@ -40,6 +40,7 @@ class RemoveUnoccupiedSites(object):
         newtraj = translation[st.traj.reshape(-1)]
         newtraj.shape = st.traj.shape
 
+        # We don't clear computed attributes since nothing is changing for other sites.
         newsn = old_sn[seen_mask]
 
         new_st = SiteTrajectory(
