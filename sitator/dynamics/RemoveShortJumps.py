@@ -1,6 +1,9 @@
 import numpy as np
 
+from collections import defaultdict
+
 from sitator import SiteTrajectory
+from sitator.dynamics import RemoveUnoccupiedSites
 
 import logging
 logger = logging.getLogger(__name__)
@@ -16,13 +19,17 @@ class RemoveShortJumps(object):
         - only_returning_jumps (bool, default: True): If True, only short jumps
             where the mobile atom returns to its initial site will be removed.
     """
-    def __init__(self, only_returning_jumps = True):
+    def __init__(self,
+                 only_returning_jumps = True,
+                 remove_unoccupied_sites = True):
         self.only_returning_jumps = only_returning_jumps
+        self.remove_unoccupied_sites = remove_unoccupied_sites
 
 
     def run(self,
             st,
-            threshold):
+            threshold,
+            return_stats = False):
         """Returns a copy of `st` with short jumps removed.
 
         Args:
@@ -47,7 +54,12 @@ class RemoveShortJumps(object):
         n_problems = 0
         n_short_jumps = 0
 
+        # Dict of lists [sum_jump_times, n_short_jumps]
+        short_jump_info = defaultdict(lambda: [0, 0])
+
         for i, frame in enumerate(st.traj):
+            if i == 0:
+                continue
             # -- Deal with unassigned
             # Don't screw up the SiteTrajectory
             np.copyto(framebuf, frame)
@@ -63,8 +75,10 @@ class RemoveShortJumps(object):
             # -- Update stats
 
             jumped = (frame != last_known) & fknown
-            problems = last_known[jumped] == -1
-            jumped[np.where(jumped)[0][problems]] = False
+            #problems = last_known[jumped] == -1
+            #jumped[np.where(jumped)[0][problems]] = False
+            problems = last_known == -1
+            jumped[problems] = False
             n_problems += np.sum(problems)
 
             jump_froms = last_known[jumped]
@@ -78,9 +92,13 @@ class RemoveShortJumps(object):
                 short_mask &= jump_tos == previous_site[jumped]
             # Remove short jumps
             for sj_atom in np.arange(n_mobile)[jumped][short_mask]:
-                #print("atom %s removing %i -> %i (%i) -> %i" % (sj_atom, previous_site[sj_atom], last_known[sj_atom], time_at_current[sj_atom], frame[sj_atom]))
+                # Bookkeeping
+                sjkey = (previous_site[sj_atom], last_known[sj_atom], frame[sj_atom])
+                short_jump_info[sjkey][0] += time_at_current[sj_atom]
+                short_jump_info[sjkey][1] += 1
                 n_short_jumps += 1
-                out[i - time_at_current[sj_atom]:i+1, sj_atom] = previous_site[sj_atom]
+                # Remove short jump
+                out[i - time_at_current[sj_atom]:i, sj_atom] = previous_site[sj_atom]
 
             previous_site[jumped] = last_known[jumped]
 
@@ -93,9 +111,26 @@ class RemoveShortJumps(object):
         if n_problems != 0:
             logger.warning("Came across %i times where assignment and last known assignment were unassigned." % n_problems)
         logger.info("Removed %i short jumps" % n_short_jumps)
-        self.n_short_jumps = n_short_jumps
+        # Do average
+        for k in short_jump_info.keys():
+            short_jump_info[k][0] /= short_jump_info[k][1]
+        logger.info(
+            "Short jump statistics:\n" +
+            "\n".join(
+                "    removed {1[1]:3}x {0[0]:2} -> {0[1]:2} -> {0[2]:2}; avg. residence at {0[1]:2} of {1[0]} frames".format(
+                    k, v
+                ) for k, v in short_jump_info.items()
+            )
+        )
 
         st = st.copy()
         st._traj = out
+        if self.remove_unoccupied_sites:
+            # Removing short jumps could have made some sites completely unoccupied
+            st = RemoveUnoccupiedSites().run(st)
+        st.site_network.clear_attributes()
 
-        return st
+        if return_stats:
+            return st, short_jump_info
+        else:
+            return st
