@@ -12,8 +12,9 @@ setup(name = 'sitator',
       packages = find_packages(),
       ext_modules = cythonize([
         "sitator/landmark/helpers.pyx",
-        "sitator/util/*.pyx"
-      ]),
+        "sitator/util/*.pyx",
+        "sitator/dynamics/*.pyx"
+      ], language_level = 3),
       include_dirs=[np.get_include()],
       install_requires = [
         "numpy",
