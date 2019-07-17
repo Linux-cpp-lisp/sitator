@@ -37,8 +37,19 @@ def plot_atoms(atoms, positions = None, hide_species = (), wrap = False, fig = N
 
     all_cvecs = []
     whos_left = set(range(len(atoms.cell)))
+    cvec_labels = ["$\\vec{a}$", "$\\vec{b}$", "$\\vec{c}$"]
     for i, cvec1 in enumerate(atoms.cell):
         all_cvecs.append(np.array([[0.0, 0.0, 0.0], cvec1]))
+        ax.text(
+            cvec1[0] * 0.25,
+            cvec1[1] * 0.25,
+            cvec1[2] * 0.25,
+            cvec_labels[i],
+            size = 9,
+            color = 'gray',
+            ha = 'left',
+            va = 'center'
+        )
         for j, cvec2 in enumerate(atoms.cell[list(whos_left - {i})]):
             all_cvecs.append(np.array([cvec1, cvec1 + cvec2]))
     for i, cvec1 in enumerate(atoms.cell):
