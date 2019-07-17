@@ -39,7 +39,7 @@ class DiffusionPathwayAnalysis(object):
         self.connectivity_threshold = connectivity_threshold
         self.minimum_n_sites = minimum_n_sites
 
-    def run(self, sn, return_count = False):
+    def run(self, sn, return_count = False, return_direction = False):
         """
         Expects a ``SiteNetwork`` that has had a ``JumpAnalysis`` run on it.
 
@@ -48,8 +48,11 @@ class DiffusionPathwayAnalysis(object):
         Args:
             sn (SiteNetwork): Must have jump statistics from a ``JumpAnalysis``.
             return_count (bool): Return the number of connected pathways.
+            return_direction (bool): If True and `self.true_periodic_pathways`,
+                return for each pathway the direction matrix indicating which
+                directions it connects accross periodic boundaries.
         Returns:
-            sn, [n_pathways]
+            sn, [n_pathways], [list of set of tuple]
         """
         if not sn.has_attribute('n_ij'):
             raise ValueError("SiteNetwork has no `n_ij`; run a JumpAnalysis on it first.")
@@ -68,7 +71,7 @@ class DiffusionPathwayAnalysis(object):
         connectivity_matrix = sn.n_ij >= threshold
 
         if self.true_periodic_pathways:
-            connectivity_matrix, mask_000 = self._build_mic_connmat(sn, connectivity_matrix)
+            connectivity_matrix, mask_000, images = self._build_mic_connmat(sn, connectivity_matrix)
 
         n_ccs, ccs = connected_components(connectivity_matrix,
                                    directed = False, # even though the matrix is symmetric
@@ -85,7 +88,8 @@ class DiffusionPathwayAnalysis(object):
 
             # Add a non-path (contains no sites, all False) so the broadcasting works
             site_masks = [np.zeros(shape = len(sn), dtype = np.bool)]
-            #seen_mask = np.zeros(shape = len(sn), dtype = np.bool)
+
+            pathway_dirs = [set()]
 
             for pathway_i in np.arange(n_ccs):
                 path_mask = ccs == pathway_i
@@ -100,20 +104,32 @@ class DiffusionPathwayAnalysis(object):
                     # Not percolating; doesn't contain any site and its periodic image.
                     continue
 
+                pdirs = set()
+                for periodic_site in np.where(site_counts > 1)[0]:
+                    at_images = images[path_mask[periodic_site::len(sn)]]
+                    # The direction from 0 to 1 should be the same as any other pair.
+                    # Cause periodic.
+                    direction = (at_images[0] - at_images[1]) != 0
+                    pdirs.add(tuple(direction))
+
                 cur_site_mask = site_counts > 0
 
                 intersects_with = np.where(np.any(np.logical_and(site_masks, cur_site_mask), axis = 1))[0]
                 # Merge them:
                 if len(intersects_with) > 0:
                     path_mask = cur_site_mask | np.logical_or.reduce([site_masks[i] for i in intersects_with], axis = 0)
+                    pdirs = pdirs.union(*[pathway_dirs[i] for i in intersects_with])
+                    print("Merge pdirs: %s" % pdirs)
                 else:
                     path_mask = cur_site_mask
                 # Remove individual merged paths
                 # Going in reverse order means indexes don't become invalid as deletes happen
                 for i in sorted(intersects_with, reverse=True):
                     del site_masks[i]
+                    del pathway_dirs[i]
                 # Add new (super)path
                 site_masks.append(path_mask)
+                pathway_dirs.append(pdirs)
 
                 new_ccs[path_mask] = new_n_ccs
                 new_n_ccs += 1
@@ -124,6 +140,8 @@ class DiffusionPathwayAnalysis(object):
             # This will deal with the ones that were merged.
             is_pathway = np.in1d(np.arange(n_ccs), ccs)
             is_pathway[0] = False # Cause this was the "unassigned" value, we initialized with zeros up above
+            pathway_dirs = [pd for i, pd in enumerate(pathway_dirs) if is_pathway[i]]
+            assert len(pathway_dirs) == np.sum(is_pathway)
         else:
             is_pathway = counts >= self.minimum_n_sites
 
@@ -147,10 +165,12 @@ class DiffusionPathwayAnalysis(object):
         sn.add_site_attribute('site_diffusion_pathway', node_pathways)
         sn.add_edge_attribute('edge_diffusion_pathway', outmat)
 
+        retval = [sn]
         if return_count:
-            return sn, n_pathway
-        else:
-            return sn
+            retval.append(n_pathway)
+        if return_direction:
+            retval.append(pathway_dirs)
+        return tuple(retval)
 
 
     def _build_mic_connmat(self, sn, connectivity_matrix):
@@ -206,4 +226,4 @@ class DiffusionPathwayAnalysis(object):
 
         assert np.sum(newmat) >= n_images * np.sum(internal_mat) # Lowest it can be is if every one is internal
 
-        return newmat, mask_000
+        return newmat, mask_000, images
