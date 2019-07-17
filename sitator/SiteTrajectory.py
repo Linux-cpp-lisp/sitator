@@ -226,7 +226,7 @@ class SiteTrajectory(object):
         """
         total_unknown = self.n_unassigned
 
-        logger.info("%i unassigned positions (%i%%); assigning unassigned mobile particles to last known positions within %i frames..." % (total_unknown, 100.0 * self.percent_unassigned, frame_threshold))
+        logger.info("%i unassigned positions (%i%%); assigning unassigned mobile particles to last known positions within %s frames..." % (total_unknown, 100.0 * self.percent_unassigned, frame_threshold))
 
         last_known = np.empty(shape = self._sn.n_mobile, dtype = np.int)
         last_known.fill(-1)
@@ -293,7 +293,7 @@ class SiteTrajectory(object):
 
          - Frame 0: Atom 1 at site 4
          - Frame 1: Atom 1 at site 5
-        
+
         will yield a jump ``(1, 1, 4, 5)``.
 
         Args:

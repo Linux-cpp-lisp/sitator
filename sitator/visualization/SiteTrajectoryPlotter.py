@@ -100,7 +100,13 @@ class SiteTrajectoryPlotter(object):
                 val = last_value if current_value == -1 else current_value
                 segments.append([[current_segment_start, last_value], [current_segment_start, val], [i, val]])
                 linestyles.append(':' if current_value == -1 else '-')
-                colors.append('lightgray' if current_value == -1 else 'k')
+                if current_value == -1:
+                    c = 'lightgray' # Unknown but reassigned
+                elif val == -1:
+                    c = 'red' # Uncorrected unknown
+                else:
+                    c = 'k' # Known
+                colors.append(c)
 
                 if types:
                     rxy = (current_segment_start, 0)
