@@ -98,12 +98,16 @@ class SiteTrajectoryPlotter(object):
         for i, f in enumerate(traj):
             if f != current_value or i == len(traj) - 1:
                 val = last_value if current_value == -1 else current_value
-                segments.append([[current_segment_start, last_value], [current_segment_start, val], [i, val]])
+                if last_value == -1:
+                    segments.append([[current_segment_start, val], [i, val]])
+                else:
+                    segments.append([[current_segment_start, last_value], [current_segment_start, val], [i, val]])
                 linestyles.append(':' if current_value == -1 else '-')
                 if current_value == -1:
-                    c = 'lightgray' # Unknown but reassigned
-                elif val == -1:
-                    c = 'red' # Uncorrected unknown
+                    if val == -1:
+                        c = 'red' # Uncorrected unknown
+                    else:
+                        c = 'lightgray' # Unknown but reassigned
                 else:
                     c = 'k' # Known
                 colors.append(c)
