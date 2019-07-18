@@ -104,13 +104,18 @@ cdef class PBCCalculator(object):
 
         Assumes that the points are relatively close (within a half unit cell)
         together, and that the first point is not a particular outsider (the
-        cell is centered at that point).
+        cell is centered at that point). If the average is weighted, the
+        maximally weighted point will be taken as the center.
 
         Can be a weighted average with the semantics of :func:numpy.average.
         """
         assert points.shape[1] == 3 and points.ndim == 2
 
-        offset = self._cell_centroid - points[0]
+        center_about = 0
+        if weights is not None:
+            center_about = np.argmax(weights)
+
+        offset = self._cell_centroid - points[center_about]
 
         ptbuf = points.copy()
 
