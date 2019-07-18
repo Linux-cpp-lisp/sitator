@@ -86,6 +86,8 @@ class SiteVolumes(object):
 
         Adds the ``site_volumes`` and ``site_surface_areas`` attributes.
 
+        Volumes can be NaN for degenerate hulls/point sets on which QHull fails.
+
         Args:
             - sn (SiteNetwork)
         """
@@ -114,9 +116,14 @@ class SiteVolumes(object):
             pos += offset
             pbcc.wrap_points(pos)
 
-            hull = ConvexHull(pos)
-            vols[site] = hull.volume
-            areas[site] = hull.area
+            try:
+                hull = ConvexHull(pos)
+                vols[site] = hull.volume
+                areas[site] = hull.area
+            except QhullError as qhe:
+                logger.warning("Had QHull failure when computing volume of site %i" % site)
+                vols[site] = np.nan
+                areas[site] = np.nan
 
         sn.add_site_attribute('site_volumes', vols)
         sn.add_site_attribute('site_surface_areas', areas)
