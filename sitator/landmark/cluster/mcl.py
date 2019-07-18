@@ -3,6 +3,7 @@ import numpy as np
 from sitator.util.progress import tqdm
 from sitator.util.mcl import markov_clustering
 from sitator.util import DotProdClassifier
+from sitator.landmark import LandmarkAnalysis
 
 from sklearn.covariance import empirical_covariance
 
@@ -73,10 +74,12 @@ def do_landmark_clustering(landmark_vectors,
 
     msk = info['kept_clusters_mask']
     clusters = [c for i, c in enumerate(clusters) if msk[i]] # Only need the ones above the threshold
+    centers = [c for i, c in enumerate(centers) if msk[i]] # Only need the ones above the threshold
 
-    return (
-        landmark_classifier.cluster_counts,
-        lmk_lbls,
-        lmk_confs,
-        clusters
-    )
+    return {
+        LandmarkAnalysis.CLUSTERING_CLUSTER_SIZE : landmark_classifier.cluster_counts,
+        LandmarkAnalysis.CLUSTERING_LABELS : lmk_lbls,
+        LandmarkAnalysis.CLUSTERING_CONFIDENCES: lmk_confs,
+        LandmarkAnalysis.CLUSTERING_LANDMARK_GROUPINGS : clusters,
+        LandmarkAnalysis.CLUSTERING_REPRESENTATIVE_LANDMARKS : np.abs(centers)
+    }

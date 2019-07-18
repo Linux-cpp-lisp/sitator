@@ -1,5 +1,6 @@
 
 from sitator.util import DotProdClassifier
+from sitator.landmark import LandmarkAnalysis
 
 DEFAULT_PARAMS = {
     'clustering_threshold' : 0.45,
@@ -23,4 +24,9 @@ def do_landmark_clustering(landmark_vectors,
                                         predict_threshold = clustering_params['assignment_threshold'],
                                         verbose = verbose)
 
-    return landmark_classifier.cluster_counts, lmk_lbls, lmk_confs
+    return {
+        LandmarkAnalysis.CLUSTERING_CLUSTER_SIZE : landmark_classifier.cluster_counts,
+        LandmarkAnalysis.CLUSTERING_LABELS: lmk_lbls,
+        LandmarkAnalysis.CLUSTERING_CONFIDENCES : lmk_confs,
+        LandmarkAnalysis.CLUSTERING_REPRESENTATIVE_LANDMARKS : landmark_classifier.cluster_centers
+    }

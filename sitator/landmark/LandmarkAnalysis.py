@@ -34,9 +34,25 @@ class LandmarkAnalysis(object):
     :param double cutoff_steepness: Steepness of the logistic cutoff function.
     :param double minimum_site_occupancy = 0.1: Minimum occupancy (% of time occupied)
         for a site to qualify as such.
+    :param str clustering_algorithm: The landmark clustering algorithm. ``sitator``
+        supplies two:
+         - ``"dotprod"``: The method described in our "Unsupervised landmark
+            analysis for jump detection in molecular dynamics simulations" paper.
+         - ``"mcl"``: A newer method we are developing.
     :param dict clustering_params: Parameters for the chosen ``clustering_algorithm``.
-    :param bool weighted_site_positions: When computing site positions, whether
-        to weight the average by assignment confidence.
+    :param str site_centers_method: The method to use for computing the real
+        space positions of the sites. Options:
+         - ``SITE_CENTERS_REAL_UNWEIGHTED``: A spatial average of all real-space
+            mobile atom positions assigned to the site is taken.
+         - ``SITE_CENTERS_REAL_WEIGHTED``: A spatial average of all real-space
+            mobile atom positions assigned to the site is taken, weighted
+            by the confidences with which they assigned to the site.
+         - ``SITE_CENTERS_REPRESENTATIVE_LANDMARK``: A spatial average over
+            all landmarks' centers is taken, weighted by the representative
+            or "typical" landmark vector at the site.
+        The "real" methods will generally be more faithful to the simulation,
+        but the representative landmark method can work better in cases with
+        short trajectories, producing a more "ideal" site location.
     :param bool check_for_zero_landmarks: Whether to check for and raise exceptions
         when all-zero landmark vectors are computed.
     :param float static_movement_threshold: (Angstrom) the maximum allowed
@@ -65,13 +81,24 @@ class LandmarkAnalysis(object):
     :param bool verbose: Verbosity for the ``clustering_algorithm``. Other output
         controlled through ``logging``.
     """
+
+    SITE_CENTERS_REAL_UNWEIGHTED = 'real-unweighted'
+    SITE_CENTERS_REAL_WEIGHTED = 'real-weighted'
+    SITE_CENTERS_REPRESENTATIVE_LANDMARK = 'representative-landmark'
+
+    CLUSTERING_CLUSTER_SIZE = 'cluster-size'
+    CLUSTERING_LABELS = 'cluster-labels'
+    CLUSTERING_CONFIDENCES = 'cluster-confs'
+    CLUSTERING_LANDMARK_GROUPINGS = 'cluster-landmark-groupings'
+    CLUSTERING_REPRESENTATIVE_LANDMARKS = 'cluster-representative-lvecs'
+
     def __init__(self,
                  clustering_algorithm = 'dotprod',
                  clustering_params = {},
                  cutoff_midpoint = 1.5,
                  cutoff_steepness = 30,
                  minimum_site_occupancy = 0.01,
-                 weighted_site_positions = True,
+                 site_centers_method = SITE_CENTERS_REAL_WEIGHTED,
                  check_for_zero_landmarks = True,
                  static_movement_threshold = 1.0,
                  dynamic_lattice_mapping = False,
@@ -88,7 +115,7 @@ class LandmarkAnalysis(object):
 
         self.verbose = verbose
         self.check_for_zero_landmarks = check_for_zero_landmarks
-        self.weighted_site_positions = weighted_site_positions
+        self.site_centers_method = site_centers_method
         self.dynamic_lattice_mapping = dynamic_lattice_mapping
         self.relaxed_lattice_checks = relaxed_lattice_checks
 
@@ -214,14 +241,19 @@ class LandmarkAnalysis(object):
                              min_samples = self._minimum_site_occupancy / float(sn.n_mobile),
                              verbose = self.verbose)
 
-        if len(clustering) == 3:
-            cluster_counts, lmk_lbls, lmk_confs = clustering
-            landmark_clusters = None
-        elif len(clustering) == 4:
-            cluster_counts, lmk_lbls, lmk_confs, landmark_clusters = clustering
+        cluster_counts = clustering[LandmarkAnalysis.CLUSTERING_CLUSTER_SIZE]
+        lmk_lbls = clustering[LandmarkAnalysis.CLUSTERING_LABELS]
+        lmk_confs = clustering[LandmarkAnalysis.CLUSTERING_CONFIDENCES]
+        if LandmarkAnalysis.CLUSTERING_LANDMARK_GROUPINGS in clustering:
+            landmark_clusters = clustering[LandmarkAnalysis.CLUSTERING_LANDMARK_GROUPINGS]
             assert len(cluster_counts) == len(landmark_clusters)
         else:
-            raise ValueError("Clustering function returned invalid result %s" % clustering)
+            landmark_clusters = None
+        if LandmarkAnalysis.CLUSTERING_REPRESENTATIVE_LANDMARKS in clustering:
+            rep_lvecs = np.asarray(clustering[LandmarkAnalysis.CLUSTERING_REPRESENTATIVE_LANDMARKS])
+            assert rep_lvecs.shape == (len(cluster_counts), self._landmark_vectors.shape[1])
+        else:
+            rep_lvecs = None
 
         logging.info("    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls))))
 
@@ -240,13 +272,26 @@ class LandmarkAnalysis(object):
         out_sn = sn.copy()
         # - Compute site centers
         site_centers = np.empty(shape = (n_sites, 3), dtype = frames.dtype)
-        for site in range(n_sites):
-            mask = lmk_lbls == site
-            pts = frames[:, sn.mobile_mask][mask]
-            if self.weighted_site_positions:
-                site_centers[site] = self._pbcc.average(pts, weights = lmk_confs[mask])
-            else:
-                site_centers[site] = self._pbcc.average(pts)
+        if self.site_centers_method == LandmarkAnalysis.SITE_CENTERS_REAL_WEIGHTED or \
+           self.site_centers_method == LandmarkAnalysis.SITE_CENTERS_REAL_UNWEIGHTED:
+            for site in range(n_sites):
+                mask = lmk_lbls == site
+                pts = frames[:, sn.mobile_mask][mask]
+                if self.site_centers_method == LandmarkAnalysis.SITE_CENTERS_REAL_WEIGHTED:
+                    site_centers[site] = self._pbcc.average(pts, weights = lmk_confs[mask])
+                else:
+                    site_centers[site] = self._pbcc.average(pts)
+        elif self.site_centers_method == LandmarkAnalysis.SITE_CENTERS_REPRESENTATIVE_LANDMARK:
+            if rep_lvecs is None:
+                raise ValueError("Chosen clustering method (with current parameters) didn't return representative landmark vectors; can't use SITE_CENTERS_REPRESENTATIVE_LANDMARK.")
+            for site in range(n_sites):
+                weights_nonzero = rep_lvecs[site] > 0
+                site_centers[site] = self._pbcc.average(
+                    sn.centers[weights_nonzero],
+                    weights = rep_lvecs[site, weights_nonzero]
+                )
+        else:
+            raise ValueError("Invalid site centers method '%s'" % self.site_centers_method)
         out_sn.centers = site_centers
         # - If clustering gave us that, compute site vertices
         if landmark_clusters is not None:
