@@ -70,15 +70,11 @@ class JumpAnalysis(object):
             frame[unassigned] = last_known[unassigned]
             fknown = (frame >= 0) & (last_known >= 0)
 
-            if np.any(~fknown):
-                logger.warning("  at frame %i, %i uncorrectable unassigned particles" % (i, np.sum(~fknown)))
+            n_problems += np.sum(~fknown)
             # -- Update stats
             total_time_spent_at_site[frame[fknown]] += 1
 
             jumped = (frame != last_known) & fknown
-            problems = last_known[jumped] == -1
-            jumped[np.where(jumped)[0][problems]] = False
-            n_problems += np.sum(problems)
 
             n_ij[last_known[fknown], frame[fknown]] += 1
 
