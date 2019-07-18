@@ -83,6 +83,7 @@ class SiteCoordinationEnvironment(object):
                 if np.any(mob_val != mob_val[0]):
                     logger.warning("Mobile atom estimated valences (%s) not uniform; arbitrarily taking first." % mob_val)
                 valences[site_atom_index] = mob_val[0]
+            finally:
                 valences = list(valences)
 
         logger.info("Running site coordination environment analysis...")
