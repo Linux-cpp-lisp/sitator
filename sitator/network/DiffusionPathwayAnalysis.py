@@ -119,7 +119,6 @@ class DiffusionPathwayAnalysis(object):
                 if len(intersects_with) > 0:
                     path_mask = cur_site_mask | np.logical_or.reduce([site_masks[i] for i in intersects_with], axis = 0)
                     pdirs = pdirs.union(*[pathway_dirs[i] for i in intersects_with])
-                    print("Merge pdirs: %s" % pdirs)
                 else:
                     path_mask = cur_site_mask
                 # Remove individual merged paths
@@ -140,7 +139,7 @@ class DiffusionPathwayAnalysis(object):
             # This will deal with the ones that were merged.
             is_pathway = np.in1d(np.arange(n_ccs), ccs)
             is_pathway[0] = False # Cause this was the "unassigned" value, we initialized with zeros up above
-            pathway_dirs = [pd for i, pd in enumerate(pathway_dirs) if is_pathway[i]]
+            pathway_dirs = pathway_dirs[1:] # Get rid of the dummy pathway's direction
             assert len(pathway_dirs) == np.sum(is_pathway)
         else:
             is_pathway = counts >= self.minimum_n_sites
