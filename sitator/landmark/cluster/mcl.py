@@ -75,11 +75,17 @@ def do_landmark_clustering(landmark_vectors,
     msk = info['kept_clusters_mask']
     clusters = [c for i, c in enumerate(clusters) if msk[i]] # Only need the ones above the threshold
     centers = [c for i, c in enumerate(centers) if msk[i]] # Only need the ones above the threshold
+    # If it's negative, their all negative and its in "quadrant III", so abs is safe
+    centers = np.abs(centers)
+    # The most important landmark contributes unity
+    centers /= np.max(centers, axis = 1)[:, np.newaxis]
+    # Exaggerate the contributions of the more maximal landmarks
+    centers = np.square(centers)
 
     return {
         LandmarkAnalysis.CLUSTERING_CLUSTER_SIZE : landmark_classifier.cluster_counts,
         LandmarkAnalysis.CLUSTERING_LABELS : lmk_lbls,
         LandmarkAnalysis.CLUSTERING_CONFIDENCES: lmk_confs,
         LandmarkAnalysis.CLUSTERING_LANDMARK_GROUPINGS : clusters,
-        LandmarkAnalysis.CLUSTERING_REPRESENTATIVE_LANDMARKS : np.abs(centers)
+        LandmarkAnalysis.CLUSTERING_REPRESENTATIVE_LANDMARKS : centers
     }
