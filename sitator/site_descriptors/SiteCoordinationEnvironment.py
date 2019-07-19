@@ -42,13 +42,26 @@ class SiteCoordinationEnvironment(object):
      - ``coordination_numbers``: The coordination number of the site.
 
     Args:
+        guess_ionic_bonds (bool): If True, uses ``pymatgen``'s bond valence
+            analysis to guess valences and only consider ionic bonds for
+            neighbor analysis. Otherwise, or if it fails, all bonds are fair game.
+        full_chemenv_site_types (bool): If True, ``sitator`` site types on the
+            final ``SiteNetwork`` will be assigned based on unique chemical
+            environments, including shape. If False, they will be assigned
+            solely based on coordination number. Either way, both sets of information
+            are included in the ``SiteNetwork``, this just changes which determines
+            the ``site_types``.
         **kwargs: passed to ``compute_structure_environments``.
     """
-    def __init__(self, guess_ionic_bonds = True, **kwargs):
+    def __init__(self,
+                 guess_ionic_bonds = True,
+                 full_chemenv_site_types = False,
+                 **kwargs):
         if not has_pymatgen:
             raise ImportError("Pymatgen (or a recent enough version including `pymatgen.analysis.chemenv.coordination_environments`) cannot be imported.")
         self._kwargs = kwargs
         self._guess_ionic_bonds = guess_ionic_bonds
+        self._full_chemenv_site_types = full_chemenv_site_types
 
     def run(self, sn):
         """
@@ -124,12 +137,15 @@ class SiteCoordinationEnvironment(object):
 
         # -- Postprocess
         # TODO: allow user to ask for full fractional breakdown
-        unique_envs = list(set(env['ce_symbol'] for env in coord_envs))
-        site_types = np.array([unique_envs.index(env['ce_symbol']) for env in coord_envs])
+        str_coord_environments = [env['ce_symbol'] for env in coord_envs]
         # The closer to 1 this is, the better
         site_type_confidences = np.array([env['ce_fraction'] for env in coord_envs])
         coordination_numbers = np.array([int(env['ce_symbol'].split(':')[1]) for env in coord_envs])
         assert np.all(coordination_numbers == [len(v) for v in vertices])
+
+        typearr = str_coord_environments if self._full_chemenv_site_types else coordination_numbers
+        unique_envs = list(set(typearr))
+        site_types = np.array([unique_envs.index(t) for t in typearr])
 
         n_types = len(unique_envs)
         logger.info(("Type         " + "{:<8}" * n_types).format(*unique_envs))
@@ -137,7 +153,7 @@ class SiteCoordinationEnvironment(object):
 
         sn.site_types = site_types
         sn.vertices = vertices
-        sn.add_site_attribute("coordination_environments", [env['ce_symbol'] for env in coord_envs])
+        sn.add_site_attribute("coordination_environments", str_coord_environments)
         sn.add_site_attribute("site_type_confidences", site_type_confidences)
         sn.add_site_attribute("coordination_numbers", coordination_numbers)
 
