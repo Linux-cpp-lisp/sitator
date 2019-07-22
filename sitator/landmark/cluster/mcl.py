@@ -35,8 +35,11 @@ def do_landmark_clustering(landmark_vectors,
     clustering_params = tmp
 
     n_lmk = landmark_vectors.shape[1]
-
-    cov = empirical_covariance(landmark_vectors)
+    # Center landmark vectors
+    seen_ntimes = np.count_nonzero(landmark_vectors, axis = 0)
+    mean = np.mean(landmark_vectors, axis = 0)
+    landmark_vectors -= mean
+    cov = empirical_covariance(landmark_vectors, assume_centered = True)
     corr = cov2corr(cov)
     graph = np.clip(corr, 0, None)
     for i in range(n_lmk):
@@ -47,7 +50,8 @@ def do_landmark_clustering(landmark_vectors,
 
     # -- Cluster Landmarks
     clusters = markov_clustering(graph, **clustering_params)
-    clusters = [list(c) for c in clusters]
+    # Filter out single element clusters of landmarks that never appear.
+    clusters = [list(c) for c in clusters if seen_ntimes[c[0]] > 0]
     n_clusters = len(clusters)
     centers = np.zeros(shape = (n_clusters, n_lmk))
     for i, cluster in enumerate(clusters):
@@ -72,15 +76,19 @@ def do_landmark_clustering(landmark_vectors,
                                         verbose = verbose,
                                         return_info = True)
 
+    # Shift landmark vectors back
+    landmark_vectors += mean
+
     msk = info['kept_clusters_mask']
     clusters = [c for i, c in enumerate(clusters) if msk[i]] # Only need the ones above the threshold
-    centers = [c for i, c in enumerate(centers) if msk[i]] # Only need the ones above the threshold
-    # If it's negative, their all negative and its in "quadrant III", so abs is safe
-    centers = np.abs(centers)
-    # The most important landmark contributes unity
-    centers /= np.max(centers, axis = 1)[:, np.newaxis]
-    # Exaggerate the contributions of the more maximal landmarks
-    centers = np.square(centers)
+
+    # Find the average landmark vector at each site
+    centers = np.zeros(shape = (len(clusters), n_lmk))
+    mask = np.empty(shape = lmk_lbls.shape, dtype = np.bool)
+    for site in range(len(clusters)):
+        np.equal(lmk_lbls, site, out = mask)
+        centers[site] = np.average(landmark_vectors, weights = mask, axis = 0)
+
 
     return {
         LandmarkAnalysis.CLUSTERING_CLUSTER_SIZE : landmark_classifier.cluster_counts,
