@@ -126,14 +126,14 @@ class SiteNetworkPlotter(object):
             elif key == 'color':
                 pts_arrays['c'] = val.copy()
                 if not same_normalization:
-                    self._color_minmax = (np.min(val), np.max(val))
+                    self._color_minmax = [np.min(val), np.max(val)]
                     if self._color_minmax[0] == self._color_minmax[1]:
                         self._color_minmax[0] -= 1 # Just to avoid div by zero
                 color_minmax = self._color_minmax
                 pts_params['norm'] = matplotlib.colors.Normalize(vmin = color_minmax[0], vmax = color_minmax[1])
             elif key == 'size':
                 if not same_normalization:
-                    self._size_minmax = (np.min(val), np.max(val))
+                    self._size_minmax = [np.min(val), np.max(val)]
                     if self._size_minmax[0] == self._size_minmax[1]:
                         self._size_minmax[0] -= 1 # Just to avoid div by zero
                 size_minmax = self._size_minmax

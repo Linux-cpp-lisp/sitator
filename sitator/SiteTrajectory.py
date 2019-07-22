@@ -52,6 +52,16 @@ class SiteTrajectory(object):
             st.set_real_traj(self._real_traj[key])
         return st
 
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains
+        # all our instance attributes. Always use the dict.copy()
+        # method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Don't want to pickle giant trajectories or uninteresting plotters
+        state['_real_traj'] = None
+        state['_default_plotter'] = None
+        return state
+
     @property
     def traj(self):
         """The site assignments over time."""
