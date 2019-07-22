@@ -58,6 +58,10 @@ class SiteTrajectory(object):
         return self._traj
 
     @property
+    def confidences(self):
+        return self._confs
+
+    @property
     def n_frames(self):
         """The number of frames in the trajectory."""
         return len(self._traj)
