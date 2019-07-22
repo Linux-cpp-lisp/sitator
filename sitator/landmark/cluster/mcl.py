@@ -83,11 +83,14 @@ def do_landmark_clustering(landmark_vectors,
     clusters = [c for i, c in enumerate(clusters) if msk[i]] # Only need the ones above the threshold
 
     # Find the average landmark vector at each site
+    weighted_reps = clustering_params.get('weighted_representative_landmarks', True)
     centers = np.zeros(shape = (len(clusters), n_lmk))
-    mask = np.empty(shape = lmk_lbls.shape, dtype = np.bool)
+    weights = np.empty(shape = lmk_lbls.shape)
     for site in range(len(clusters)):
-        np.equal(lmk_lbls, site, out = mask)
-        centers[site] = np.average(landmark_vectors, weights = mask, axis = 0)
+        np.equal(lmk_lbls, site, out = weights)
+        if weighted_reps:
+            weights *= lmk_confs
+        centers[site] = np.average(landmark_vectors, weights = weights, axis = 0)
 
 
     return {
