@@ -37,9 +37,7 @@ def do_landmark_clustering(landmark_vectors,
     n_lmk = landmark_vectors.shape[1]
     # Center landmark vectors
     seen_ntimes = np.count_nonzero(landmark_vectors, axis = 0)
-    mean = np.mean(landmark_vectors, axis = 0)
-    landmark_vectors -= mean
-    cov = empirical_covariance(landmark_vectors, assume_centered = True)
+    cov = empirical_covariance(landmark_vectors, assume_centered = False)
     corr = cov2corr(cov)
     graph = np.clip(corr, 0, None)
     for i in range(n_lmk):
@@ -61,6 +59,7 @@ def do_landmark_clustering(landmark_vectors,
             # PCA inspired:
             eigenval, eigenvec = eigsh(cov[cluster][:, cluster], k = 1)
             centers[i, cluster] = eigenvec.T
+            centers[i, cluster] /= np.sqrt(len(cluster))
 
 
     landmark_classifier = \
@@ -72,12 +71,9 @@ def do_landmark_clustering(landmark_vectors,
     lmk_lbls, lmk_confs, info = \
         landmark_classifier.fit_predict(landmark_vectors,
                                         predict_threshold = predict_threshold,
-                                        predict_normed = True,
+                                        predict_normed = False,
                                         verbose = verbose,
                                         return_info = True)
-
-    # Shift landmark vectors back
-    landmark_vectors += mean
 
     msk = info['kept_clusters_mask']
     clusters = [c for i, c in enumerate(clusters) if msk[i]] # Only need the ones above the threshold
