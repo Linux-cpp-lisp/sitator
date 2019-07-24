@@ -1,3 +1,5 @@
+"""Cluster landmarks into sites using Markov Clustering and then assign each landmark vector."""
+
 import numpy as np
 
 from sitator.util.progress import tqdm
@@ -37,7 +39,7 @@ def do_landmark_clustering(landmark_vectors,
     n_lmk = landmark_vectors.shape[1]
     # Center landmark vectors
     seen_ntimes = np.count_nonzero(landmark_vectors, axis = 0)
-    cov = empirical_covariance(landmark_vectors, assume_centered = False)
+    cov = np.dot(landmark_vectors.T, landmark_vectors) / landmark_vectors.shape[0]
     corr = cov2corr(cov)
     graph = np.clip(corr, 0, None)
     for i in range(n_lmk):
@@ -52,6 +54,7 @@ def do_landmark_clustering(landmark_vectors,
     clusters = [list(c) for c in clusters if seen_ntimes[c[0]] > 0]
     n_clusters = len(clusters)
     centers = np.zeros(shape = (n_clusters, n_lmk))
+    maxbuf = np.empty(shape = len(landmark_vectors))
     for i, cluster in enumerate(clusters):
         if len(cluster) == 1:
             centers[i, cluster] = 1.0 # Eigenvec is trivial case; scale doesn't matter either.
@@ -59,7 +62,11 @@ def do_landmark_clustering(landmark_vectors,
             # PCA inspired:
             eigenval, eigenvec = eigsh(cov[cluster][:, cluster], k = 1)
             centers[i, cluster] = eigenvec.T
-            centers[i, cluster] /= np.sqrt(len(cluster))
+            np.dot(landmark_vectors, centers[i], out = maxbuf)
+            np.abs(maxbuf, out = maxbuf)
+            max_projection = np.max(maxbuf)
+            if max_projection > 0:
+                centers[i] /= np.max(maxbuf)
 
 
     landmark_classifier = \
