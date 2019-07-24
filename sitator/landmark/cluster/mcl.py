@@ -1,4 +1,16 @@
-"""Cluster landmarks into sites using Markov Clustering and then assign each landmark vector."""
+"""Cluster landmarks into sites using Markov Clustering and then assign each landmark vector.
+
+Valid clustering params include:
+ - ``"assignment_threshold"`` (float between 0 and 1): The similarity threshold
+    below which a landmark vector will be marked unassigned.
+ - ``"good_site_normed_threshold"`` (float between 0 and 1): The minimum for
+    the cosine similarity between a good site's representative unit vector and
+    its best match landmark vector.
+ - ``"good_site_projected_threshold"`` (positive float): The minimum inner product
+    between a good site's representative unit vector and its best match
+    landmark vector.
+ - All other params are passed along to `sitator.util.mcl.markov_clustering`.
+"""
 
 import numpy as np
 
@@ -47,6 +59,8 @@ def do_landmark_clustering(landmark_vectors,
             graph[i, i] = 1 # Needs a self loop for Markov clustering not to degenerate. Arbitrary value, shouldn't affect anyone else.
 
     predict_threshold = clustering_params.pop('assignment_threshold')
+    good_site_normed_threshold = clustering_params.pop('good_site_normed_threshold', predict_threshold)
+    good_site_project_thresh = clustering_params.pop('good_site_projected_threshold', predict_threshold)
 
     # -- Cluster Landmarks
     clusters = markov_clustering(graph, **clustering_params)
@@ -55,19 +69,31 @@ def do_landmark_clustering(landmark_vectors,
     n_clusters = len(clusters)
     centers = np.zeros(shape = (n_clusters, n_lmk))
     maxbuf = np.empty(shape = len(landmark_vectors))
+    good_clusters = np.zeros(shape = n_clusters, dtype = np.bool)
     for i, cluster in enumerate(clusters):
         if len(cluster) == 1:
-            centers[i, cluster] = 1.0 # Eigenvec is trivial case; scale doesn't matter either.
+            eigenvec = [1.0] # Eigenvec is trivial
         else:
             # PCA inspired:
-            eigenval, eigenvec = eigsh(cov[cluster][:, cluster], k = 1)
-            centers[i, cluster] = eigenvec.T
-            np.dot(landmark_vectors, centers[i], out = maxbuf)
-            np.abs(maxbuf, out = maxbuf)
-            max_projection = np.max(maxbuf)
-            if max_projection > 0:
-                centers[i] /= np.max(maxbuf)
+            _, eigenvec = eigsh(cov[cluster][:, cluster], k = 1)
+            eigenvec = eigenvec.T
+        centers[i, cluster] = eigenvec
+        np.dot(landmark_vectors, centers[i], out = maxbuf)
+        np.abs(maxbuf, out = maxbuf)
+        best_match = np.argmax(maxbuf)
+        best_match_lvec = landmark_vectors[best_match]
+        best_match_dot = np.abs(np.dot(best_match_lvec, centers[i]))
+        best_match_dot_norm = best_match_dot / np.linalg.norm(best_match_lvec)
+        good_clusters[i] = best_match_dot_norm >= good_site_normed_threshold
+        good_clusters[i] &= best_match_dot >= good_site_project_thresh
+        centers[i] /= best_match_dot
 
+    logger.debug("Kept %i/%i landmark clusters as good sites" % (np.sum(good_clusters), len(good_clusters)))
+
+    # Filter out "bad" sites
+    clusters = [c for i, c in enumerate(clusters) if good_clusters[i]]
+    centers = centers[good_clusters]
+    n_clusters = len(clusters)
 
     landmark_classifier = \
         DotProdClassifier(threshold = np.nan, # We're not fitting
