@@ -1,3 +1,4 @@
+"""Cluster landmark vectors using the custom online algorithm from the original paper."""
 
 from sitator.util import DotProdClassifier
 from sitator.landmark import LandmarkAnalysis

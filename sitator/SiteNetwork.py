@@ -211,6 +211,11 @@ class SiteNetwork(object):
         """The static atoms defining each site."""
         return self._vertices
 
+    @property
+    def site_ids(self):
+        """Convenience property giving the index of each site."""
+        return np.arange(self.n_sites)
+
     @vertices.setter
     def vertices(self, value):
         if not len(value) == len(self._centers):
