@@ -39,12 +39,13 @@ cdef class PBCCalculator(object):
       return self._cell_centroid
 
 
-    cpdef pairwise_distances(self, pts):
+    cpdef pairwise_distances(self, pts, out = None):
         """Compute the pairwise distance matrix of ``pts`` with itself.
 
         :returns ndarray (len(pts), len(pts)): distances
         """
-        out = np.empty(shape = (len(pts), len(pts)), dtype = pts.dtype)
+        if out is None:
+            out = np.empty(shape = (len(pts), len(pts)), dtype = pts.dtype)
 
         buf = pts.copy()
 
