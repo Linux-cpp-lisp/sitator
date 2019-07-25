@@ -95,9 +95,13 @@ class SiteNetwork(object):
         return self.n_sites
 
     def __getitem__(self, key):
-        sn = type(self)(self.structure,
-                        self.static_mask,
-                        self.mobile_mask)
+        sn = self.__new__(type(self))
+        SiteNetwork.__init__(
+            sn,
+            self.structure,
+            self.static_mask,
+            self.mobile_mask
+        )
 
         if not self._centers is None:
             sn.centers = self._centers[key]
