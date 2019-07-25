@@ -48,9 +48,13 @@ cdef class PBCCalculator(object):
 
         buf = pts.copy()
 
-        for i in xrange(len(pts)):
-            self.distances(pts[i], buf, in_place = True, out = out[i])
+        for i in xrange(len(pts) - 1):
+            out[i, i] = 0
+            self.distances(pts[i], buf[i + 1:], in_place = True, out = out[i, i + 1:])
+            out[i + 1:, i] = out[i, i + 1:]
             buf[:] = pts
+
+        out[len(pts) - 1, len(pts) - 1] = 0
 
         return out
 
