@@ -1,9 +1,14 @@
+# cython: language_level=3
+
 import numpy as np
 
 from sitator import SiteTrajectory
-from sitator.util import PBCCalculator
+from sitator.util.PBCCalculator cimport PBCCalculator, precision
 from sitator.util.progress import tqdm
 
+from libc.math cimport floor
+
+ctypedef Py_ssize_t site_int
 
 class GenerateClampedTrajectory(object):
     """Create a real-space trajectory with the fixed site/static structure positions.
@@ -46,7 +51,7 @@ class GenerateClampedTrajectory(object):
         wrap = self.wrap
         pass_through_unassigned = self.pass_through_unassigned
         cell = st._sn.structure.cell
-        pbcc = PBCCalculator(cell)
+        cdef PBCCalculator pbcc = PBCCalculator(cell)
 
         n_atoms = len(st._sn.structure)
         if clamp_mask is None:
@@ -68,33 +73,56 @@ class GenerateClampedTrajectory(object):
         if not pass_through_unassigned and np.min(selected_sitetraj) < 0:
             raise RuntimeError("The mobile atoms indicated for clamping are unassigned at some point during the trajectory and `pass_through_unassigned` is set to False. Try `assign_to_last_known_site()`?")
 
+        cdef site_int at_site
+        cdef Py_ssize_t frame_i
+        cdef Py_ssize_t mobile_i
+        cdef Py_ssize_t [:] mobile_clamp_indexes_c = mobile_clamp_indexes
+        cdef precision [:, :] buf
+        cdef precision [:] site_pt
+        cdef site_int site_unknown = SiteTrajectory.SITE_UNKNOWN
+        cdef const site_int [:, :] sitetrj_c = st._traj
+        cdef precision [:, :, :] clamptrj_c = clamptrj
+        cdef const precision [:, :, :] realtrj_c = st._real_traj
+        cdef const precision [:, :] centers_c = st.site_network.centers
+        cdef int site_mic_int
+        cdef int [3] site_mic
+        cdef int [3] pt_in_image
+        cdef precision [:, :] centers_crystal_c
+        cdef Py_ssize_t dim
         if wrap:
             for frame_i in tqdm(range(len(clamptrj))):
-                for mobile_i in mobile_clamp_indexes:
-                    at_site = st._traj[frame_i, mobile_i]
-                    if at_site == SiteTrajectory.SITE_UNKNOWN: # we already know that this means pass_through_unassigned = True
-                        clamptrj[frame_i, mobile_i] = st._real_traj[frame_i, mobile_i]
-                        continue
-                    clamptrj[frame_i, mobile_i] = st._sn.centers[at_site]
+                for mobile_i in mobile_clamp_indexes_c:
+                    at_site = sitetrj_c[frame_i, mobile_i]
+                    if at_site == site_unknown: # we already know that this means pass_through_unassigned = True
+                        clamptrj_c[frame_i, mobile_i] = realtrj_c[frame_i, mobile_i]
+                    else:
+                        clamptrj_c[frame_i, mobile_i] = centers_c[at_site]
         else:
             buf = np.empty(shape = (1, 3))
             site_pt = np.empty(shape = 3)
+            centers_crystal_c = st.site_network.centers.copy()
+            pbcc.to_cell_coords(centers_crystal_c)
             for frame_i in tqdm(range(len(clamptrj))):
-                for mobile_i in mobile_clamp_indexes:
-                    buf[:, :] = st._real_traj[frame_i, mobile_i]
-                    at_site = st._traj[frame_i, mobile_i]
-                    if at_site == SiteTrajectory.SITE_UNKNOWN: # we already know that this means pass_through_unassigned = True
-                        clamptrj[frame_i, mobile_i] = st._real_traj[frame_i, mobile_i]
+                for mobile_i in mobile_clamp_indexes_c:
+                    buf[:, :] = realtrj_c[frame_i, mobile_i]
+                    at_site = sitetrj_c[frame_i, mobile_i]
+                    if at_site == site_unknown: # we already know that this means pass_through_unassigned = True
+                        clamptrj_c[frame_i, mobile_i] = realtrj_c[frame_i, mobile_i]
                         continue
-                    site_pt[:] = st._sn.centers[at_site]
+                    site_pt[:] = centers_c[at_site]
                     pbcc.wrap_point(site_pt)
                     pbcc.wrap_points(buf)
-                    site_mic = pbcc.min_image(buf[0], site_pt)
-                    site_mic = [(site_mic // 10**(2 - i) % 10) - 1 for i in range(3)]
-                    buf[:, :] = st._real_traj[frame_i, mobile_i]
+                    site_mic_int = pbcc.min_image(buf[0], site_pt)
+                    for dim in range(3):
+                        site_mic[dim] = (site_mic_int // 10**(2 - dim) % 10) - 1
+                    buf[:, :] = realtrj_c[frame_i, mobile_i]
                     pbcc.to_cell_coords(buf)
-                    pt_in_image = np.floor(buf[0])
-                    pt_in_image += site_mic
-                    clamptrj[frame_i, mobile_i] =  np.dot(pt_in_image, cell) + st._sn.centers[at_site]
+                    for dim in range(3):
+                        pt_in_image[dim] = <int>floor(buf[0, dim]) + site_mic[dim]
+                    buf[0] = centers_crystal_c[at_site]
+                    for dim in range(3):
+                        buf[0, dim] += pt_in_image[dim]
+                    pbcc.to_real_coords(buf)
+                    clamptrj_c[frame_i, mobile_i] = buf[0]
 
         return clamptrj
