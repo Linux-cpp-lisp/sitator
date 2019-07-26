@@ -44,12 +44,12 @@ pip install ".[SiteTypeAnalysis]"
 
 ## Examples and Documentation
 
-Two example Jupyter notebooks for conducting full landmark analyses of LiAlSiO4 and Li12La3Zr2O12, including data files, can be found [on Materials Cloud](https://archive.materialscloud.org/2019.0008/).
+Two example Jupyter notebooks for conducting full landmark analyses of LiAlSiO<sub>4</sub> and Li<sub>12</sub>La<sub>3</sub>Zr<sub>2</sub>O<sub>12</sub> as in our paper, including data files, can be found [on Materials Cloud](https://archive.materialscloud.org/2019.0008/).
+
+Full API documentation can be found at [ReadTheDocs](https://sitator.readthedocs.io/en/py3/).
 
 `sitator` generally assumes units of femtoseconds for time, Angstroms for space,
 and Cartesian (not crystal) coordinates.
-
-Documentation can be found at [ReadTheDocs](https://sitator.readthedocs.io/en/py3/).
 
 ## Global Options
 
@@ -59,4 +59,4 @@ The `SITATOR_ZEO_PATH` and `SITATOR_QUIP_PATH` environment variables can set the
 
 ## License
 
-This software is made available under the MIT License. See `LICENSE` for more details.
+This software is made available under the MIT License. See [`LICENSE`](LICENSE) for more details.
