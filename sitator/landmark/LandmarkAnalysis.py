@@ -10,7 +10,7 @@ import tempfile
 
 from . import helpers
 from sitator import SiteNetwork, SiteTrajectory
-from .errors import MultipleOccupancyError
+from sitator.errors import MultipleOccupancyError
 
 
 import logging
@@ -264,7 +264,11 @@ class LandmarkAnalysis(object):
         n_sites = len(cluster_counts)
 
         if n_sites < (sn.n_mobile / self.max_mobile_per_site):
-            raise MultipleOccupancyError("There are %i mobile particles, but only identified %i sites. With %i max_mobile_per_site, this is an error. Check clustering_params." % (sn.n_mobile, n_sites, self.max_mobile_per_site))
+            raise InsufficientSitesError(
+                verb = "Landmark analysis",
+                n_sites = n_sites,
+                n_mobile = sn.n_mobile
+            )
 
         logging.info("    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts))
 

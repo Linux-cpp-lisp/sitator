@@ -211,7 +211,7 @@ class SiteTrajectory(object):
             int: the total number of multiple assignment incidents; and
             float: the average number of mobile atoms at any site at any one time.
         """
-        from sitator.landmark.errors import MultipleOccupancyError
+        from sitator.errors import MultipleOccupancyError
         n_more_than_ones = 0
         avg_mobile_per_site = 0
         divisor = 0
@@ -219,7 +219,12 @@ class SiteTrajectory(object):
             _, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
             count_msk = counts > max_mobile_per_site
             if np.any(count_msk):
-                raise MultipleOccupancyError("%i mobile particles were assigned to only %i site(s) (%s) at frame %i." % (np.sum(counts[count_msk]), np.sum(count_msk), np.where(count_msk)[0], frame_i))
+                first_multi_site = np.where(count_msk)[0][0]
+                raise MultipleOccupancyError(
+                    mobile = np.where(site_frame == first_multi_site)[0],
+                    site = first_multi_site,
+                    frame = frame_i
+                )
             n_more_than_ones += np.sum(counts > 1)
             avg_mobile_per_site += np.sum(counts)
             divisor += len(counts)

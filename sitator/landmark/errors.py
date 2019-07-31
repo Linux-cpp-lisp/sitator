@@ -38,7 +38,3 @@ class ZeroLandmarkError(LandmarkAnalysisError):
 
         self.mobile_index = mobile_index
         self.frame = frame
-
-class MultipleOccupancyError(LandmarkAnalysisError):
-    """Error raised when multiple mobile atoms are assigned to the same site."""
-    pass

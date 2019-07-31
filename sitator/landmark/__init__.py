@@ -1,4 +1,4 @@
 
-from .errors import StaticLatticeError, ZeroLandmarkError, LandmarkAnalysisError, MultipleOccupancyError
+from .errors import StaticLatticeError, ZeroLandmarkError, LandmarkAnalysisError
 
 from .LandmarkAnalysis import LandmarkAnalysis
