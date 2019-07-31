@@ -1,6 +1,7 @@
 import numpy as np
 
 from sitator import SiteTrajectory
+from sitator.errors import InsufficientSitesError
 
 import logging
 logger = logging.getLogger(__name__)
@@ -37,6 +38,14 @@ class RemoveUnoccupiedSites(object):
         logger.info("Removing unoccupied sites %s" % np.where(~seen_mask)[0])
 
         n_new_sites = np.sum(seen_mask)
+
+        if n_new_sites < old_sn.n_mobile:
+            raise InsufficientSitesError(
+                verb = "Removing unoccupied sites",
+                n_sites = n_new_sites,
+                n_mobile = old_sn.n_mobile
+            )
+
         translation = np.empty(shape = old_sn.n_sites + 1, dtype = np.int)
         translation[:-1][seen_mask] = np.arange(n_new_sites)
         translation[:-1][~seen_mask] = -4321

@@ -4,6 +4,7 @@ import abc
 
 from sitator.util import PBCCalculator
 from sitator import SiteNetwork, SiteTrajectory
+from sitator.errors import InsufficientSitesError
 
 import logging
 logger = logging.getLogger(__name__)
@@ -12,9 +13,6 @@ class MergeSitesError(Exception):
     pass
 
 class MergedSitesTooDistantError(MergeSitesError):
-    pass
-
-class TooFewMergedSitesError(MergeSitesError):
     pass
 
 
@@ -63,7 +61,11 @@ class MergeSites(abc.ABC):
         logger.info("After merging %i sites there will be %i sites for %i mobile particles" % (len(site_centers), new_n_sites, st.site_network.n_mobile))
 
         if new_n_sites < st.site_network.n_mobile:
-            raise TooFewMergedSitesError("There are %i mobile atoms in this system, but only %i sites after merge" % (np.sum(st.site_network.mobile_mask), new_n_sites))
+            raise InsufficientSitesError(
+                verb = "Merging",
+                n_sites = new_n_sites,
+                n_mobile = st.site_network.n_mobile
+            )
 
         if self.check_types:
             new_types = np.empty(shape = new_n_sites, dtype = np.int)
