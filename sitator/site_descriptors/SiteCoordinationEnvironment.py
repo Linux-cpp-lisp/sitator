@@ -72,6 +72,9 @@ class SiteCoordinationEnvironment(object):
         """
         # -- Determine local environments
         # Get an ASE structure with a single mobile site that we'll move around
+        if sn.n_sites == 0:
+            logger.warning("Site network had no sites.")
+            return sn
         site_struct, site_species = sn[0:1].get_structure_with_sites()
         pymat_struct = AseAtomsAdaptor.get_structure(site_struct)
         lgf = cgf.LocalGeometryFinder()
