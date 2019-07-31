@@ -299,8 +299,8 @@ class SiteTrajectory(object):
         return res
 
 
-    def jumps(self, unknown_as_jump = False):
-        """Generator to iterate over all jumps in the trajectory.
+    def jumps(self, **kwargs):
+        """Iterate over all jumps in the trajectory, jump by jump.
 
         A jump is considered to occur "at the frame" when it first acheives its
         new site. For example,
@@ -317,6 +317,39 @@ class SiteTrajectory(object):
         Yields:
             tuple: (frame_number, mobile_atom_number, from_site, to_site)
         """
+        n_mobile = self.site_network.n_mobile
+        for frame_i, jumped, last_known, frame in self._jumped_generator(**kwargs):
+            for atom_i in range(n_mobile):
+                if jumped[atom_i]:
+                    yield frame_i, atom_i, last_known[atom_i], frame[atom_i]
+
+    def jumps_by_frame(self, **kwargs):
+        """Iterate over all jumps in the trajectory, frame by frame.
+
+        A jump is considered to occur "at the frame" when it first acheives its
+        new site. For example,
+
+         - Frame 0: Atom 1 at site 4
+         - Frame 1: Atom 1 at site 5
+
+        will yield a jump ``(1, 1, 4, 5)``.
+
+        Args:
+            unknown_as_jump (bool): If ``True``, moving from a site to unknown
+                (or vice versa) is considered a jump; if ``False``, unassigned
+                mobile atoms are considered to be at their last known sites.
+        Yields:
+            tuple: (frame_number, mob_that_jumped, from_sites, to_sites)
+        """
+        n_mobile = self.site_network.n_mobile
+        for frame_i, jumped, last_known, frame in self._jumped_generator(**kwargs):
+            yield frame_i, np.where(jumped)[0], last_known[jumped], frame[jumped]
+
+    def _jumped_generator(self, unknown_as_jump = False):
+        """Internal jump generator that does not create intermediate arrays.
+
+        Wrapped by convinience functions.
+        """
         traj = self.traj
         n_mobile = self.site_network.n_mobile
         assert n_mobile == traj.shape[1]
@@ -330,12 +363,9 @@ class SiteTrajectory(object):
             np.not_equal(traj[frame_i], last_known, out = jumped)
             jumped &= known # Must be currently known to have jumped
 
-            for atom_i in range(n_mobile):
-                if jumped[atom_i]:
-                    yield frame_i, atom_i, last_known[atom_i], traj[frame_i, atom_i]
+            yield frame_i, jumped, last_known, traj[frame_i]
 
             last_known[known] = traj[frame_i, known]
-
 
     # ---- Plotting code
     def plot_frame(self, *args, **kwargs):
