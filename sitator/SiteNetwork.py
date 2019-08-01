@@ -94,6 +94,25 @@ class SiteNetwork(object):
     def __len__(self):
         return self.n_sites
 
+    def __str__(self):
+        return (
+            "{}: {:d} sites for {:d} mobile particles in static lattice of {:d} particles\n"
+            "           Has vertices: {}\n"
+            "              Has types: {}\n"
+            "    Has site attributes: {}\n"
+            "    Has edge attributes: {}\n"
+            ""
+        ).format(
+            type(self).__name__,
+            self.n_sites,
+            self.n_mobile,
+            self.n_static,
+            self._vertices is not None,
+            self._types is not None,
+            ", ".join(self._site_attrs.keys()),
+            ", ".join(self._edge_attrs.keys())
+        )
+
     def __getitem__(self, key):
         sn = self.__new__(type(self))
         SiteNetwork.__init__(
