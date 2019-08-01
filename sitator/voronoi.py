@@ -20,7 +20,7 @@ class VoronoiSiteGenerator(object):
         self._radial = radial
         self._zeopy = Zeopy(zeopp_path)
 
-    def run(self, sn):
+    def run(self, sn, seed_mask = None):
         """
         Args:
             sn (SiteNetwork): Any sites will be ignored; needed for structure
@@ -30,12 +30,21 @@ class VoronoiSiteGenerator(object):
         """
         assert isinstance(sn, SiteNetwork)
 
+        if seed_mask is None:
+            seed_mask = sn.static_mask
+        assert not np.any(seed_mask & sn.mobile_mask), "Seed mask must not overlap with mobile mask"
+        assert not np.any(seed_mask & ~sn.static_mask), "All seed atoms must be static."
+        voro_struct = sn.structure[seed_mask]
+        translation = np.zeros(shape = len(sn.static_mask), dtype = np.int)
+        translation[sn.static_mask] = np.arange(sn.n_static)
+        translation = translation[seed_mask]
+
         with self._zeopy:
-            nodes, verts, edges, _ = self._zeopy.voronoi(sn.static_structure,
+            nodes, verts, edges, _ = self._zeopy.voronoi(voro_struct,
                                                         radial = self._radial)
 
         out = sn.copy()
         out.centers = nodes
-        out.vertices = verts
+        out.vertices = [translation[v] for v in verts]
 
         return out
