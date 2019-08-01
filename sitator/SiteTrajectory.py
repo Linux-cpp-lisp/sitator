@@ -216,10 +216,10 @@ class SiteTrajectory(object):
         avg_mobile_per_site = 0
         divisor = 0
         for frame_i, site_frame in enumerate(self._traj):
-            _, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
+            sites, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
             count_msk = counts > max_mobile_per_site
             if np.any(count_msk):
-                first_multi_site = np.where(count_msk)[0][0]
+                first_multi_site = sites[count_msk][0]
                 raise MultipleOccupancyError(
                     mobile = np.where(site_frame == first_multi_site)[0],
                     site = first_multi_site,
