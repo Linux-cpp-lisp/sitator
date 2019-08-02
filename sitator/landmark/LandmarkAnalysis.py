@@ -10,8 +10,8 @@ import tempfile
 
 from . import helpers
 from sitator import SiteNetwork, SiteTrajectory
-from sitator.errors import MultipleOccupancyError
-
+from sitator.errors import MultipleOccupancyError, InsufficientSitesError
+from sitator.landmark.anchor import to_origin
 
 import logging
 logger = logging.getLogger(__name__)
@@ -108,6 +108,7 @@ class LandmarkAnalysis(object):
                  check_for_zero_landmarks = True,
                  static_movement_threshold = 1.0,
                  dynamic_lattice_mapping = False,
+                 static_anchoring = to_origin,
                  relaxed_lattice_checks = False,
                  max_mobile_per_site = 1,
                  force_no_memmap = False,
@@ -127,6 +128,7 @@ class LandmarkAnalysis(object):
             from sitator.landmark.dynamic_mapping import within_species
             dynamic_lattice_mapping = within_species
         self.dynamic_lattice_mapping = dynamic_lattice_mapping
+        self.static_anchoring = static_anchoring
 
         self.relaxed_lattice_checks = relaxed_lattice_checks
 
@@ -221,6 +223,9 @@ class LandmarkAnalysis(object):
             # If no dynamic mapping, each is only compatable with itself.
             dynmap_compat = np.arange(sn.n_static)[:, np.newaxis]
         assert len(dynmap_compat) == sn.n_static
+        static_anchors = self.static_anchoring(sn)
+        # This also validates the anchors
+        lattice_pt_order = self._get_lattice_order_from_anchors(static_anchors)
 
         # The dimension of one landmark vector is the number of Voronoi regions
         shape = (n_frames * sn.n_mobile, self._landmark_dimension)
@@ -237,6 +242,8 @@ class LandmarkAnalysis(object):
             helpers._fill_landmark_vectors(self, sn, verts_np, site_vert_dists,
                                             frames,
                                             dynmap_compat = dynmap_compat,
+                                            lattice_pt_anchors = static_anchors,
+                                            lattice_pt_order = lattice_pt_order,
                                             check_for_zeros = self.check_for_zero_landmarks,
                                             tqdm = tqdm, logger = logger)
 
@@ -335,3 +342,24 @@ class LandmarkAnalysis(object):
         self._has_run = True
 
         return out_st
+
+    def _get_lattice_order_from_anchors(self, lattice_pt_anchors):
+        absolute_lattice_mask = lattice_pt_anchors == -1
+        lattice_pt_order = []
+        # -1 (absolte anchor of origin) is always known
+        known = np.zeros(shape = len(lattice_pt_anchors) + 1, dtype = np.bool)
+        known[-1] = True
+
+        while True:
+            can_know = known[lattice_pt_anchors]
+            new_know = can_know & ~known[:-1]
+            known[:-1] |= can_know
+            lattice_pt_order.extend(np.where(new_know)[0])
+            if not np.any(new_know):
+                break
+        if len(lattice_pt_order) < len(lattice_pt_anchors):
+            raise ValueError("Lattice point anchors %s contains a unsatisfiable dependency (likely a circular dependency)." % lattice_pt_anchors)
+        # Remove points with absolute anchors from the order; there's no need to
+        # do any computations for them.
+        lattice_pt_order = lattice_pt_order[np.sum(absolute_lattice_mask):]
+        return lattice_pt_order

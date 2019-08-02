@@ -15,6 +15,8 @@ def _fill_landmark_vectors(self,
                            site_vert_dists,
                            frames,
                            dynmap_compat,
+                           lattice_pt_anchors,
+                           lattice_pt_order,
                            check_for_zeros = True,
                            tqdm = lambda i: i,
                            logger = None):
@@ -27,18 +29,29 @@ def _fill_landmark_vectors(self,
 
     cdef pbcc = self._pbcc
 
-    frame_shift = np.empty(shape = (sn.n_static, 3))
+    frame_shift = np.empty(shape = (sn.n_static, 3), dtype = frames.dtype)
     temp_distbuff = np.empty(shape = sn.n_static, dtype = frames.dtype)
 
     mobile_idexes = np.where(sn.mobile_mask)[0]
-
-    lattice_map = np.empty(shape = sn.n_static, dtype = np.int)
-
-    lattice_pt = np.empty(shape = 3, dtype = sn.static_structure.positions.dtype)
+    # Static lattice point buffers
+    lattice_pts_resolved = np.empty(shape = (sn.n_static, 3), dtype = sn.static_structure.positions.dtype)
+    # Determine resolution order
+    absolute_lattice_mask = lattice_pt_anchors == -1
+    assert len(lattice_pt_order) == len(lattice_pt_anchors) - np.sum(absolute_lattice_mask), "Order must contain all non-absolute anchored static lattice points"
+    cdef Py_ssize_t [:] lattice_pt_order_c = np.asarray(lattice_pt_order, dtype = np.int)
+    # Absolute (relative to origin) ones never need to be resolved, put it in
+    # the buffer now
+    lattice_pts_resolved[absolute_lattice_mask] = sn.static_structure.positions[absolute_lattice_mask]
+    assert not np.any(absolute_lattice_mask[lattice_pt_order]), "None of the absolute lattice points should be in the resolution order"
+    # Precompute the offsets for relative static lattice points:
+    relative_lattice_offsets = sn.static_structure.positions[lattice_pt_order] - sn.static_structure.positions[lattice_pt_anchors[lattice_pt_order]]
+    # Buffers for dynamic mapping
     max_n_dynmat_compat = max(len(dm) for dm in dynmap_compat)
     lattice_pt_dists = np.empty(shape = max_n_dynmat_compat, dtype = np.float)
-    static_pos_buffer = np.empty(shape = (max_n_dynmat_compat, 3), dtype = lattice_pt.dtype)
+    static_pos_buffer = np.empty(shape = (max_n_dynmat_compat, 3), dtype = lattice_pts_resolved.dtype)
     static_positions_seen = np.empty(shape = sn.n_static, dtype = np.bool)
+    lattice_map = np.empty(shape = sn.n_static, dtype = np.int)
+    # Instant static position buffers
     static_positions = np.empty(shape = (sn.n_static, 3), dtype = frames.dtype)
     static_mask_idexes = sn.static_mask.nonzero()[0]
 
@@ -60,8 +73,7 @@ def _fill_landmark_vectors(self,
     cdef Py_ssize_t n_dynmap_allowed
     # Iterate through time
     for i, frame in enumerate(tqdm(frames, desc = "Landmark Frame")):
-
-        #static_positions = frame[sn.static_mask]
+        # Copy static positions to buffer
         np.take(frame,
                 static_mask_idexes,
                 out = static_positions,
@@ -71,10 +83,16 @@ def _fill_landmark_vectors(self,
         # Every frame, update the lattice map
         static_positions_seen.fill(False)
 
+        # - Resolve static lattice positions from their origins
+        for order_i, lattice_index in enumerate(lattice_pt_order_c):
+            lattice_pts_resolved[lattice_index] = static_positions[lattice_pt_anchors[lattice_index]]
+            lattice_pts_resolved[lattice_index] += relative_lattice_offsets[order_i]
+
+        # - Map static positions to static lattice sites
         for lattice_index in xrange(sn.n_static):
             dynmap_allowed = dynmap_compat[lattice_index]
             n_dynmap_allowed = len(dynmap_allowed)
-            lattice_pt[:] = sn.static_structure.positions[lattice_index]
+
             np.take(static_positions,
                     dynmap_allowed,
                     out = static_pos_buffer[:n_dynmap_allowed],
@@ -82,7 +100,7 @@ def _fill_landmark_vectors(self,
                     mode = 'clip')
 
             pbcc.distances(
-                lattice_pt,
+                lattice_pts_resolved[lattice_index],
                 static_pos_buffer[:n_dynmap_allowed],
                 out = lattice_pt_dists[:n_dynmap_allowed]
             )
@@ -98,7 +116,7 @@ def _fill_landmark_vectors(self,
             static_positions_seen[nearest_static_position] = True
 
             if nearest_static_distance > self.static_movement_threshold:
-                raise StaticLatticeError("No static atom position within %f A threshold of static lattice position %i" % (self.static_movement_threshold, lattice_index),
+                raise StaticLatticeError("Nearest static atom to lattice position %i is %.2fÅ away, above threshold of %.2fÅ" % (lattice_index, nearest_static_distance, self.static_movement_threshold),
                                          lattice_atoms = [lattice_index],
                                          frame = i,
                                          try_recentering = True)
@@ -114,7 +132,7 @@ def _fill_landmark_vectors(self,
                                      frame = i,
                                      try_recentering = True)
 
-
+        # - Compute landmark vectors for mobile
         for j in xrange(sn.n_mobile):
             mobile_pt = frame[mobile_idexes[j]]
 
