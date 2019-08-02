@@ -24,6 +24,7 @@ cdef class PBCCalculator(object):
         :param DxD ndarray: the unit cell -- an array of cell vectors, like the
           cell of an ASE :class:Atoms object.
         """
+        cell = cell[:]
         cellmat = np.matrix(cell).T
 
         assert cell.shape[1] == cell.shape[0], "Cell must be square"
