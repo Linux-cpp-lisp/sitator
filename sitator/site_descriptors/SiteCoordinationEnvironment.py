@@ -85,7 +85,7 @@ class SiteCoordinationEnvironment(object):
 
         valences = 'undefined'
         if self._only_ionic_bonds:
-            valences = np.concatenate((sn.static_charges, [sn.mobile_charge]))
+            valences = list(sn.static_charges) + [sn.mobile_charge]
 
         logger.info("Running site coordination environment analysis...")
         # Do this once.

@@ -106,6 +106,18 @@ class IonicSiteNetwork(SiteNetwork):
     def n_same_charge(self):
         return np.sum(self.same_ion_mask)
 
+    def __getitem__(self, key):
+        out = super().__getitem__(key)
+        out.mobile_species = self.mobile_species
+        out.static_species = self.static_species
+        out.mobile_charge = self.mobile_charge
+        out.static_charges = self.static_charges
+        out.opposite_ion_mask = self.opposite_ion_mask
+        out.opposite_ion_structure = self.opposite_ion_structure
+        out.same_ion_mask = self.same_ion_mask
+        out.same_ion_structure = self.same_ion_structure
+        return out
+
     def __str__(self):
         out = super().__str__()
         static_nums = self.static_structure.numbers
