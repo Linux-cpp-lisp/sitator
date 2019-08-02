@@ -42,9 +42,9 @@ class SiteCoordinationEnvironment(object):
      - ``coordination_numbers``: The coordination number of the site.
 
     Args:
-        guess_ionic_bonds (bool): If True, uses ``pymatgen``'s bond valence
-            analysis to guess valences and only consider ionic bonds for
-            neighbor analysis. Otherwise, or if it fails, all bonds are fair game.
+        only_ionic_bonds (bool): If True, assumes ``sn`` is an ``IonicSiteNetwork``
+            and uses its charge information to only consider as neighbors
+            atoms with compatable (anion and cation, ion and neutral) charges.
         full_chemenv_site_types (bool): If True, ``sitator`` site types on the
             final ``SiteNetwork`` will be assigned based on unique chemical
             environments, including shape. If False, they will be assigned
@@ -54,13 +54,13 @@ class SiteCoordinationEnvironment(object):
         **kwargs: passed to ``compute_structure_environments``.
     """
     def __init__(self,
-                 guess_ionic_bonds = True,
+                 only_ionic_bonds = True,
                  full_chemenv_site_types = False,
                  **kwargs):
         if not has_pymatgen:
             raise ImportError("Pymatgen (or a recent enough version including `pymatgen.analysis.chemenv.coordination_environments`) cannot be imported.")
         self._kwargs = kwargs
-        self._guess_ionic_bonds = guess_ionic_bonds
+        self._only_ionic_bonds = only_ionic_bonds
         self._full_chemenv_site_types = full_chemenv_site_types
 
     def run(self, sn):
@@ -84,23 +84,8 @@ class SiteCoordinationEnvironment(object):
         vertices = []
 
         valences = 'undefined'
-        if self._guess_ionic_bonds:
-            sim_struct = AseAtomsAdaptor.get_structure(sn.structure)
-            valences = np.zeros(shape = len(site_struct), dtype = np.int)
-            bv = BVAnalyzer()
-            try:
-                struct_valences = np.asarray(bv.get_valences(sim_struct))
-            except ValueError as ve:
-                logger.warning("Failed to compute bond valences: %s" % ve)
-            else:
-                valences = np.zeros(shape = len(site_struct), dtype = np.int)
-                valences[:site_atom_index] = struct_valences[sn.static_mask]
-                mob_val = struct_valences[sn.mobile_mask]
-                if np.any(mob_val != mob_val[0]):
-                    logger.warning("Mobile atom estimated valences (%s) not uniform; arbitrarily taking first." % mob_val)
-                valences[site_atom_index] = mob_val[0]
-            finally:
-                valences = list(valences)
+        if self._only_ionic_bonds:
+            valences = np.concatenate((sn.static_charges, [sn.mobile_charge]))
 
         logger.info("Running site coordination environment analysis...")
         # Do this once.
