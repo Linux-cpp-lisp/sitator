@@ -9,7 +9,15 @@ from sitator.landmark import StaticLatticeError, ZeroLandmarkError
 
 ctypedef double precision
 
-def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_for_zeros = True, tqdm = lambda i: i, logger = None):
+def _fill_landmark_vectors(self,
+                           sn,
+                           verts_np,
+                           site_vert_dists,
+                           frames,
+                           dynmap_compat,
+                           check_for_zeros = True,
+                           tqdm = lambda i: i,
+                           logger = None):
     if self._landmark_dimension is None:
         raise ValueError("_fill_landmark_vectors called before Voronoi!")
 
@@ -24,15 +32,15 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
     mobile_idexes = np.where(sn.mobile_mask)[0]
 
-    if self.dynamic_lattice_mapping:
-        lattice_map = np.empty(shape = sn.n_static, dtype = np.int)
-    else:
-        # Otherwise just map to themselves
-        lattice_map = np.arange(sn.n_static, dtype = np.int)
+    lattice_map = np.empty(shape = sn.n_static, dtype = np.int)
 
     lattice_pt = np.empty(shape = 3, dtype = sn.static_structure.positions.dtype)
-    lattice_pt_dists = np.empty(shape = sn.n_static, dtype = np.float)
+    max_n_dynmat_compat = max(len(dm) for dm in dynmap_compat)
+    lattice_pt_dists = np.empty(shape = max_n_dynmat_compat, dtype = np.float)
+    static_pos_buffer = np.empty(shape = (max_n_dynmat_compat, 3), dtype = lattice_pt.dtype)
     static_positions_seen = np.empty(shape = sn.n_static, dtype = np.bool)
+    static_positions = np.empty(shape = (sn.n_static, 3), dtype = frames.dtype)
+    static_mask_idexes = sn.static_mask.nonzero()[0]
 
     # - Precompute cutoff function rounding point
     # TODO: Think about the 0.0001 value
@@ -46,25 +54,41 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
     cdef Py_ssize_t landmark_dim = self._landmark_dimension
     cdef Py_ssize_t current_landmark_i = 0
+
+    cdef Py_ssize_t nearest_static_position
+    cdef precision nearest_static_distance
+    cdef Py_ssize_t n_dynmap_allowed
     # Iterate through time
     for i, frame in enumerate(tqdm(frames, desc = "Landmark Frame")):
 
-        static_positions = frame[sn.static_mask]
+        #static_positions = frame[sn.static_mask]
+        np.take(frame,
+                static_mask_idexes,
+                out = static_positions,
+                axis = 0,
+                mode = 'clip')
 
         # Every frame, update the lattice map
         static_positions_seen.fill(False)
 
         for lattice_index in xrange(sn.n_static):
-            lattice_pt = sn.static_structure.positions[lattice_index]
+            dynmap_allowed = dynmap_compat[lattice_index]
+            n_dynmap_allowed = len(dynmap_allowed)
+            lattice_pt[:] = sn.static_structure.positions[lattice_index]
+            np.take(static_positions,
+                    dynmap_allowed,
+                    out = static_pos_buffer[:n_dynmap_allowed],
+                    axis = 0,
+                    mode = 'clip')
 
-            if self.dynamic_lattice_mapping:
-                # Only compute all distances if dynamic remapping is on
-                pbcc.distances(lattice_pt, static_positions, out = lattice_pt_dists)
-                nearest_static_position = np.argmin(lattice_pt_dists)
-                nearest_static_distance = lattice_pt_dists[nearest_static_position]
-            else:
-                nearest_static_position = lattice_index
-                nearest_static_distance = pbcc.distances(lattice_pt, static_positions[nearest_static_position:nearest_static_position+1])[0]
+            pbcc.distances(
+                lattice_pt,
+                static_pos_buffer[:n_dynmap_allowed],
+                out = lattice_pt_dists[:n_dynmap_allowed]
+            )
+            nearest_static_position = np.argmin(lattice_pt_dists[:n_dynmap_allowed])
+            nearest_static_distance = lattice_pt_dists[nearest_static_position]
+            nearest_static_position = dynmap_allowed[nearest_static_position]
 
             if static_positions_seen[nearest_static_position]:
                 # We've already seen this one... error
@@ -79,8 +103,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
                                          frame = i,
                                          try_recentering = True)
 
-            if self.dynamic_lattice_mapping:
-                lattice_map[lattice_index] = nearest_static_position
+            lattice_map[lattice_index] = nearest_static_position
 
         # In normal circumstances, every current static position should be assigned.
         # Just a sanity check
@@ -96,8 +119,9 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
             mobile_pt = frame[mobile_idexes[j]]
 
             # Shift the Li in question to the center of the unit cell
-            np.copyto(frame_shift, frame[sn.static_mask])
-            frame_shift += (pbcc.cell_centroid - mobile_pt)
+            frame_shift[:] = static_positions
+            frame_shift -= mobile_pt
+            frame_shift += pbcc.cell_centroid
 
             # Wrap all positions into the unit cell
             pbcc.wrap_points(frame_shift)
@@ -148,18 +172,6 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
                   precision cutoff_round_to_zero,
                   precision [:] distbuff) nogil:
 
-    # Pure Python equiv:
-    #         for k in xrange(landmark_dim):
-    #             lvec = np.linalg.norm(lattice_positions[verts[k]] - cell_centroid, axis = 1)
-    #             past_cutoff = lvec > cutoff
-
-    #             # Short circut it, since the product then goes to zero too.
-    #             if np.any(past_cutoff):
-    #                 landmark_vectors[(i * n_li) + j, k] = 0
-    #             else:
-    #                 lvec = (np.cos((np.pi / cutoff) * lvec) + 1.0) / 2.0
-    #                 landmark_vectors[(i * n_li) + j, k] = np.product(lvec)
-
     # Fill the landmark vector
     cdef int [:] vert
     cdef Py_ssize_t v
@@ -176,11 +188,6 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
         temp = sqrt((pt[0] - li_pos[0])**2 + (pt[1] - li_pos[1])**2 + (pt[2] - li_pos[2])**2)
 
         distbuff[idex] = temp
-
-        # if temp > cutoff:
-        #     distbuff[idex] = 0.0
-        # else:
-        #     distbuff[idex] = (cos((M_PI / cutoff) * temp) + 1.0) * 0.5
 
     # For each component
     for k in xrange(landmark_dim):
@@ -205,7 +212,6 @@ cdef void fill_landmark_vec(precision [:,:] landmark_vectors,
                 temp = 1.0 / (1.0 + exp(cutoff_steepness * (temp - cutoff_midpoint)))
 
             # Multiply into accumulator
-            #ci *= distbuff[v]
             ci *= temp
 
         # "Normalize" to number of vertices

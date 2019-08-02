@@ -57,8 +57,8 @@ class LandmarkAnalysis(object):
         when all-zero landmark vectors are computed.
     :param float static_movement_threshold: (Angstrom) the maximum allowed
         distance between an instantanous static atom position and it's ideal position.
-    :param bool dynamic_lattice_mapping: Whether to dynamically decide each
-        frame which static atom represents each average lattice position;
+    :param bool/callable dynamic_lattice_mapping: Whether to dynamically decide
+        each frame which static atom represents each average lattice position;
         this allows the LandmarkAnalysis to deal with, say, a rare exchage of
         two static atoms that does not change the structure of the lattice.
 
@@ -66,6 +66,12 @@ class LandmarkAnalysis(object):
         actually change over the course of the trajectory.
 
         In certain cases this is better delt with by ``MergeSitesByDynamics``.
+
+        If ``False``, no mapping will occur. Otherwise, a callable taking a
+        ``SiteNetwork`` should be provided. The callable should return a list
+        of static atom indexes that can be validly assigned to each static lattice
+        position. If ``True``, ``sitator.landmark.dynamic_mapping.within_species``
+        is used.
     :param int max_mobile_per_site: The maximum number of mobile atoms that can
         be assigned to a single site without throwing an error. Regardless of the
         value, assignments of more than one mobile atom to a single site will
@@ -116,7 +122,12 @@ class LandmarkAnalysis(object):
         self.verbose = verbose
         self.check_for_zero_landmarks = check_for_zero_landmarks
         self.site_centers_method = site_centers_method
+
+        if dynamic_lattice_mapping is True:
+            from sitator.landmark.dynamic_mapping import within_species
+            dynamic_lattice_mapping = within_species
         self.dynamic_lattice_mapping = dynamic_lattice_mapping
+
         self.relaxed_lattice_checks = relaxed_lattice_checks
 
         self._landmark_vectors = None
@@ -203,7 +214,13 @@ class LandmarkAnalysis(object):
 
         # -- Step 2: Compute landmark vectors
         logger.info("  - computing landmark vectors -")
-        # Compute landmark vectors
+
+        if self.dynamic_lattice_mapping:
+            dynmap_compat = self.dynamic_lattice_mapping(sn)
+        else:
+            # If no dynamic mapping, each is only compatable with itself.
+            dynmap_compat = np.arange(sn.n_static)[:, np.newaxis]
+        assert len(dynmap_compat) == sn.n_static
 
         # The dimension of one landmark vector is the number of Voronoi regions
         shape = (n_frames * sn.n_mobile, self._landmark_dimension)
@@ -218,7 +235,9 @@ class LandmarkAnalysis(object):
                                                    shape = shape)
 
             helpers._fill_landmark_vectors(self, sn, verts_np, site_vert_dists,
-                                            frames, check_for_zeros = self.check_for_zero_landmarks,
+                                            frames,
+                                            dynmap_compat = dynmap_compat,
+                                            check_for_zeros = self.check_for_zero_landmarks,
                                             tqdm = tqdm, logger = logger)
 
             if not self.check_for_zero_landmarks and self.n_all_zero_lvecs > 0:
