@@ -1,1 +1,1 @@
-from ConfigurationalEntropy import ConfigurationalEntropy
+from .ConfigurationalEntropy import ConfigurationalEntropy

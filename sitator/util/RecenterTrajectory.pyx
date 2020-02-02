@@ -18,7 +18,7 @@ class RecenterTrajectory(object):
         ``static_mask``, IN PLACE.
 
         Args:
-            structure (ASE Atoms): An atoms representing the structure of the
+            structure (ase.Atoms): An atoms representing the structure of the
                 simulation.
             static_mask (ndarray): Boolean mask indicating which atoms to recenter on
             positions (ndarray): (n_frames, n_atoms, 3), modified in place
@@ -31,6 +31,8 @@ class RecenterTrajectory(object):
                  - If an ``ndarray``, must have ``n_atoms`` elements giving the
                     masses of all atoms in the system.
         """
+
+        assert np.any(static_mask), "Static mask all false; there must be static atoms to recenter on."
 
         factors = static_mask.astype(np.float)
         n_static = np.sum(static_mask)

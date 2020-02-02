@@ -9,7 +9,7 @@ from sitator.landmark import StaticLatticeError, ZeroLandmarkError
 
 ctypedef double precision
 
-def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_for_zeros = True, tqdm = lambda i: i):
+def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_for_zeros = True, tqdm = lambda i: i, logger = None):
     if self._landmark_dimension is None:
         raise ValueError("_fill_landmark_vectors called before Voronoi!")
 
@@ -42,10 +42,12 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
                                                       self._cutoff_steepness,
                                                       0.0001)
 
+    cdef Py_ssize_t n_all_zero_lvecs = 0
+
     cdef Py_ssize_t landmark_dim = self._landmark_dimension
     cdef Py_ssize_t current_landmark_i = 0
     # Iterate through time
-    for i, frame in enumerate(tqdm(frames, desc = "Frame")):
+    for i, frame in enumerate(tqdm(frames, desc = "Landmark Frame")):
 
         static_positions = frame[sn.static_mask]
 
@@ -66,7 +68,7 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
 
             if static_positions_seen[nearest_static_position]:
                 # We've already seen this one... error
-                print "Static atom %i is the closest to more than one static lattice position" % nearest_static_position
+                logger.warning("Static atom %i is the closest to more than one static lattice position" % nearest_static_position)
                 #raise ValueError("Static atom %i is the closest to more than one static lattice position" % nearest_static_position)
 
             static_positions_seen[nearest_static_position] = True
@@ -111,16 +113,23 @@ def _fill_landmark_vectors(self, sn, verts_np, site_vert_dists, frames, check_fo
                               cutoff_round_to_zero,
                               temp_distbuff)
 
-            if check_for_zeros and (np.count_nonzero(self._landmark_vectors[current_landmark_i]) == 0):
-                raise ZeroLandmarkError(mobile_index = j, frame = i)
+            if np.count_nonzero(self._landmark_vectors[current_landmark_i]) == 0:
+                if check_for_zeros:
+                    raise ZeroLandmarkError(mobile_index = j, frame = i)
+                else:
+                    n_all_zero_lvecs += 1
 
             current_landmark_i += 1
+
+    self.n_all_zero_lvecs = n_all_zero_lvecs
+
 
 cdef precision cutoff_round_to_zero_point(precision cutoff_midpoint,
                                           precision cutoff_steepness,
                                           precision threshold):
     # Computed by solving for x:
     return cutoff_midpoint + log((1/threshold) - 1.) / cutoff_steepness
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

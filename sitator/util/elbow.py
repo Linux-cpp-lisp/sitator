@@ -2,7 +2,7 @@ import numpy as np
 
 # See discussion around this question: https://stackoverflow.com/questions/2018178/finding-the-best-trade-off-point-on-a-curve/2022348#2022348
 def index_of_elbow(points):
-    """Returns the index of the "elbow" in points.
+    """Returns the index of the "elbow" in ``points``.
 
     Decently fast and pretty approximate. Performs worse with disproportionately
     long "flat" tails. For example, in a dataset with a nearly right-angle elbow,
