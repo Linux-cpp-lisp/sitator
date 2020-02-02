@@ -1,14 +1,11 @@
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-
 import numpy as np
 
 from sitator.util import PBCCalculator
-from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
+from sitator.visualization import SiteTrajectoryPlotter
+from sitator.util.progress import tqdm
 
-import matplotlib
-from matplotlib.collections import LineCollection
+import logging
+logger = logging.getLogger(__name__)
 
 class SiteTrajectory(object):
     """A trajectory capturing the dynamics of particles through a SiteNetwork."""
@@ -42,6 +39,8 @@ class SiteTrajectory(object):
 
         self._real_traj = None
 
+        self._default_plotter = None
+
     def __len__(self):
         return self.n_frames
 
@@ -51,28 +50,45 @@ class SiteTrajectory(object):
                         confidences = None if self._confs is None else self._confs[key])
         if not self._real_traj is None:
             st.set_real_traj(self._real_traj[key])
-
         return st
+
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains
+        # all our instance attributes. Always use the dict.copy()
+        # method to avoid modifying the original state.
+        state = self.__dict__.copy()
+        # Don't want to pickle giant trajectories or uninteresting plotters
+        state['_real_traj'] = None
+        state['_default_plotter'] = None
+        return state
 
     @property
     def traj(self):
-        """The underlying trajectory."""
+        """The site assignments over time."""
         return self._traj
 
     @property
+    def confidences(self):
+        return self._confs
+
+    @property
     def n_frames(self):
+        """The number of frames in the trajectory."""
         return len(self._traj)
 
     @property
     def n_unassigned(self):
+        """The total number of times a mobile particle is unassigned."""
         return np.sum(self._traj < 0)
 
     @property
     def n_assigned(self):
+        """The total number of times a mobile particle was assigned to a site."""
         return self._sn.n_mobile * self.n_frames - self.n_unassigned
 
     @property
     def percent_unassigned(self):
+        """Proportion of particle positions that are unassigned over all time."""
         return float(self.n_unassigned) / (self._sn.n_mobile * self.n_frames)
 
     @property
@@ -88,25 +104,49 @@ class SiteTrajectory(object):
 
     @property
     def real_trajectory(self):
+        """The real-space trajectory this ``SiteTrajectory`` is based on."""
         return self._real_traj
+
+    def copy(self, with_computed = True):
+        """Return a copy.
+
+        Args:
+            with_computed (bool): See ``SiteNetwork.copy()``.
+        """
+        st = self[:]
+        st.site_network = st.site_network.copy(with_computed = with_computed)
+        return st
 
     def set_real_traj(self, real_traj):
         """Assocaite this SiteTrajectory with a trajectory of points in real space.
 
-        The trajectory is not copied, and should have shape (n_frames, n_total)
+        The trajectory is not copied.
+
+        Args:
+            real_traj (ndarray of shape (n_frames, n_total))
         """
         expected_shape = (self.n_frames, self._sn.n_total, 3)
         if not real_traj.shape == expected_shape:
             raise ValueError("real_traj of shape %s does not have expected shape %s" % (real_traj.shape, expected_shape))
         self._real_traj = real_traj
 
+
     def remove_real_traj(self):
         """Forget associated real trajectory."""
         del self._real_traj
         self._real_traj = None
 
+
     def trajectory_for_particle(self, i, return_confidences = False):
-        """Returns the array of sites particle i is assigned to over time."""
+        """Returns the array of sites particle i is assigned to over time.
+
+        Args:
+            i (int)
+            return_confidences (bool): If ``True``, also return the confidences
+                with which those assignments were made.
+        Returns:
+            ndarray (int) of length ``n_frames``[, ndarray (float) length ``n_frames``]
+        """
         if return_confidences and self._confs is None:
             raise ValueError("This SiteTrajectory has no confidences")
         if return_confidences:
@@ -114,7 +154,19 @@ class SiteTrajectory(object):
         else:
             return self._traj[:, i]
 
+
     def real_positions_for_site(self, site, return_confidences = False):
+        """Get all real-space positions assocated with a site.
+
+        Args:
+            site (int)
+            return_confidences (bool): If ``True``, the confidences with which
+                each real-space position was assigned to ``site`` are also
+                returned.
+
+        Returns:
+            ndarray (N, 3)[, ndarray (N)]
+        """
         if self._real_traj is None:
             raise ValueError("This SiteTrajectory has no real trajectory")
         if return_confidences and self._confs is None:
@@ -131,22 +183,69 @@ class SiteTrajectory(object):
         else:
             return pts
 
+
     def compute_site_occupancies(self):
-        """Computes site occupancies and adds site attribute `occupancies` to site_network."""
-        occ = np.true_divide(np.bincount(self._traj[self._traj >= 0]), self.n_frames)
+        """Computes site occupancies.
+
+        Adds site attribute ``occupancies`` to ``site_network``.
+
+        In cases of multiple occupancy, this will be higher than the number of
+        frames in which the site is occupied and could be over 1.0.
+
+        Returns:
+            ndarray of occupancies (length ``n_sites``)
+        """
+        occ = np.true_divide(np.bincount(self._traj[self._traj >= 0], minlength = self._sn.n_sites), self.n_frames)
+        if self.site_network.has_attribute('occupancies'):
+            self.site_network.remove_attribute('occupancies')
         self.site_network.add_site_attribute('occupancies', occ)
         return occ
 
-    def assign_to_last_known_site(self, frame_threshold = 1, verbose = True):
-        """Assign unassigned mobile particles to their last known site within
-            `frame_threshold` frames.
 
-        :returns: information dictionary of debugging/diagnostic information.
+    def check_multiple_occupancy(self, max_mobile_per_site = 1):
+        """Count cases of "multiple occupancy" where more than one mobile share the same site at the same time.
+
+        These cases usually indicate bad site analysis.
+
+        Returns:
+            int: the total number of multiple assignment incidents; and
+            float: the average number of mobile atoms at any site at any one time.
+        """
+        from sitator.errors import MultipleOccupancyError
+        n_more_than_ones = 0
+        avg_mobile_per_site = 0
+        divisor = 0
+        for frame_i, site_frame in enumerate(self._traj):
+            sites, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
+            count_msk = counts > max_mobile_per_site
+            if np.any(count_msk):
+                first_multi_site = sites[count_msk][0]
+                raise MultipleOccupancyError(
+                    mobile = np.where(site_frame == first_multi_site)[0],
+                    site = first_multi_site,
+                    frame = frame_i
+                )
+            n_more_than_ones += np.sum(counts > 1)
+            avg_mobile_per_site += np.sum(counts)
+            divisor += len(counts)
+        avg_mobile_per_site /= divisor
+        return n_more_than_ones, avg_mobile_per_site
+
+
+    def assign_to_last_known_site(self, frame_threshold = 1):
+        """Assign unassigned mobile particles to their last known site.
+
+        Args:
+            frame_threshold (int): The maximum number of frames between the last
+                known site and the present frame up to which the last known site
+                can be used.
+
+        Returns:
+            information dictionary of debugging/diagnostic information.
         """
         total_unknown = self.n_unassigned
 
-        if verbose:
-            print("%i unassigned positions (%i%%); assigning unassigned mobile particles to last known positions within %i frames..." % (total_unknown, 100.0 * self.percent_unassigned, frame_threshold))
+        logger.info("%i unassigned positions (%i%%); assigning unassigned mobile particles to last known positions within %s frames..." % (total_unknown, 100.0 * self.percent_unassigned, frame_threshold))
 
         last_known = np.empty(shape = self._sn.n_mobile, dtype = np.int)
         last_known.fill(-1)
@@ -156,7 +255,7 @@ class SiteTrajectory(object):
         max_time_unknown = 0
         total_reassigned = 0
 
-        for i in xrange(self.n_frames):
+        for i in range(self.n_frames):
             # All those unknown this frame
             unknown = self._traj[i] == -1
             # Update last_known for assigned sites
@@ -184,10 +283,9 @@ class SiteTrajectory(object):
         if avg_time_unknown_div > 0: # We corrected some unknowns
             avg_time_unknown = float(avg_time_unknown) / avg_time_unknown_div
 
-            if verbose:
-                print("  Maximum # of frames any mobile particle spent unassigned: %i" % max_time_unknown)
-                print("  Avg. # of frames spent unassigned: %f" % avg_time_unknown)
-                print("  Assigned %i/%i unassigned positions, leaving %i (%i%%) unknown" % (total_reassigned, total_unknown, self.n_unassigned, self.percent_unassigned))
+            logger.info("  Maximum # of frames any mobile particle spent unassigned: %i" % max_time_unknown)
+            logger.info("  Avg. # of frames spent unassigned: %f" % avg_time_unknown)
+            logger.info("  Assigned %i/%i unassigned positions, leaving %i (%i%%) unknown" % (total_reassigned, total_unknown, self.n_unassigned, self.percent_unassigned))
 
             res = {
                 'max_time_unknown' : max_time_unknown,
@@ -195,8 +293,7 @@ class SiteTrajectory(object):
                 'total_reassigned' : total_reassigned
             }
         else:
-            if self.verbose:
-                print("  None to correct.")
+            logger.info("  None to correct.")
 
             res = {
                 'max_time_unknown' : 0,
@@ -206,119 +303,87 @@ class SiteTrajectory(object):
 
         return res
 
-    @plotter(is3D = True)
-    def plot_frame(self, frame, **kwargs):
-        sites_of_frame = np.unique(self._traj[frame])
-        frame_sn = self._sn[sites_of_frame]
 
-        frame_sn.plot(**kwargs)
+    def jumps(self, **kwargs):
+        """Iterate over all jumps in the trajectory, jump by jump.
 
-        if not self._real_traj is None:
-            mobile_atoms = self._sn.structure.copy()
-            del mobile_atoms[~self._sn.mobile_mask]
+        A jump is considered to occur "at the frame" when it first acheives its
+        new site. For example,
 
-            mobile_atoms.positions[:] = self._real_traj[frame, self._sn.mobile_mask]
-            plot_atoms(atoms = mobile_atoms, **kwargs)
+         - Frame 0: Atom 1 at site 4
+         - Frame 1: Atom 1 at site 5
 
-        kwargs['ax'].set_title("Frame %i/%i" % (frame, self.n_frames))
+        will yield a jump ``(1, 1, 4, 5)``.
 
-    @plotter(is3D = True)
-    def plot_site(self, site, **kwargs):
-        pbcc = PBCCalculator(self._sn.structure.cell)
-        pts = self.real_positions_for_site(site).copy()
-        offset = pbcc.cell_centroid - pts[3]
-        pts += offset
-        pbcc.wrap_points(pts)
-        lattice_pos = self._sn.static_structure.positions.copy()
-        lattice_pos += offset
-        pbcc.wrap_points(lattice_pos)
-        site_pos = self._sn.centers[site:site+1].copy()
-        site_pos += offset
-        pbcc.wrap_points(site_pos)
-        # Plot point cloud
-        plot_points(points = pts, alpha = 0.3, marker = '.', color = 'k', **kwargs)
-        # Plot site
-        plot_points(points = site_pos, color = 'cyan', **kwargs)
-        # Plot everything else
-        plot_atoms(self._sn.static_structure, positions = lattice_pos, **kwargs)
+        Args:
+            unknown_as_jump (bool): If ``True``, moving from a site to unknown
+                (or vice versa) is considered a jump; if ``False``, unassigned
+                mobile atoms are considered to be at their last known sites.
+        Yields:
+            tuple: (frame_number, mobile_atom_number, from_site, to_site)
+        """
+        n_mobile = self.site_network.n_mobile
+        for frame_i, jumped, last_known, frame in self._jumped_generator(**kwargs):
+            for atom_i in range(n_mobile):
+                if jumped[atom_i]:
+                    yield frame_i, atom_i, last_known[atom_i], frame[atom_i]
 
-        title = "Site %i/%i" % (site, len(self._sn))
+    def jumps_by_frame(self, **kwargs):
+        """Iterate over all jumps in the trajectory, frame by frame.
 
-        if not self._sn.site_types is None:
-            title += " (type %i)" % self._sn.site_types[site]
+        A jump is considered to occur "at the frame" when it first acheives its
+        new site. For example,
 
-        kwargs['ax'].set_title(title)
+         - Frame 0: Atom 1 at site 4
+         - Frame 1: Atom 1 at site 5
 
-    @plotter(is3D = False)
-    def plot_particle_trajectory(self, particle, ax = None, fig = None, **kwargs):
-        types = not self._sn.site_types is None
-        if types:
-            type_height_percent = 0.1
-            axpos = ax.get_position()
-            typeax_height = type_height_percent * axpos.height
-            typeax = fig.add_axes([axpos.x0, axpos.y0, axpos.width, typeax_height], sharex = ax)
-            ax.set_position([axpos.x0, axpos.y0 + typeax_height, axpos.width, axpos.height - typeax_height])
-            type_height = 1
-        # Draw trajectory
-        segments = []
-        linestyles = []
-        colors = []
+        will yield a jump ``(1, 1, 4, 5)``.
 
-        traj = self._traj[:, particle]
-        current_value = traj[0]
-        last_value = traj[0]
-        if types:
-            last_type = None
-        current_segment_start = 0
-        puttext = False
+        Args:
+            unknown_as_jump (bool): If ``True``, moving from a site to unknown
+                (or vice versa) is considered a jump; if ``False``, unassigned
+                mobile atoms are considered to be at their last known sites.
+        Yields:
+            tuple: (frame_number, mob_that_jumped, from_sites, to_sites)
+        """
+        n_mobile = self.site_network.n_mobile
+        for frame_i, jumped, last_known, frame in self._jumped_generator(**kwargs):
+            yield frame_i, np.where(jumped)[0], last_known[jumped], frame[jumped]
 
-        for i, f in enumerate(traj):
-            if f != current_value or i == len(traj) - 1:
-                val = last_value if current_value == -1 else current_value
-                segments.append([[current_segment_start, last_value], [current_segment_start, val], [i, val]])
-                linestyles.append(':' if current_value == -1 else '-')
-                colors.append('lightgray' if current_value == -1 else 'k')
+    def _jumped_generator(self, unknown_as_jump = False):
+        """Internal jump generator that does not create intermediate arrays.
 
-                if types:
-                    rxy = (current_segment_start, 0)
-                    this_type = self._sn.site_types[val]
-                    typerect = matplotlib.patches.Rectangle(rxy, i - current_segment_start, type_height,
-                                                            color = DEFAULT_COLORS[this_type], linewidth = 0)
-                    typeax.add_patch(typerect)
-                    if this_type != last_type:
-                        typeax.annotate("T%i" % this_type,
-                                    xy = (rxy[0], rxy[1] + 0.5 * type_height),
-                                    xytext = (3, -1),
-                                    textcoords = 'offset points',
-                                    fontsize = 'xx-small',
-                                    va = 'center',
-                                    fontweight = 'bold')
-                    last_type = this_type
+        Wrapped by convinience functions.
+        """
+        traj = self.traj
+        n_mobile = self.site_network.n_mobile
+        assert n_mobile == traj.shape[1]
+        last_known = traj[0].copy()
+        known = np.ones(shape = len(last_known), dtype = np.bool)
+        jumped = np.zeros(shape = len(last_known), dtype = np.bool)
+        for frame_i in range(1, self.n_frames):
+            if not unknown_as_jump:
+                np.not_equal(traj[frame_i], SiteTrajectory.SITE_UNKNOWN, out = known)
 
-                last_value = val
-                current_segment_start = i
-                current_value = f
+            np.not_equal(traj[frame_i], last_known, out = jumped)
+            jumped &= known # Must be currently known to have jumped
 
-        lc = LineCollection(segments, linestyles = linestyles, colors = colors, linewidth=1.5)
-        ax.add_collection(lc)
+            yield frame_i, jumped, last_known, traj[frame_i]
 
-        if types:
-            typeax.set_xlabel("Frame")
-            ax.tick_params(axis = 'x', which = 'both', bottom = False, top = False, labelbottom = False)
-            typeax.tick_params(axis = 'y', which = 'both', left = False, right = False, labelleft = False)
-            typeax.annotate("Type", xy = (0, 0.5), xytext = (-25, 0), xycoords = 'axes fraction', textcoords = 'offset points', va = 'center', fontsize = 'x-small')
-        else:
-            ax.set_xlabel("Frame")
-        ax.set_ylabel("Atom %i's site" % particle)
+            last_known[known] = traj[frame_i, known]
 
-        ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
-        ax.grid()
+    # ---- Plotting code
+    def plot_frame(self, *args, **kwargs):
+        if self._default_plotter is None:
+            self._default_plotter = SiteTrajectoryPlotter()
+        self._default_plotter.plot_frame(self, *args, **kwargs)
 
-        ax.set_xlim((0, self.n_frames - 1))
-        margin_percent = 0.04
-        ymargin = (margin_percent * self._sn.n_sites)
-        ax.set_ylim((-ymargin, self._sn.n_sites - 1.0 + ymargin))
+    def plot_site(self, *args, **kwargs):
+        if self._default_plotter is None:
+            self._default_plotter = SiteTrajectoryPlotter()
+        self._default_plotter.plot_site(self, *args, **kwargs)
 
-        if types:
-            typeax.set_xlim((0, self.n_frames - 1))
-            typeax.set_ylim((0, type_height))
+    def plot_particle_trajectory(self, *args, **kwargs):
+        if self._default_plotter is None:
+            self._default_plotter = SiteTrajectoryPlotter()
+        self._default_plotter.plot_particle_trajectory(self, *args, **kwargs)

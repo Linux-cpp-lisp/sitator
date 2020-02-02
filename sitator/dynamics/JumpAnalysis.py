@@ -5,31 +5,39 @@ import itertools
 from sitator import SiteNetwork, SiteTrajectory
 from sitator.visualization import plotter, plot_atoms, layers
 
+import logging
+logger = logging.getLogger(__name__)
+
 class JumpAnalysis(object):
     """Given a SiteTrajectory, compute various statistics about the jumps it contains.
 
     Adds these edge attributes to the SiteTrajectory's SiteNetwork:
-     - `n_ij`: total number of jumps from i to j.
-     - `p_ij`: being at i, the probability of jumping to j.
-     - `jump_lag`: The average number of frames a particle spends at i before jumping
+     - ``n_ij``: total number of jumps from i to j.
+     - ``p_ij``: being at i, the probability of jumping to j.
+     - ``jump_lag``: The average number of frames a particle spends at i before jumping
         to j. Can be +inf if no such jumps every occur.
     And these site attributes:
-     - `residence_times`: Avg. number of frames a particle spends at a site before jumping.
-     - `total_corrected_residences`: Total number of frames when a particle was at the site,
+     - ``residence_times``: Avg. number of frames a particle spends at a site before jumping.
+     - ``total_corrected_residences``: Total number of frames when a particle was at the site,
         *including* frames when an unassigned particle's last known site was this site.
     """
-    def __init__(self, verbose = True):
-        self.verbose = verbose
+    def __init__(self):
+        pass
 
     def run(self, st):
         """Run the analysis.
 
-        Adds edge attributes to st's SiteNetwork and returns st.
+        Adds edge attributes to ``st``'s ``SiteNetwork``.
+
+        Args:
+            st (SiteTrajectory)
+
+        Returns:
+            ``st``
         """
         assert isinstance(st, SiteTrajectory)
 
-        if self.verbose:
-            print "Running JumpAnalysis..."
+        logger.info("Running JumpAnalysis...")
 
         n_mobile = st.site_network.n_mobile
         n_frames = st.n_frames
@@ -60,17 +68,13 @@ class JumpAnalysis(object):
             unassigned = frame == SiteTrajectory.SITE_UNKNOWN
             # Reassign unassigned
             frame[unassigned] = last_known[unassigned]
-            fknown = frame >= 0
+            fknown = (frame >= 0) & (last_known >= 0)
 
-            if np.any(~fknown) and self.verbose:
-                print "  at frame %i, %i uncorrectable unassigned particles" % (i, np.sum(~fknown))
+            n_problems += np.sum(~fknown)
             # -- Update stats
             total_time_spent_at_site[frame[fknown]] += 1
 
             jumped = (frame != last_known) & fknown
-            problems = last_known[jumped] == -1
-            jumped[np.where(jumped)[0][problems]] = False
-            n_problems += np.sum(problems)
 
             n_ij[last_known[fknown], frame[fknown]] += 1
 
@@ -94,8 +98,8 @@ class JumpAnalysis(object):
         # The time before jumping to self should always be inf
         assert not np.any(np.nonzero(avg_time_before_jump.diagonal()))
 
-        if self.verbose and n_problems != 0:
-            print "Came across %i times where assignment and last known assignment were unassigned." % n_problems
+        if n_problems != 0:
+            logger.warning("Came across %i times where assignment and last known assignment were unassigned." % n_problems)
 
         msk = avg_time_before_jump_n > 0
         # Zeros -- i.e. no jumps -- should actualy be infs
@@ -103,12 +107,20 @@ class JumpAnalysis(object):
         # Do mean
         avg_time_before_jump[msk] /= avg_time_before_jump_n[msk]
 
+        if st.site_network.has_attribute('n_ij'):
+            st.site_network.remove_attribute('n_ij')
+            st.site_network.remove_attribute('p_ij')
+            st.site_network.remove_attribute('jump_lag')
+            st.site_network.remove_attribute('residence_times')
+            st.site_network.remove_attribute('occupancy_freqs')
+            st.site_network.remove_attribute('total_corrected_residences')
+
         st.site_network.add_edge_attribute('jump_lag', avg_time_before_jump)
         st.site_network.add_edge_attribute('n_ij', n_ij)
         st.site_network.add_edge_attribute('p_ij', n_ij / total_time_spent_at_site)
 
         res_times = np.empty(shape = n_sites, dtype = np.float)
-        for site in xrange(n_sites):
+        for site in range(n_sites):
             times = avg_time_before_jump[site]
             noninf = times < np.inf
             if np.any(noninf):
@@ -125,18 +137,23 @@ class JumpAnalysis(object):
     def jump_lag_by_type(self,
                          sn,
                          return_counts = False):
-        """Given a SiteNetwork with jump_lag info, compute avg. residence times by type
+        """Given a SiteNetwork with jump_lag info, compute avg. residence times by type.
 
         Computes the average number of frames a mobile particle spends at each
         type of site before jumping to each other type of site.
 
-        Returns an (n_types, n_types) matrix. If no jumps of a given type occured,
+        Args:
+            sn (SiteNetwork)
+            return_counts (bool): Whether to also return a matrix giving the
+            number of each type of jump that occured.
+
+
+        Returns:
+            An (n_types, n_types) matrix. If no jumps of a given type occured,
         the corresponding entry is +inf.
 
-        If ``return_counts``, then also returns a matrix giving the number of
-        each type of jump that occured.
+            If ``return_counts``, two such matrixes.
         """
-
         if sn.site_types is None:
             raise ValueError("SiteNetwork has no type information.")
 
@@ -148,7 +165,7 @@ class JumpAnalysis(object):
         if return_counts:
             countmat = np.empty(shape = outmat.shape, dtype = np.int)
 
-        for stype_from, stype_to in itertools.product(xrange(len(all_types)), repeat = 2):
+        for stype_from, stype_to in itertools.product(range(len(all_types)), repeat = 2):
             lags = sn.jump_lag[site_types == all_types[stype_from]][:, site_types == all_types[stype_to]]
             # Only take things that aren't inf
             lags = lags[lags < np.inf]
@@ -172,13 +189,11 @@ class JumpAnalysis(object):
         """Plot the jump lag of a site network.
 
         :param SiteNetwork sn:
-        :param str mode: If 'site', show jump lag between individual sites.
-            If 'type', show jump lag between types of sites (see :func:jump_lag_by_type)
-            Default: 'site'
+        :param str mode: If ``'site'``, show jump lag between individual sites.
+            If ``'type'``, show jump lag between types of sites (see :func:jump_lag_by_type)
         :param int min_n_events: Minimum number of jump events of a given type
             (i -> j or type -> type) to show a jump lag. If a given jump has
-            occured less than min_n_events times, no jump lag will be shown.
-            Default: 1
+            occured less than ``min_n_events`` times, no jump lag will be shown.
         """
         if mode == 'site':
             mat = np.copy(sn.jump_lag)
@@ -192,7 +207,7 @@ class JumpAnalysis(object):
         mat[counts < min_n_events] = np.nan
 
         # Show diagonal
-        ax.plot(*zip([0.0, 0.0], mat.shape), color = 'k', alpha = 0.5, linewidth = 1, linestyle = '--')
+        ax.plot(*list(zip([0.0, 0.0], mat.shape)), color = 'k', alpha = 0.5, linewidth = 1, linestyle = '--')
         ax.grid()
 
         im = ax.matshow(mat, zorder = 10, cmap = 'plasma')

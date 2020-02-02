@@ -1,28 +1,20 @@
 import numpy as np
 
 from sitator.util import PBCCalculator
+from sitator.util.progress import tqdm
 
-# From https://github.com/tqdm/tqdm/issues/506#issuecomment-373126698
 import sys
-try:
-    ipy_str = str(type(get_ipython()))
-    if 'zmqshell' in ipy_str:
-        from tqdm import tqdm_notebook as tqdm
-    if 'terminal' in ipy_str:
-        from tqdm import tqdm
-except:
-    if sys.stderr.isatty():
-        from tqdm import tqdm
-    else:
-        def tqdm(iterable, **kwargs):
-            return iterable
 
 import importlib
 import tempfile
 
-import helpers
+from . import helpers
 from sitator import SiteNetwork, SiteTrajectory
+from sitator.errors import MultipleOccupancyError
 
+
+import logging
+logger = logging.getLogger(__name__)
 
 from functools import wraps
 def analysis_result(func):
@@ -35,7 +27,70 @@ def analysis_result(func):
     return wrapper
 
 class LandmarkAnalysis(object):
-    """Track a mobile species through a fixed lattice using landmark vectors."""
+    """Site analysis of mobile atoms in a static lattice with landmark analysis.
+
+    :param double cutoff_center: The midpoint for the logistic function used
+        as the landmark cutoff function. (unitless)
+    :param double cutoff_steepness: Steepness of the logistic cutoff function.
+    :param double minimum_site_occupancy = 0.1: Minimum occupancy (% of time occupied)
+        for a site to qualify as such.
+    :param str clustering_algorithm: The landmark clustering algorithm. ``sitator``
+        supplies two:
+         - ``"dotprod"``: The method described in our "Unsupervised landmark
+            analysis for jump detection in molecular dynamics simulations" paper.
+         - ``"mcl"``: A newer method we are developing.
+    :param dict clustering_params: Parameters for the chosen ``clustering_algorithm``.
+    :param str site_centers_method: The method to use for computing the real
+        space positions of the sites. Options:
+         - ``SITE_CENTERS_REAL_UNWEIGHTED``: A spatial average of all real-space
+            mobile atom positions assigned to the site is taken.
+         - ``SITE_CENTERS_REAL_WEIGHTED``: A spatial average of all real-space
+            mobile atom positions assigned to the site is taken, weighted
+            by the confidences with which they assigned to the site.
+         - ``SITE_CENTERS_REPRESENTATIVE_LANDMARK``: A spatial average over
+            all landmarks' centers is taken, weighted by the representative
+            or "typical" landmark vector at the site.
+        The "real" methods will generally be more faithful to the simulation,
+        but the representative landmark method can work better in cases with
+        short trajectories, producing a more "ideal" site location.
+    :param bool check_for_zero_landmarks: Whether to check for and raise exceptions
+        when all-zero landmark vectors are computed.
+    :param float static_movement_threshold: (Angstrom) the maximum allowed
+        distance between an instantanous static atom position and it's ideal position.
+    :param bool dynamic_lattice_mapping: Whether to dynamically decide each
+        frame which static atom represents each average lattice position;
+        this allows the LandmarkAnalysis to deal with, say, a rare exchage of
+        two static atoms that does not change the structure of the lattice.
+
+        It does NOT allow LandmarkAnalysis to deal with lattices whose structures
+        actually change over the course of the trajectory.
+
+        In certain cases this is better delt with by ``MergeSitesByDynamics``.
+    :param int max_mobile_per_site: The maximum number of mobile atoms that can
+        be assigned to a single site without throwing an error. Regardless of the
+        value, assignments of more than one mobile atom to a single site will
+        be recorded and reported.
+
+        Setting this to 2 can be necessary for very diffusive, liquid-like
+        materials at high temperatures.
+
+        Statistics related to this are reported in ``self.avg_mobile_per_site``
+        and ``self.n_multiple_assignments``.
+    :param bool force_no_memmap: if True, landmark vectors will be stored only in memory.
+        Only useful if access to landmark vectors after the analysis has run is desired.
+    :param bool verbose: Verbosity for the ``clustering_algorithm``. Other output
+        controlled through ``logging``.
+    """
+
+    SITE_CENTERS_REAL_UNWEIGHTED = 'real-unweighted'
+    SITE_CENTERS_REAL_WEIGHTED = 'real-weighted'
+    SITE_CENTERS_REPRESENTATIVE_LANDMARK = 'representative-landmark'
+
+    CLUSTERING_CLUSTER_SIZE = 'cluster-size'
+    CLUSTERING_LABELS = 'cluster-labels'
+    CLUSTERING_CONFIDENCES = 'cluster-confs'
+    CLUSTERING_LANDMARK_GROUPINGS = 'cluster-landmark-groupings'
+    CLUSTERING_REPRESENTATIVE_LANDMARKS = 'cluster-representative-lvecs'
 
     def __init__(self,
                  clustering_algorithm = 'dotprod',
@@ -43,8 +98,7 @@ class LandmarkAnalysis(object):
                  cutoff_midpoint = 1.5,
                  cutoff_steepness = 30,
                  minimum_site_occupancy = 0.01,
-                 peak_evening = 'none',
-                 weighted_site_positions = True,
+                 site_centers_method = SITE_CENTERS_REAL_WEIGHTED,
                  check_for_zero_landmarks = True,
                  static_movement_threshold = 1.0,
                  dynamic_lattice_mapping = False,
@@ -52,48 +106,6 @@ class LandmarkAnalysis(object):
                  max_mobile_per_site = 1,
                  force_no_memmap = False,
                  verbose = True):
-        """
-        :param double cutoff_center: The midpoint for the logistic function used
-            as the landmark cutoff function. (unitless)
-        :param double cutoff_steepness: Steepness of the logistic cutoff function.
-        :param double minimum_site_occupancy = 0.1: Minimum occupancy (% of time occupied)
-            for a site to qualify as such.
-        :param dict clustering_params: Parameters for the chosen clustering_algorithm
-        :param str peak_evening: Whether and what kind of peak "evening" to apply;
-            that is, processing that makes all large peaks in the landmark vector
-            more similar in magnitude. This can help in site clustering.
-
-            Valid options: 'none', 'clip'
-        :param bool weighted_site_positions: When computing site positions, whether
-            to weight the average by assignment confidence.
-        :param bool check_for_zero_landmarks: Whether to check for and raise exceptions
-            when all-zero landmark vectors are computed.
-        :param float static_movement_threshold: (Angstrom) the maximum allowed
-            distance between an instantanous static atom position and it's ideal position.
-        :param bool dynamic_lattice_mapping: Whether to dynamically decide each
-            frame which static atom represents each average lattice position;
-            this allows the LandmarkAnalysis to deal with, say, a rare exchage of
-            two static atoms that does not change the structure of the lattice.
-
-            It does NOT allow LandmarkAnalysis to deal with lattices whose structures
-            actually change over the course of the trajectory.
-
-            In certain cases this is better delt with by MergeSitesByDynamics.
-        :param int max_mobile_per_site: The maximum number of mobile atoms that can
-            be assigned to a single site without throwing an error. Regardless of the
-            value, assignments of more than one mobile atom to a single site will
-            be recorded and reported.
-
-            Setting this to 2 can be necessary for very diffusive, liquid-like
-            materials at high temperatures.
-
-            Statistics related to this are reported in self.avg_mobile_per_site
-            and self.n_multiple_assignments.
-        :param bool force_no_memmap: if True, landmark vectors will be stored only in memory.
-            Only useful if access to landmark vectors after the analysis has run is desired.
-        :param bool verbose: If `True`, progress bars and messages will be printed to stdout.
-        """
-
         self._cutoff_midpoint = cutoff_midpoint
         self._cutoff_steepness = cutoff_steepness
         self._minimum_site_occupancy = minimum_site_occupancy
@@ -101,13 +113,9 @@ class LandmarkAnalysis(object):
         self._cluster_algo = clustering_algorithm
         self._clustering_params = clustering_params
 
-        if not peak_evening in ['none', 'clip']:
-          raise ValueError("Invalid value `%s` for peak_evening" % peak_evening)
-        self._peak_evening = peak_evening
-
         self.verbose = verbose
         self.check_for_zero_landmarks = check_for_zero_landmarks
-        self.weighted_site_positions = weighted_site_positions
+        self.site_centers_method = site_centers_method
         self.dynamic_lattice_mapping = dynamic_lattice_mapping
         self.relaxed_lattice_checks = relaxed_lattice_checks
 
@@ -123,26 +131,34 @@ class LandmarkAnalysis(object):
 
     @property
     def cutoff(self):
-      return self._cutoff
+        return self._cutoff
 
     @analysis_result
     def landmark_vectors(self):
+        """Landmark vectors from the last invocation of ``run()``"""
         view = self._landmark_vectors[:]
         view.flags.writeable = False
         return view
 
     @analysis_result
     def landmark_dimension(self):
+        """Number of components in a single landmark vector."""
         return self._landmark_dimension
-
 
     def run(self, sn, frames):
         """Run the landmark analysis.
 
-        The input SiteNetwork is a network of predicted sites; it's sites will
+        The input ``SiteNetwork`` is a network of predicted sites; it's sites will
         be used as the "basis" for the landmark vectors.
 
-        Takes a SiteNetwork and returns a SiteTrajectory.
+        Wraps a copy of ``frames`` into the unit cell.
+
+        Args:
+            sn (SiteNetwork): The landmark basis. Each site is a landmark defined
+                by its vertex static atoms, as indicated by `sn.vertices`.
+                (Typically from ``VoronoiSiteGenerator``.)
+            frames (ndarray n_frames x n_atoms x 3): A trajectory. Can be unwrapped;
+                a copy will be wrapped before the analysis.
         """
         assert isinstance(sn, SiteNetwork)
 
@@ -150,24 +166,33 @@ class LandmarkAnalysis(object):
             raise ValueError("Cannot rerun LandmarkAnalysis!")
 
         if frames.shape[1:] != (sn.n_total, 3):
-            raise ValueError("Wrong shape %s for frames." % frames.shape)
+            raise ValueError("Wrong shape %s for frames." % (frames.shape,))
 
         if sn.vertices is None:
             raise ValueError("Input SiteNetwork must have vertices")
 
         n_frames = len(frames)
 
-        if self.verbose:
-            print "--- Running Landmark Analysis ---"
+        logger.info("--- Running Landmark Analysis ---")
 
         # Create PBCCalculator
         self._pbcc = PBCCalculator(sn.structure.cell)
+
+        # -- Step 0: Wrap to Unit Cell
+        orig_frames = frames # Keep a reference around
+        frames = frames.copy()
+        # Flatten to list of points for wrapping
+        orig_frame_shape = frames.shape
+        frames.shape = (orig_frame_shape[0] * orig_frame_shape[1], 3)
+        self._pbcc.wrap_points(frames)
+        # Back to list of frames
+        frames.shape = orig_frame_shape
 
         # -- Step 1: Compute site-to-vertex distances
         self._landmark_dimension = sn.n_sites
 
         longest_vert_set = np.max([len(v) for v in sn.vertices])
-        verts_np = np.array([v + [-1] * (longest_vert_set - len(v)) for v in sn.vertices])
+        verts_np = np.array([np.concatenate((v, [-1] * (longest_vert_set - len(v)))) for v in sn.vertices], dtype = np.int)
         site_vert_dists = np.empty(shape = verts_np.shape, dtype = np.float)
         site_vert_dists.fill(np.nan)
 
@@ -177,7 +202,7 @@ class LandmarkAnalysis(object):
             site_vert_dists[i, :len(polyhedron)] = dists
 
         # -- Step 2: Compute landmark vectors
-        if self.verbose: print "  - computing landmark vectors -"
+        logger.info("  - computing landmark vectors -")
         # Compute landmark vectors
 
         # The dimension of one landmark vector is the number of Voronoi regions
@@ -194,24 +219,43 @@ class LandmarkAnalysis(object):
 
             helpers._fill_landmark_vectors(self, sn, verts_np, site_vert_dists,
                                             frames, check_for_zeros = self.check_for_zero_landmarks,
-                                            tqdm = tqdm)
+                                            tqdm = tqdm, logger = logger)
+
+            if not self.check_for_zero_landmarks and self.n_all_zero_lvecs > 0:
+                logger.warning("     Had %i all-zero landmark vectors; no error because `check_for_zero_landmarks = False`." % self.n_all_zero_lvecs)
+            elif self.check_for_zero_landmarks:
+                assert self.n_all_zero_lvecs == 0
 
             # -- Step 3: Cluster landmark vectors
-            if self.verbose: print "  - clustering landmark vectors -"
-            #  - Preprocess -
-            self._do_peak_evening()
+            logger.info("  - clustering landmark vectors -")
 
             #  - Cluster -
-            cluster_func = importlib.import_module("..cluster." + self._cluster_algo, package = __name__).do_landmark_clustering
+            # FIXME: remove reload after development done
+            clustermod = importlib.import_module("..cluster." + self._cluster_algo, package = __name__)
+            importlib.reload(clustermod)
+            cluster_func = clustermod.do_landmark_clustering
 
-            cluster_counts, lmk_lbls, lmk_confs = \
+            clustering = \
                 cluster_func(self._landmark_vectors,
                              clustering_params = self._clustering_params,
                              min_samples = self._minimum_site_occupancy / float(sn.n_mobile),
                              verbose = self.verbose)
 
-        if self.verbose:
-            print "    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls)))
+        cluster_counts = clustering[LandmarkAnalysis.CLUSTERING_CLUSTER_SIZE]
+        lmk_lbls = clustering[LandmarkAnalysis.CLUSTERING_LABELS]
+        lmk_confs = clustering[LandmarkAnalysis.CLUSTERING_CONFIDENCES]
+        if LandmarkAnalysis.CLUSTERING_LANDMARK_GROUPINGS in clustering:
+            landmark_clusters = clustering[LandmarkAnalysis.CLUSTERING_LANDMARK_GROUPINGS]
+            assert len(cluster_counts) == len(landmark_clusters)
+        else:
+            landmark_clusters = None
+        if LandmarkAnalysis.CLUSTERING_REPRESENTATIVE_LANDMARKS in clustering:
+            rep_lvecs = np.asarray(clustering[LandmarkAnalysis.CLUSTERING_REPRESENTATIVE_LANDMARKS])
+            assert rep_lvecs.shape == (len(cluster_counts), self._landmark_vectors.shape[1])
+        else:
+            rep_lvecs = None
+
+        logging.info("    Failed to assign %i%% of mobile particle positions to sites." % (100.0 * np.sum(lmk_lbls < 0) / float(len(lmk_lbls))))
 
         # reshape lables and confidences
         lmk_lbls.shape = (n_frames, sn.n_mobile)
@@ -219,61 +263,56 @@ class LandmarkAnalysis(object):
 
         n_sites = len(cluster_counts)
 
-        if n_sites < sn.n_mobile:
-            raise ValueError("There are %i mobile particles, but only identified %i sites. Check clustering_params." % (sn.n_mobile, n_sites))
+        if n_sites < (sn.n_mobile / self.max_mobile_per_site):
+            raise InsufficientSitesError(
+                verb = "Landmark analysis",
+                n_sites = n_sites,
+                n_mobile = sn.n_mobile
+            )
 
-        if self.verbose:
-            print "    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts)
+        logging.info("    Identified %i sites with assignment counts %s" % (n_sites, cluster_counts))
+
+        # -- Do output
+        out_sn = sn.copy()
+        # - Compute site centers
+        site_centers = np.empty(shape = (n_sites, 3), dtype = frames.dtype)
+        if self.site_centers_method == LandmarkAnalysis.SITE_CENTERS_REAL_WEIGHTED or \
+           self.site_centers_method == LandmarkAnalysis.SITE_CENTERS_REAL_UNWEIGHTED:
+            for site in range(n_sites):
+                mask = lmk_lbls == site
+                pts = frames[:, sn.mobile_mask][mask]
+                if self.site_centers_method == LandmarkAnalysis.SITE_CENTERS_REAL_WEIGHTED:
+                    site_centers[site] = self._pbcc.average(pts, weights = lmk_confs[mask])
+                else:
+                    site_centers[site] = self._pbcc.average(pts)
+        elif self.site_centers_method == LandmarkAnalysis.SITE_CENTERS_REPRESENTATIVE_LANDMARK:
+            if rep_lvecs is None:
+                raise ValueError("Chosen clustering method (with current parameters) didn't return representative landmark vectors; can't use SITE_CENTERS_REPRESENTATIVE_LANDMARK.")
+            for site in range(n_sites):
+                weights_nonzero = rep_lvecs[site] > 0
+                site_centers[site] = self._pbcc.average(
+                    sn.centers[weights_nonzero],
+                    weights = rep_lvecs[site, weights_nonzero]
+                )
+        else:
+            raise ValueError("Invalid site centers method '%s'" % self.site_centers_method)
+        out_sn.centers = site_centers
+        # - If clustering gave us that, compute site vertices
+        if landmark_clusters is not None:
+            vertices = []
+            for lclust in landmark_clusters:
+                vertices.append(set.union(*[set(sn.vertices[l]) for l in lclust]))
+            out_sn.vertices = vertices
+
+        out_st = SiteTrajectory(out_sn, lmk_lbls, lmk_confs)
 
         # Check that multiple particles are never assigned to one site at the
         # same time, cause that would be wrong.
-        n_more_than_ones = 0
-        avg_mobile_per_site = 0
-        divisor = 0
-        for frame_i, site_frame in enumerate(lmk_lbls):
-            _, counts = np.unique(site_frame[site_frame >= 0], return_counts = True)
-            count_msk = counts > self.max_mobile_per_site
-            if np.any(count_msk):
-                raise ValueError("%i mobile particles were assigned to only %i site(s) (%s) at frame %i." % (np.sum(counts[count_msk]), np.sum(count_msk), np.where(count_msk)[0], frame_i))
-            n_more_than_ones += np.sum(counts > 1)
-            avg_mobile_per_site += np.sum(counts)
-            divisor += len(counts)
+        self.n_multiple_assignments, self.avg_mobile_per_site = out_st.check_multiple_occupancy(
+            max_mobile_per_site = self.max_mobile_per_site
+        )
 
-        self.n_multiple_assignments = n_more_than_ones
-        self.avg_mobile_per_site = avg_mobile_per_site / float(divisor)
-
-        # -- Do output
-        # - Compute site centers
-        site_centers = np.empty(shape = (n_sites, 3), dtype = frames.dtype)
-
-        for site in xrange(n_sites):
-            mask = lmk_lbls == site
-            pts = frames[:, sn.mobile_mask][mask]
-            if self.weighted_site_positions:
-                site_centers[site] = self._pbcc.average(pts, weights = lmk_confs[mask])
-            else:
-                site_centers[site] = self._pbcc.average(pts)
-
-        # Build output obejcts
-        out_sn = sn.copy()
-
-        out_sn.centers = site_centers
-        assert out_sn.vertices is None
-
-        out_st = SiteTrajectory(out_sn, lmk_lbls, lmk_confs)
-        out_st.set_real_traj(frames)
+        out_st.set_real_traj(orig_frames)
         self._has_run = True
 
         return out_st
-
-    # -------- "private" methods --------
-
-    def _do_peak_evening(self):
-      if self._peak_evening == 'none':
-          return
-      elif self._peak_evening == 'clip':
-          lvec_peaks = np.max(self._landmark_vectors, axis = 1)
-          # Clip all peaks to the lowest "normal" (stdev.) peak
-          lvec_clip = np.mean(lvec_peaks) - np.std(lvec_peaks)
-          # Do the clipping
-          self._landmark_vectors[self._landmark_vectors > lvec_clip] = lvec_clip
