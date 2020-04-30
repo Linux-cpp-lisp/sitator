@@ -12,9 +12,12 @@ class RemoveUnoccupiedSites(object):
     def __init__(self):
         pass
 
-    def run(self, st, return_kept_sites = False):
+    def run(self, st, threshold = 0., return_kept_sites = False):
         """
         Args:
+            threshold (float): The minimal percentage (0.0-1.0) of the time a
+                site has to be occupied to be considered occupied and not removed.
+                Defaults to 0.0, i.e., if ever occupied will be kept.
             return_kept_sites (bool): If ``True``, a list of the sites from ``st``
                 that were kept will be returned.
 
@@ -25,15 +28,17 @@ class RemoveUnoccupiedSites(object):
 
         old_sn = st.site_network
 
+        threshold = int(threshold * st.n_frames)
+
         # Allow for the -1 to affect nothing
-        seen_mask = np.zeros(shape = old_sn.n_sites + 1, dtype = np.bool)
+        count_buf = np.zeros(shape = old_sn.n_sites + 1, dtype = np.int)
+        seen_mask = np.zeros(shape = old_sn.n_sites, dtype = np.bool)
 
         for frame in st.traj:
-            seen_mask[frame] = True
-            if np.all(seen_mask[:-1]):
+            count_buf[frame] += 1
+            np.greater_equal(count_buf[:-1], threshold, out = seen_mask)
+            if np.all(seen_mask):
                 return st
-
-        seen_mask = seen_mask[:-1]
 
         logger.info("Removing unoccupied sites %s" % np.where(~seen_mask)[0])
 
