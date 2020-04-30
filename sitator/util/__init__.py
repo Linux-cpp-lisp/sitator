@@ -1,8 +1,8 @@
 
-from PBCCalculator import PBCCalculator
+from .PBCCalculator import PBCCalculator
 
-from DotProdClassifier import DotProdClassifier
+from .DotProdClassifier import DotProdClassifier
 
-from zeo import Zeopy
+from .zeo import Zeopy
 
-from RecenterTrajectory import RecenterTrajectory
+from .RecenterTrajectory import RecenterTrajectory

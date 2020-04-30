@@ -11,12 +11,13 @@ ctypedef double precision
 ctypedef double cell_precision
 
 cdef class PBCCalculator(object):
-    """Performs calculations on collections of 3D points under PBC"""
+    """Performs calculations on collections of 3D points under PBC."""
 
     cdef cell_precision [:, :] _cell_mat_array
     cdef cell_precision [:, :] _cell_mat_inverse_array
     cdef cell_precision [:] _cell_centroid
     cdef cell_precision [:, :] _cell
+
 
     def __init__(self, cell):
         """
@@ -32,15 +33,39 @@ cdef class PBCCalculator(object):
         self._cell_mat_inverse_array = np.asarray(cellmat.I)
         self._cell_centroid = np.sum(0.5 * cell, axis = 0)
 
+
     @property
     def cell_centroid(self):
       return self._cell_centroid
 
-    cpdef distances(self, pt1, pts2, in_place = False, out = None):
-        """Compute the Euclidean distances from pt1 to all points in pts2, using
-        shift-and-wrap.
 
-        Makes a copy of pts2 unless in_place == True.
+    cpdef pairwise_distances(self, pts, out = None):
+        """Compute the pairwise distance matrix of ``pts`` with itself.
+
+        :returns ndarray (len(pts), len(pts)): distances
+        """
+        if out is None:
+            out = np.empty(shape = (len(pts), len(pts)), dtype = pts.dtype)
+
+        buf = pts.copy()
+
+        for i in xrange(len(pts) - 1):
+            out[i, i] = 0
+            self.distances(pts[i], buf[i + 1:], in_place = True, out = out[i, i + 1:])
+            out[i + 1:, i] = out[i, i + 1:]
+            buf[:] = pts
+
+        out[len(pts) - 1, len(pts) - 1] = 0
+
+        return out
+
+
+    cpdef distances(self, pt1, pts2, in_place = False, out = None):
+        """
+        Compute the Euclidean distances from ``pt1`` to all points in
+        ``pts2``, using shift-and-wrap.
+
+        Makes a copy of ``pts2`` unless ``in_place == True``.
 
         :returns ndarray len(pts2): distances
         """
@@ -76,6 +101,7 @@ cdef class PBCCalculator(object):
         #return np.linalg.norm(self._cell_centroid - pts2, axis = 1)
         return np.sqrt(out, out = out)
 
+
     cpdef average(self, points, weights = None):
         """Average position of a "cloud" of points using the shift-and-wrap hack.
 
@@ -83,13 +109,18 @@ cdef class PBCCalculator(object):
 
         Assumes that the points are relatively close (within a half unit cell)
         together, and that the first point is not a particular outsider (the
-        cell is centered at that point).
+        cell is centered at that point). If the average is weighted, the
+        maximally weighted point will be taken as the center.
 
         Can be a weighted average with the semantics of :func:numpy.average.
         """
         assert points.shape[1] == 3 and points.ndim == 2
 
-        offset = self._cell_centroid - points[0]
+        center_about = 0
+        if weights is not None:
+            center_about = np.argmax(weights)
+
+        offset = self._cell_centroid - points[center_about]
 
         ptbuf = points.copy()
 
@@ -105,6 +136,7 @@ cdef class PBCCalculator(object):
         del ptbuf
 
         return out
+
 
     cpdef time_average(self, frames):
         """Do multiple PBC correct means. Frames is n_frames x n_pts x 3.
@@ -137,6 +169,7 @@ cdef class PBCCalculator(object):
         del posbuf
         return out
 
+
     cpdef void wrap_point(self, precision [:] pt):
         """Wrap a single point into the unit cell, IN PLACE. 3D only."""
         cdef cell_precision [:, :] cell = self._cell_mat_array
@@ -158,7 +191,8 @@ cdef class PBCCalculator(object):
 
         pt[0] = buf[0]; pt[1] = buf[1]; pt[2] = buf[2];
 
-    cpdef bint is_in_unit_cell(self, precision [:] pt):
+
+    cpdef bint is_in_unit_cell(self, const precision [:] pt):
         cdef cell_precision [:, :] cell = self._cell_mat_array
         cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
@@ -174,13 +208,15 @@ cdef class PBCCalculator(object):
         return (buf[0] < 1.0) and (buf[1] < 1.0) and (buf[2] < 1.0) and \
                (buf[0] >= 0.0) and (buf[1] >= 0.0) and (buf[2] >= 0.0)
 
-    cpdef bint all_in_unit_cell(self, precision [:, :] pts):
+
+    cpdef bint all_in_unit_cell(self, const precision [:, :] pts):
         for pt in pts:
             if not self.is_in_unit_cell(pt):
                 return False
         return True
 
-    cpdef bint is_in_image_of_cell(self, precision [:] pt, image):
+
+    cpdef bint is_in_image_of_cell(self, const precision [:] pt, image):
         cdef cell_precision [:, :] cell = self._cell_mat_array
         cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
@@ -198,6 +234,7 @@ cdef class PBCCalculator(object):
             out &= (buf[dim] >= image[dim]) and (buf[dim] < (image[dim] + 1))
 
         return out
+
 
     cpdef void to_cell_coords(self, precision [:, :] points):
         """Convert to cell coordinates in place."""
@@ -220,10 +257,14 @@ cdef class PBCCalculator(object):
             # Store into points
             points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
 
-    cpdef int min_image(self, precision [:] ref, precision [:] pt):
-        """Find the minimum image of `pt` relative to `ref`. In place in pt.
+
+    cpdef int min_image(self, const precision [:] ref, precision [:] pt):
+        """Find the minimum image of ``pt`` relative to ``ref``. In place in pt.
 
         Uses the brute force algorithm for correctness; returns the minimum image.
+
+        Assumes that ``ref`` and ``pt`` are already in the *same* cell (though not
+        necessarily the <0,0,0> cell -- any periodic image will do).
 
         :returns int[3] minimg: Which image was the minimum image.
         """
@@ -273,6 +314,7 @@ cdef class PBCCalculator(object):
 
         return 100 * minimg[0] + 10 * minimg[1] + 1 * minimg[2]
 
+
     cpdef void to_real_coords(self, precision [:, :] points):
         """Convert to real coords from crystal coords in place."""
         assert points.shape[1] == 3, "Points must be 3D"
@@ -294,8 +336,9 @@ cdef class PBCCalculator(object):
             # Store into points
             points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
 
+
     cpdef void wrap_points(self, precision [:, :] points):
-        """Wrap `points` into a unit cell, IN PLACE. 3D only.
+        """Wrap ``points`` into a unit cell, IN PLACE. 3D only.
         """
 
         assert points.shape[1] == 3, "Points must be 3D"

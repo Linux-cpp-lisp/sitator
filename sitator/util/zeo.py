@@ -1,9 +1,6 @@
 #zeopy: simple Python interface to the Zeo++ `network` tool.
 # Alby Musaelian 2018
 
-from __future__ import (absolute_import, division,
-                        print_function)
-
 import os
 import sys
 import tempfile
@@ -19,10 +16,13 @@ import ase.io
 
 from sitator.util import PBCCalculator
 
+import logging
+logger = logging.getLogger(__name__)
+
 # TODO: benchmark CUC vs CIF
 
 class Zeopy(object):
-    """A wrapper for the Zeo++ `network` tool.
+    """A wrapper for the Zeo++ ``network`` tool.
 
     :warning: Do not use a single instance of Zeopy in parallel.
     """
@@ -30,7 +30,7 @@ class Zeopy(object):
     def __init__(self, path_to_zeo):
         """Create a Zeopy.
 
-        :param str path_to_zeo: Path to the `network` executable.
+        :param str path_to_zeo: Path to the ``network`` executable.
         """
         if not (os.path.exists(path_to_zeo) and os.access(path_to_zeo, os.X_OK)):
             raise ValueError("`%s` doesn't seem to be the path to an executable file." % path_to_zeo)
@@ -43,7 +43,7 @@ class Zeopy(object):
     def __exit__(self, *args):
         shutil.rmtree(self._tmpdir)
 
-    def voronoi(self, structure, radial = False, verbose=True):
+    def voronoi(self, structure, radial = False):
         """
         :param Atoms structure: The ASE Atoms to compute the Voronoi decomposition of.
         """
@@ -55,7 +55,7 @@ class Zeopy(object):
         outp = os.path.join(self._tmpdir, "out.nt2")
         v1out = os.path.join(self._tmpdir, "out.v1")
 
-        ase.io.write(inp, structure)
+        ase.io.write(inp, structure, parallel = False)
 
         # with open(inp, "w") as inf:
         #     inf.write(self.ase2cuc(structure))
@@ -69,12 +69,11 @@ class Zeopy(object):
             output = subprocess.check_output([self._exe] + args + ["-v1", v1out, "-nt2", outp, inp],
                                              stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            print("Zeo++ returned an error:", file = sys.stderr)
-            print(e.output, file = sys.stderr)
+            logger.error("Zeo++ returned an error:")
+            logger.error(str(e.output))
             raise
 
-        if verbose:
-            print(output)
+        logger.debug(output)
 
         with open(outp, "r") as outf:
             verts, edges = self.parse_nt2(outf.readlines())
@@ -130,12 +129,12 @@ class Zeopy(object):
         # remove blank lines:
         v1lines = iter(filter(None, v1lines))
         # First line is just "Unit cell vectors:"
-        assert v1lines.next().strip() == "Unit cell vectors:"
+        assert next(v1lines).strip() == "Unit cell vectors:"
         # Unit cell:
         cell = np.empty(shape = (3, 3), dtype = np.float)
         cellvec_re = re.compile('v[abc]=')
-        for i in xrange(3):
-            cellvec = v1lines.next().strip().split()
+        for i in range(3):
+            cellvec = next(v1lines).strip().split()
             assert cellvec_re.match(cellvec[0])
             cell[i] = [float(e) for e in cellvec[1:]]
         # number of atoms, etc.

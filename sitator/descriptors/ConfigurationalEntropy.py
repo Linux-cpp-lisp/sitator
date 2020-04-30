@@ -3,21 +3,28 @@ import numpy as np
 from sitator import SiteTrajectory
 from sitator.dynamics import JumpAnalysis
 
+import logging
+logger = logging.getLogger(__name__)
+
 class ConfigurationalEntropy(object):
-    """Compute the S~ configurational entropy.
+    """Compute the S~ (S tilde) configurational entropy.
 
     If the SiteTrajectory lacks type information, the summation is taken over
     the sites rather than the site types.
 
-    Ref:
-        Structural, Chemical, and Dynamical Frustration: Origins of Superionic Conductivity in closo-Borate Solid Electrolytes
-        Kyoung E. Kweon, Joel B. Varley, Patrick Shea, Nicole Adelstein, Prateek Mehta, Tae Wook Heo, Terrence J. Udovic, Vitalie Stavila, and Brandon C. Wood
+    Reference:
+        Structural, Chemical, and Dynamical Frustration: Origins of Superionic
+        Conductivity in closo-Borate Solid Electrolytes
+
+        Kyoung E. Kweon, Joel B. Varley, Patrick Shea, Nicole Adelstein,
+        Prateek Mehta, Tae Wook Heo, Terrence J. Udovic, Vitalie Stavila,
+        and Brandon C. Wood
+
         Chemistry of Materials 2017 29 (21), 9142-9153
         DOI: 10.1021/acs.chemmater.7b02902
     """
-    def __init__(self, acceptable_overshoot = 0.0001, verbose = True):
+    def __init__(self, acceptable_overshoot = 0.0):
         self.acceptable_overshoot = acceptable_overshoot
-        self.verbose = verbose
 
     def compute(self, st):
         assert isinstance(st, SiteTrajectory)
@@ -52,16 +59,13 @@ class ConfigurationalEntropy(object):
         size_of_problems = p2 - 1.0
         forgivable = problems & (size_of_problems < self.acceptable_overshoot)
 
-        if self.verbose:
-            print "n_i      " + ("{:5.3} " * len(n_i)).format(*n_i)
-            print "N_i      " + ("{:>5} " * len(N_i)).format(*N_i)
-            print "         " + ("------" * len(n_i))
-            print "P_2      " + ("{:5.3} " * len(p2)).format(*p2)
+        logger.info("n_i      " + ("{:5.3} " * len(n_i)).format(*n_i))
+        logger.info("N_i      " + ("{:>5} " * len(N_i)).format(*N_i))
+        logger.info("         " + ("------" * len(n_i)))
+        logger.info("P_2      " + ("{:5.3} " * len(p2)).format(*p2))
 
         if not np.all(problems == forgivable):
             raise ValueError("P_2 values for site types %s larger than 1.0 + acceptable_overshoot (%f)" % (np.where(problems)[0], self.acceptable_overshoot))
-        elif np.any(problems) and self.verbose:
-            print ""
 
         # Correct forgivable problems
         p2[forgivable] = 1.0

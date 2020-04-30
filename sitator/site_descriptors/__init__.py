@@ -1,3 +1,3 @@
-from SiteTypeAnalysis import SiteTypeAnalysis
-
-from SOAP import SOAPCenters, SOAPSampledCenters, SOAPDescriptorAverages
+from .SiteTypeAnalysis import SiteTypeAnalysis
+from .SiteCoordinationEnvironment import SiteCoordinationEnvironment
+from .SiteVolumes import SiteVolumes

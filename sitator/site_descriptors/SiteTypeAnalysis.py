@@ -1,7 +1,3 @@
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-
 import numpy as np
 
 from sitator.misc import GenerateAroundSites
@@ -14,39 +10,59 @@ from sklearn.decomposition import PCA
 
 import itertools
 
+import logging
+logger = logging.getLogger(__name__)
+
+has_pydpc = False
 try:
     import pydpc
+    has_pydpc = True
 except ImportError:
-    raise ImportError("SiteTypeAnalysis requires the `pydpc` package")
+    pass
 
 class SiteTypeAnalysis(object):
-    """Cluster sites into types using a descriptor and DPCLUS.
+    """Cluster sites into types using a continuous descriptor and Density Peak Clustering.
 
-    -- descriptor --
-    Some kind of object implementing:
-         - n_dim: the number of components in a descriptor vector
-         - get_descriptors(site_traj or site_network): returns an array of descriptor vectors
-            of dimension (M, n_dim) and an array of length M indicating which
-            descriptor vectors correspond to which sites in (site_traj.)site_network.
+    Computes descriptor vectors, processes them with Principal Component Analysis,
+    and then clusters using Density Peak Clustering.
+
+    Args:
+        descriptor (object): Must implement ``get_descriptors(st|sn)``, which
+            returns an array of descriptor vectors of dimension (M, n_dim) and
+            an array of length M indicating which descriptor vectors correspond
+            to which sites in (``site_traj.``)``site_network``.
+        min_pca_variance (float): The minimum proportion of the total variance
+            that the taken principal components of the descriptor must explain.
+        min_pca_dimensions (int): Force taking at least this many principal
+            components.
+        n_site_types_max (int): Maximum number of clusters. Must be set reasonably
+            for the automatic selection of cluster number to work.
     """
     def __init__(self, descriptor,
                 min_pca_variance = 0.9, min_pca_dimensions = 2,
-                verbose = True, n_site_types_max = 20):
+                n_site_types_max = 20):
+        if not has_pydpc:
+            raise ImportError("SiteTypeAnalysis requires the `pydpc` package")
+
         self.descriptor = descriptor
         self.min_pca_variance = min_pca_variance
         self.min_pca_dimensions = min_pca_dimensions
-        self.verbose = verbose
         self.n_site_types_max = n_site_types_max
 
         self._n_dvecs = None
 
     def run(self, descriptor_input, **kwargs):
+        """
+        Args:
+            descriptor_input (SiteNetwork or SiteTrajectory)
+        Returns:
+            ``SiteNetwork``
+        """
         if not self._n_dvecs is None:
             raise ValueError("Can't run SiteTypeAnalysis more than once!")
 
         # -- Sample enough points
-        if self.verbose:
-            print(" -- Running SiteTypeAnalysis --")
+        logger.info(" -- Running SiteTypeAnalysis --")
 
         if isinstance(descriptor_input, SiteNetwork):
             sn = descriptor_input.copy()
@@ -56,30 +72,26 @@ class SiteTypeAnalysis(object):
             raise RuntimeError("Input {}".format(type(descriptor_input)))
 
         # -- Compute descriptor vectors
-        if self.verbose:
-            print("  - Computing Descriptor Vectors")
+        logger.info("  - Computing Descriptor Vectors")
 
         self.dvecs, dvecs_to_site = self.descriptor.get_descriptors(descriptor_input, **kwargs)
         assert len(self.dvecs) == len(dvecs_to_site), "Length mismatch in descriptor return values"
         assert np.min(dvecs_to_site) == 0 and np.max(dvecs_to_site) < sn.n_sites
 
         # -- Dimensionality Reduction
-        if self.verbose:
-            print("  - Clustering Descriptor Vectors")
+        logger.info("  - Clustering Descriptor Vectors")
         self.pca = PCA(self.min_pca_variance)
         pca_dvecs = self.pca.fit_transform(self.dvecs)
 
         if pca_dvecs.shape[1] < self.min_pca_dimensions:
-            if self.verbose:
-                print("     PCA accounted for %.0f%% variance in only %i dimensions; less than minimum of %.0f." % (100.0 * np.sum(self.pca.explained_variance_ratio_), pca_dvecs.shape[1], self.min_pca_dimensions))
-                print("     Forcing PCA to use %i dimensions." % self.min_pca_dimensions)
-                self.pca = PCA(n_components = self.min_pca_dimensions)
-                pca_dvecs = self.pca.fit_transform(self.dvecs)
+            logger.info("     PCA accounted for %.0f%% variance in only %i dimensions; less than minimum of %.0f." % (100.0 * np.sum(self.pca.explained_variance_ratio_), pca_dvecs.shape[1], self.min_pca_dimensions))
+            logger.info("     Forcing PCA to use %i dimensions." % self.min_pca_dimensions)
+            self.pca = PCA(n_components = self.min_pca_dimensions)
+            pca_dvecs = self.pca.fit_transform(self.dvecs)
 
         self.dvecs = pca_dvecs
 
-        if self.verbose:
-            print("     Accounted for %.0f%% of variance in %i dimensions" % (100.0 * np.sum(self.pca.explained_variance_ratio_), self.dvecs.shape[1]))
+        logger.info(("     Accounted for %.0f%% of variance in %i dimensions" % (100.0 * np.sum(self.pca.explained_variance_ratio_), self.dvecs.shape[1])))
 
         # -- Do clustering
         # pydpc requires a C-contiguous array
@@ -122,14 +134,13 @@ class SiteTypeAnalysis(object):
 
         assert self.n_types == len(site_type_counts), "Got %i types from pydpc, but counted %i" % (self.n_types, len(site_type_counts))
 
-        if self.verbose:
-            print("     Found %i site type clusters" % self.n_types )
-            print("     Failed to assign %i/%i descriptor vectors to clusters." % (self._n_unassigned, self._n_dvecs))
+        logger.info("     Found %i site type clusters" % self.n_types )
+        logger.info("     Failed to assign %i/%i descriptor vectors to clusters." % (self._n_unassigned, self._n_dvecs))
 
         # -- Voting
         types = np.empty(shape = sn.n_sites, dtype = np.int)
         self.winning_vote_percentages = np.empty(shape = sn.n_sites, dtype = np.float)
-        for site in xrange(sn.n_sites):
+        for site in range(sn.n_sites):
             corresponding_samples = dvecs_to_site == site
             votes = assignments[corresponding_samples]
             n_votes = len(votes)
@@ -145,12 +156,11 @@ class SiteTypeAnalysis(object):
         n_sites_of_each_type = np.bincount(types, minlength = self.n_types)
         sn.site_types = types
 
-        if self.verbose:
-            print(("             " + "Type {:<2} " * self.n_types).format(*xrange(self.n_types)))
-            print(("# of sites   " + "{:<8}" * self.n_types).format(*n_sites_of_each_type))
+        logger.info(("             " + "Type {:<2} " * self.n_types).format(*range(self.n_types)))
+        logger.info(("# of sites   " + "{:<8}" * self.n_types).format(*n_sites_of_each_type))
 
-            if np.any(n_sites_of_each_type == 0):
-                print("WARNING: Had site types with no sites; check clustering settings/voting!")
+        if np.any(n_sites_of_each_type == 0):
+            logger.warning("WARNING: Had site types with no sites; check clustering settings/voting!")
 
         return sn
 
@@ -172,11 +182,11 @@ class SiteTypeAnalysis(object):
     @plotter(is3D = False)
     def plot_clustering(self, fig = None, ax = None, **kwargs):
         ccycle = itertools.cycle(DEFAULT_COLORS)
-        for cluster in xrange(self.n_types):
+        for cluster in range(self.n_types):
             mask = self.dpc.membership == cluster
             dvecs_core = self.dvecs[mask & ~self.dpc.border_member]
             dvecs_border = self.dvecs[mask & self.dpc.border_member]
-            color = ccycle.next()
+            color = next(ccycle)
             ax.scatter(dvecs_core[:,0], dvecs_core[:,1], s = 3, color = color, label = "Type %i" % cluster)
             ax.scatter(dvecs_border[:,0], dvecs_border[:,1], s = 3, color = color, alpha = 0.3)
 

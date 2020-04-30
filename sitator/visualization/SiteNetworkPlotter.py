@@ -1,7 +1,3 @@
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-
 import numpy as np
 
 import itertools
@@ -10,21 +6,35 @@ import matplotlib
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
 from sitator.util import PBCCalculator
-from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS
+from sitator.visualization import plotter, plot_atoms, plot_points, layers, DEFAULT_COLORS, set_axes_equal
 
 class SiteNetworkPlotter(object):
-    """Plot a SiteNetwork.
-
-    site_mappings defines how to show different properties. Each entry maps a
-    visual aspect ('marker', 'color', 'size') to the name of a site attribute
-    including 'site_type'.
-
-    Likewise for edge_mappings, each key maps a visual property ('intensity', 'color',
-    'width', 'linestyle') to an edge attribute in the SiteNetwork.
+    """Plot a ``SiteNetwork``.
 
     Note that for edges, the average of the edge property for i -> j and j -> i
     is often used for visual clarity; if your edge properties are not almost symmetric,
     the visualization might not be useful.
+
+    Args:
+        site_mappings (dict): defines how to show different properties. Each
+            entry maps a visual aspect ('marker', 'color', 'size') to the name
+            of a site attribute including 'site_type'. The markers can also be
+            arbitrary text (key `"text"`) in which case the value can also be a
+            2-tuple of an attribute name and a `%` format string.
+        edge_mappings (dict): each key maps a visual property ('intensity',
+            'color', 'width', 'linestyle') to an edge attribute in the SiteNetwork.
+        markers (list of str): What `matplotlib` markers to use for sites.
+        plot_points_params (dict): User options for plotting site points.
+        minmax_linewidth (2-tuple): Minimum and maximum linewidth to use.
+        minmax_edge_alpha (2-tuple): Similar, for edge line alphas.
+        minmax_markersize (2-tuple): Similar, for markersize.
+        min_color_threshold (float): Minimum (normalized) color intensity for
+            the corresponding line to be shown. Defaults to zero, i.e., all
+            nonzero edges will be drawn.
+        min_width_threshold (float): Minimum normalized edge width for the
+            corresponding edge to be shown. Defaults to zero, i.e., all
+            nonzero edges will be drawn.
+        title (str): Title for the figure.
     """
 
     DEFAULT_SITE_MAPPINGS = {
@@ -34,7 +44,7 @@ class SiteNetworkPlotter(object):
     DEFAULT_MARKERS = ['x', '+', 'v', '<', '^', '>', '*', 'd', 'h', 'p']
     DEFAULT_LINESTYLES = ['--', ':', '-.', '-']
 
-    EDGE_GROUP_COLORS = ['b', 'g', 'm', 'lightseagreen', 'crimson'] + ['gray'] # gray last for -1's
+    EDGE_GROUP_COLORS = ['b', 'g', 'm', 'crimson', 'lightseagreen', 'darkorange', 'sandybrown', 'gold', 'hotpink'] + ['gray'] # gray last for -1's
 
     def __init__(self,
                 site_mappings = DEFAULT_SITE_MAPPINGS,
@@ -43,11 +53,12 @@ class SiteNetworkPlotter(object):
                 plot_points_params = {},
                 minmax_linewidth = (1.5, 7),
                 minmax_edge_alpha = (0.15, 0.75),
-                minmax_markersize = (80.0, 180.0),
-                min_color_threshold = 0.005,
-                min_width_threshold = 0.005,
+                minmax_markersize = (20.0, 80.0),
+                min_color_threshold = 0.0,
+                min_width_threshold = 0.0,
                 title = ""):
         self.site_mappings = site_mappings
+        assert not ("marker" in site_mappings and "text" in site_mappings)
         self.edge_mappings = edge_mappings
         self.markers = markers
         self.plot_points_params = plot_points_params
@@ -66,7 +77,6 @@ class SiteNetworkPlotter(object):
         # -- Plot actual SiteNetwork --
         l = [(plot_atoms,  {'atoms' : sn.static_structure})]
         l += self._site_layers(sn, self.plot_points_params)
-
         l += self._plot_edges(sn, *args, **kwargs)
 
         # -- Some visual clean up --
@@ -74,7 +84,6 @@ class SiteNetworkPlotter(object):
 
         ax.set_title(self.title)
 
-        ax.set_aspect('equal')
         ax.xaxis.pane.fill = False
         ax.yaxis.pane.fill = False
         ax.zaxis.pane.fill = False
@@ -90,26 +99,47 @@ class SiteNetworkPlotter(object):
         # -- Put it all together --
         layers(*l, **kwargs)
 
-    def _site_layers(self, sn, plot_points_params):
+    def _site_layers(self, sn, plot_points_params, same_normalization = False):
         pts_arrays = {'points' : sn.centers}
-        pts_params = {'cmap' : 'rainbow'}
+        pts_params = {'cmap' : 'winter'}
 
         # -- Apply mapping
         # - other mappings
         markers = None
 
         for key in self.site_mappings:
-            val = getattr(sn, self.site_mappings[key])
+            val = self.site_mappings[key]
+            if isinstance(val, tuple):
+                val, param = val
+            else:
+                param = None
+            val = getattr(sn, val)
             if key == 'marker':
                 if not val is None:
                     markers = val.copy()
+                istextmarker = False
+            elif key == 'text':
+                istextmarker = True
+                format_str = "%s" if param is None else param
+                format_str = "$" + format_str + "$"
+                markers = val.copy()
             elif key == 'color':
                 pts_arrays['c'] = val.copy()
-                pts_params['norm'] = matplotlib.colors.Normalize(vmin = np.min(val), vmax = np.max(val))
+                if not same_normalization:
+                    self._color_minmax = [np.min(val), np.max(val)]
+                    if self._color_minmax[0] == self._color_minmax[1]:
+                        self._color_minmax[0] -= 1 # Just to avoid div by zero
+                color_minmax = self._color_minmax
+                pts_params['norm'] = matplotlib.colors.Normalize(vmin = color_minmax[0], vmax = color_minmax[1])
             elif key == 'size':
+                if not same_normalization:
+                    self._size_minmax = [np.min(val), np.max(val)]
+                    if self._size_minmax[0] == self._size_minmax[1]:
+                        self._size_minmax[0] -= 1 # Just to avoid div by zero
+                size_minmax = self._size_minmax
                 s = val.copy()
-                s += np.min(s)
-                s /= np.max(s)
+                s -= size_minmax[0]
+                s /= size_minmax[1] - size_minmax[0]
                 s *= self.minmax_markersize[1]
                 s += self.minmax_markersize[0]
                 pts_arrays['s'] = s
@@ -122,17 +152,27 @@ class SiteNetworkPlotter(object):
             # Just one layer with all points and one marker
             marker_layers[SiteNetworkPlotter.DEFAULT_MARKERS[0]] = np.ones(shape = sn.n_sites, dtype = np.bool)
         else:
-            markers = self._make_discrete(markers)
+            if not istextmarker:
+                markers = self._make_discrete(markers)
             unique_markers = np.unique(markers)
-            marker_i = 0
+            if not same_normalization:
+                if istextmarker:
+                    self._marker_table = dict(zip(unique_markers, (format_str % um for um in unique_markers)))
+                else:
+                    if len(unique_markers) > len(self.markers):
+                        raise ValueError("Too many distinct values of the site property mapped to markers (there are %i) for the %i markers in `self.markers`" % (len(unique_markers), len(self.markers)))
+                    self._marker_table = dict(zip(unique_markers, self.markers[:len(unique_markers)]))
+
             for um in unique_markers:
-                marker_layers[SiteNetworkPlotter.DEFAULT_MARKERS[marker_i]] = (markers == um)
-                marker_i += 1
+                marker_layers[self._marker_table[um]] = (markers == um)
 
         # -- Do plot
         # If no color info provided, a fallback
         if not 'color' in pts_params and not 'c' in pts_arrays:
             pts_params['color'] = 'k'
+        # If no color info provided, a fallback
+        if not 's' in pts_params and not 's' in pts_arrays:
+            pts_params['s'] = sum(self.minmax_markersize) / 2
         # Add user options for `plot_points`
         pts_params.update(plot_points_params)
 
@@ -201,8 +241,8 @@ class SiteNetworkPlotter(object):
         sites_to_plot = []
         sites_to_plot_positions = []
 
-        for i in xrange(n_sites):
-            for j in xrange(n_sites):
+        for i in range(n_sites):
+            for j in range(n_sites):
                 # No self edges
                 if i == j:
                     continue
@@ -210,9 +250,9 @@ class SiteNetworkPlotter(object):
                 if done_already[i, j]:
                     continue
                 # Ignore anything below the threshold
-                if all_cs[i, j] < self.min_color_threshold:
+                if all_cs[i, j] <= self.min_color_threshold:
                     continue
-                if do_widths and all_linewidths[i, j] < self.min_width_threshold:
+                if do_widths and all_linewidths[i, j] <= self.min_width_threshold:
                     continue
 
                 segment = np.empty(shape = (2, 3), dtype = centers.dtype)
@@ -254,7 +294,9 @@ class SiteNetworkPlotter(object):
             lccolors = np.empty(shape = (len(cs), 4), dtype = np.float)
             # Group colors
             if do_groups:
-                for i in xrange(len(cs)):
+                for i in range(len(cs)):
+                    if groups[i] >= len(SiteNetworkPlotter.EDGE_GROUP_COLORS) - 1:
+                        raise ValueError("Too many groups, not enough group colors")
                     lccolors[i] = matplotlib.colors.to_rgba(SiteNetworkPlotter.EDGE_GROUP_COLORS[groups[i]])
             else:
                 lccolors[:] = matplotlib.colors.to_rgba(SiteNetworkPlotter.EDGE_GROUP_COLORS[0])
@@ -273,12 +315,14 @@ class SiteNetworkPlotter(object):
             ax.add_collection(lc)
 
             # -- Plot new sites
-            sn2 = sn[sites_to_plot]
-            sn2.update_centers(np.asarray(sites_to_plot_positions))
-
-            pts_params = dict(self.plot_points_params)
-            pts_params['alpha'] = 0.2
-            return self._site_layers(sn2, pts_params)
+            if len(sites_to_plot) > 0:
+                sn2 = sn[sites_to_plot]
+                sn2.update_centers(np.asarray(sites_to_plot_positions))
+                pts_params = dict(self.plot_points_params)
+                pts_params['alpha'] = 0.2
+                return self._site_layers(sn2, pts_params, same_normalization = True)
+            else:
+                return []
         else:
             return []
 

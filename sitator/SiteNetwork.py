@@ -1,14 +1,11 @@
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-from builtins import *
-
 import numpy as np
 
 import re
 import os
 import tarfile
-from backports import tempfile
+import tempfile
 
+import ase
 import ase.io
 
 import matplotlib
@@ -17,19 +14,33 @@ from sitator.visualization import SiteNetworkPlotter
 class SiteNetwork(object):
     """A network of mobile particle sites in a static lattice.
 
-    Stores the locations of sites (`centers`), their defining static atoms (`vertices`),
-    and their "types" (`site_types`).
+    Stores the locations of sites (``centers``) for some indicated mobile atoms
+    (``mobile_mask``) in a structure (``structure``). Optionally includes their
+    defining static atoms (``vertices``) and "types" (``site_types``).
 
     Arbitrary data can also be associated with each site and with each edge
     between sites. Site data can be any array of length n_sites; edge data can be
     any matrix of shape (n_sites, n_sites) where entry i, j is the value for the
-    edge from site i to site j.
+    edge from site i to site j (edge attributes can be asymmetric).
+
+    Attributes can be marked as "computed"; this is a hint that the attribute
+    was computed based on a ``SiteTrajectory``. Most ``sitator`` algorithms that
+    modify/process ``SiteTrajectory``s will clear "computed" attrbutes,
+    assuming that they are invalidated by the changes to the ``SiteTrajectory``.
 
     Attributes:
         centers (ndarray): (n_sites, 3) coordinates of each site.
         vertices (list, optional): list of lists of indexes of static atoms defining each
             site.
         site_types (ndarray, optional): (n_sites,) values grouping sites into types.
+
+    Args:
+        structure (ase.Atoms): an ASE ``Atoms`` containging whatever atoms exist
+            in the MD trajectory.
+        static_mask (ndarray): Boolean mask indicating which atoms make up the
+            host lattice.
+        mobile_mask (ndarray): Boolean mask indicating which atoms' movement we
+            are interested in.
     """
 
     ATTR_NAME_REGEX = re.compile("^[a-zA-Z][a-zA-Z0-9_]*$")
@@ -38,16 +49,6 @@ class SiteNetwork(object):
                  structure,
                  static_mask,
                  mobile_mask):
-        """
-        Args:
-            structure (Atoms): an ASE/Quippy ``Atoms`` containging whatever atoms exist
-                in the MD trajectory.
-            static_mask (ndarray): Boolean mask indicating which atoms make up the
-                host lattice.
-            mobile_mask (ndarray): Boolean mask indicating which atoms' movement we
-                are interested in.
-        """
-
         assert static_mask.ndim == mobile_mask.ndim == 1, "The masks must be one-dimensional"
         assert len(structure) == len(static_mask) == len(mobile_mask), "The masks must have the same length as the # of atoms in the strucutre."
 
@@ -72,20 +73,35 @@ class SiteNetwork(object):
 
         self._site_attrs = {}
         self._edge_attrs = {}
+        self._attr_computed = {}
 
-    def copy(self):
-        """Returns a (shallowish) copy of self."""
+    def copy(self, with_computed = True):
+        """Returns a (shallowish) copy of self.
+
+        Args:
+            with_computed (bool): If ``False``, attributes marked "computed" will
+                not be included in the copy.
+        Returns:
+            A ``SiteNetwork``.
+        """
         # Use a mask to force a copy
         msk = np.ones(shape = self.n_sites, dtype = np.bool)
-        return self[msk]
+        sn = self[msk]
+        if not with_computed:
+            sn.clear_computed_attributes()
+        return sn
 
     def __len__(self):
         return self.n_sites
 
     def __getitem__(self, key):
-        sn = type(self)(self.structure,
-                        self.static_mask,
-                        self.mobile_mask)
+        sn = self.__new__(type(self))
+        SiteNetwork.__init__(
+            sn,
+            self.structure,
+            self.static_mask,
+            self.mobile_mask
+        )
 
         if not self._centers is None:
             sn.centers = self._centers[key]
@@ -108,80 +124,14 @@ class SiteNetwork(object):
 
         return sn
 
-    _STRUCT_FNAME = "structure.xyz"
-    _SMASK_FNAME = "static_mask.npy"
-    _MMASK_FNAME = "mobile_mask.npy"
-    _MAIN_FNAMES = ['centers', 'vertices', 'site_types']
-
-    def save(self, file):
-        """Save this SiteNetwork to a tar archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # -- Write the structure
-            ase.io.write(os.path.join(tmpdir, self._STRUCT_FNAME), self.structure)
-            # -- Write masks
-            np.save(os.path.join(tmpdir, self._SMASK_FNAME), self.static_mask)
-            np.save(os.path.join(tmpdir, self._MMASK_FNAME), self.mobile_mask)
-            # -- Write what we have
-            for arrname in self._MAIN_FNAMES:
-                if not getattr(self, arrname) is None:
-                    np.save(os.path.join(tmpdir, "%s.npy" % arrname), getattr(self, arrname))
-            # -- Write all site/edge attributes
-            for atype, attrs in zip(("site_attr", "edge_attr"), (self._site_attrs, self._edge_attrs)):
-                for attr in attrs:
-                    np.save(os.path.join(tmpdir, "%s-%s.npy" % (atype, attr)), attrs[attr])
-            # -- Write final archive
-            with tarfile.open(file, mode = 'w:gz', format = tarfile.PAX_FORMAT) as outf:
-                outf.add(tmpdir, arcname = "")
-
-    @classmethod
-    def from_file(cls, file):
-        """Load a SiteNetwork from a tar file/file descriptor."""
-        all_others = {}
-        site_attrs = {}
-        edge_attrs = {}
-        structure = None
-        with tarfile.open(file, mode = 'r:gz', format = tarfile.PAX_FORMAT) as input:
-            # -- Load everything
-            for member in input.getmembers():
-                if member.name == '':
-                    continue
-                f = input.extractfile(member)
-                if member.name == cls._STRUCT_FNAME:
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        input.extract(member, path = tmpdir)
-                        structure = ase.io.read(os.path.join(tmpdir, member.name), format = 'xyz')
-                else:
-                    basename = os.path.splitext(os.path.basename(member.name))[0]
-                    data = np.load(f)
-                    if basename.startswith("site_attr"):
-                        site_attrs[basename.split('-')[1]] = data
-                    elif basename.startswith("edge_attr"):
-                        edge_attrs[basename.split('-')[1]] = data
-                    else:
-                        all_others[basename] = data
-
-        # Create SiteNetwork
-        assert not structure is None
-        assert all(k in all_others for k in ("static_mask", "mobile_mask")), "Malformed SiteNetwork file."
-        sn = SiteNetwork(structure,
-                         all_others['static_mask'],
-                         all_others['mobile_mask'])
-        if 'centers' in all_others:
-            sn.centers = all_others['centers']
-        for key in all_others:
-            if key in ('centers', 'static_mask', 'mobile_mask'):
-                continue
-            setattr(sn, key, all_others[key])
-
-        assert all(len(sa) == sn.n_sites for sa in site_attrs.values())
-        assert all(ea.shape == (sn.n_sites, sn.n_sites) for ea in edge_attrs.values())
-        sn._site_attrs = site_attrs
-        sn._edge_attrs = edge_attrs
-
-        return sn
-
     def of_type(self, stype):
-        """Returns a "view" to this SiteNetwork with only sites of a certain type."""
+        """Returns a subset of this ``SiteNetwork`` with only sites of a certain type.
+
+        Args:
+            stype (int)
+        Returns:
+            A ``SiteNetwork``.
+        """
         if self._types is None:
             raise ValueError("This SiteNetwork has no type information.")
 
@@ -190,18 +140,45 @@ class SiteNetwork(object):
 
         return self[self._types == stype]
 
+    def get_structure_with_sites(self, site_atomic_number = None):
+        """Get an ``ase.Atoms`` with the sites included.
+
+        Sites are appended to the static structure; the first ``np.sum(static_mask)``
+        atoms in the returned object are the static structure.
+
+        Args:
+            site_atomic_number: If ``None``, the species of the first mobile
+                atom will be used.
+        Returns:
+            ``ase.Atoms`` and final ``site_atomic_number``
+        """
+        out = self.static_structure.copy()
+        if site_atomic_number is None:
+            site_atomic_number = self.structure.get_atomic_numbers()[self.mobile_mask][0]
+        numbers = np.full(len(self), site_atomic_number)
+        sites_atoms = ase.Atoms(
+            positions = self.centers,
+            numbers = numbers
+        )
+        site_idexes = len(out) + np.arange(self.n_sites)
+        out.extend(sites_atoms)
+        return out, site_atomic_number
+
     @property
     def n_sites(self):
+        """The number of sites."""
         if self._centers is None:
             return 0
         return len(self._centers)
 
     @property
     def n_total(self):
+        """The total number of atoms in the system."""
         return len(self.static_mask)
 
     @property
     def centers(self):
+        """The positions of the sites."""
         view = self._centers.view()
         view.flags.writeable = False
         return view
@@ -215,18 +192,29 @@ class SiteNetwork(object):
         self._types = None
         self._site_attrs = {}
         self._edge_attrs = {}
+        self._attr_computed = {}
         # Set centers
         self._centers = value
 
     def update_centers(self, newcenters):
-        """Update the SiteNetwork's centers *without* reseting all other information."""
+        """Update the ``SiteNetwork``'s centers *without* reseting all other information.
+
+        Args:
+            newcenters (ndarray): Must have same length as current number of sites.
+        """
         if newcenters.shape != self._centers.shape:
             raise ValueError("New `centers` must have same shape as old; try using the setter `.centers = ...`")
         self._centers = newcenters
 
     @property
     def vertices(self):
+        """The static atoms defining each site."""
         return self._vertices
+
+    @property
+    def site_ids(self):
+        """Convenience property giving the index of each site."""
+        return np.arange(self.n_sites)
 
     @vertices.setter
     def vertices(self, value):
@@ -235,7 +223,16 @@ class SiteNetwork(object):
         self._vertices = value
 
     @property
+    def number_of_vertices(self):
+        """The number of vertices of each site."""
+        if self._vertices is None:
+            return None
+        else:
+            return [len(v) for v in self._vertices]
+
+    @property
     def site_types(self):
+        """The type IDs of each site."""
         if self._types is None:
             return None
         view = self._types.view()
@@ -250,24 +247,40 @@ class SiteNetwork(object):
 
     @property
     def n_types(self):
+        """The number of site types in the ``SiteNetwork``."""
         return len(np.unique(self.site_types))
 
     @property
     def types(self):
+        """The unique site type IDs in the ``SiteNetwork``."""
         return np.unique(self.site_types)
 
     @property
     def site_attributes(self):
-        return self._site_attrs.keys()
+        """The names of the ``SiteNetwork``'s site attributes."""
+        return list(self._site_attrs.keys())
 
     @property
     def edge_attributes(self):
-        return self._edge_attrs.keys()
+        """The names of the ``SiteNetwork``'s edge attributes."""
+        return list(self._edge_attrs.keys())
 
     def has_attribute(self, attr):
+        """Whether the ``SiteNetwork`` has a given site or edge attrbute.
+
+        Args:
+            attr (str)
+        Returns:
+            bool
+        """
         return (attr in self._site_attrs) or (attr in self._edge_attrs)
 
     def remove_attribute(self, attr):
+        """Remove a site or edge attribute.
+
+        Args:
+            attr (str)
+        """
         if attr in self._site_attrs:
             del self._site_attrs[attr]
         elif attr in self._edge_attrs:
@@ -275,10 +288,22 @@ class SiteNetwork(object):
         else:
             raise AttributeError("This SiteNetwork has no site or edge attribute `%s`" % attr)
 
+    def clear_attributes(self):
+        """Remove all site and edge attributes."""
+        self._site_attrs = {}
+        self._edge_attrs = {}
+
+    def clear_computed_attributes(self):
+        """Remove all attributes marked "computed"."""
+        for k, computed in self._attr_computed.items():
+            if computed:
+                self.remove_attribute(k)
+
     def __getattr__(self, attrkey):
-        if attrkey in self._site_attrs:
+        v = vars(self)
+        if '_site_attrs' in v and attrkey in self._site_attrs:
             return self._site_attrs[attrkey]
-        elif attrkey in self._edge_attrs:
+        elif '_edge_attrs' in v and attrkey in self._edge_attrs:
             return self._edge_attrs[attrkey]
         else:
             raise AttributeError("This SiteNetwork has no site or edge attribute `%s`" % attrkey)
@@ -320,21 +345,37 @@ class SiteNetwork(object):
 
         return out
 
-    def add_site_attribute(self, name, attr):
+    def add_site_attribute(self, name, attr, computed = True):
+        """Add a site attribute.
+
+        Args:
+            name (str)
+            attr (ndarray): Must be of length ``n_sites``.
+            computed (bool): Whether to mark this attribute as "computed".
+        """
         self._check_name(name)
         attr = np.asarray(attr)
         if not attr.shape[0] == self.n_sites:
             raise ValueError("Attribute array has only %i entries; need one for all %i sites." % (len(attr), self.n_sites))
 
         self._site_attrs[name] = attr
+        self._attr_computed[name] = computed
 
-    def add_edge_attribute(self, name, attr):
+    def add_edge_attribute(self, name, attr, computed = True):
+        """Add an edge attribute.
+
+        Args:
+            name (str)
+            attr (ndarray): Must be of shape ``(n_sites, n_sites)``.
+            computed (bool): Whether to mark this attribute as "computed".
+        """
         self._check_name(name)
         attr = np.asarray(attr)
         if not (attr.shape[0] == attr.shape[1] == self.n_sites):
             raise ValueError("Attribute matrix has shape %s; need first two dimensions to be %i" % (attr.shape, self.n_sites))
 
         self._edge_attrs[name] = attr
+        self._attr_computed[name] = computed
 
     def _check_name(self, name):
         if not SiteNetwork.ATTR_NAME_REGEX.match(name):
@@ -345,6 +386,6 @@ class SiteNetwork(object):
             raise ValueError("Attribute name `%s` reserved." % name)
 
     def plot(self, *args, **kwargs):
-        """Convenience method -- constructs a defualt SiteNetworkPlotter and calls it."""
+        """Convenience method -- constructs a defualt ``SiteNetworkPlotter`` and calls it."""
         p = SiteNetworkPlotter(title = "Sites")
         p(self, *args, **kwargs)
