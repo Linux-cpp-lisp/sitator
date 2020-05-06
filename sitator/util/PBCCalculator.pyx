@@ -17,6 +17,7 @@ cdef class PBCCalculator(object):
     cdef cell_precision [:, :] _cell_mat_inverse_array
     cdef cell_precision [:] _cell_centroid
     cdef cell_precision [:, :] _cell
+    cdef cell_precision [:] _cell_vec_lengths
 
 
     def __init__(self, cell):
@@ -29,6 +30,7 @@ cdef class PBCCalculator(object):
         assert cell.shape[1] == cell.shape[0], "Cell must be square"
 
         self._cell = cell
+        self._cell_vec_lengths = np.linalg.norm(cell, axis = 1)
         self._cell_mat_array = np.asarray(cellmat)
         self._cell_mat_inverse_array = np.asarray(cellmat.I)
         self._cell_centroid = np.sum(0.5 * cell, axis = 0)
@@ -231,7 +233,7 @@ cdef class PBCCalculator(object):
         # buf is not crystal coords
         cdef bint out = True
         for dim in xrange(3):
-            out &= (buf[dim] >= image[dim]) and (buf[dim] < (image[dim] + 1))
+            out &= (buf[dim] >= image[dim]) & (buf[dim] < (image[dim] + 1))
 
         return out
 
@@ -277,6 +279,7 @@ cdef class PBCCalculator(object):
 
         cdef precision buf[3]
 
+        cdef int i, j, k
         for i in xrange(3):
             for j in xrange(3):
                 for k in xrange(3):
