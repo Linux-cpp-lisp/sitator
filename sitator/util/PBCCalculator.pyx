@@ -5,7 +5,7 @@ import numpy as np
 cimport cython
 cimport numpy as npc
 
-from libc.math cimport sqrt, cos, M_PI, isnan, floor, INFINITY
+from libc.math cimport sqrt, cos, M_PI, isnan, floor, INFINITY, fmod
 
 ctypedef double precision
 ctypedef double cell_precision
@@ -25,20 +25,30 @@ cdef class PBCCalculator(object):
         :param DxD ndarray: the unit cell -- an array of cell vectors, like the
           cell of an ASE :class:Atoms object.
         """
-        cellmat = np.matrix(cell).T
+        cellmat = cell.T
 
-        assert cell.shape[1] == cell.shape[0], "Cell must be square"
+        if not cell.shape[1] == cell.shape[0]:
+            raise ValueError("Cell must be square")
+        if not cell.shape[0] == 3:
+            raise ValueError("Cell must be three-dimensional")
 
         self._cell = cell
         self._cell_vec_lengths = np.linalg.norm(cell, axis = 1)
-        self._cell_mat_array = np.asarray(cellmat)
-        self._cell_mat_inverse_array = np.asarray(cellmat.I)
+
+        if np.count_nonzero(self._cell_vec_lengths) < 3:
+            raise ValueError("The given cell is invalid (one or more cell vectors have zero norm)")
+
+        self._cell_mat_array = cellmat
+        self._cell_mat_inverse_array = np.linalg.inv(cellmat)
         self._cell_centroid = np.sum(0.5 * cell, axis = 0)
 
 
     @property
     def cell_centroid(self):
-      return self._cell_centroid
+        return self._cell_centroid
+    @property
+    def cell_vector_lengths(self):
+        return self._cell_vec_lengths
 
 
     cpdef pairwise_distances(self, pts, out = None):
@@ -244,6 +254,7 @@ cdef class PBCCalculator(object):
 
         cdef precision buf[3]
         cdef precision pt[3]
+        cdef Py_ssize_t dim, i
 
         cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
 
@@ -258,6 +269,29 @@ cdef class PBCCalculator(object):
 
             # Store into points
             points[i, 0] = buf[0]; points[i, 1] = buf[1]; points[i, 2] = buf[2];
+
+
+    cpdef void to_cell_coords_wrapped(self, precision [:, :] points):
+        """Convert cartesian coordinates to wrapped cell coordinates."""
+        cdef precision buf[3]
+        cdef precision pt[3]
+        cdef Py_ssize_t dim, i
+
+        cdef cell_precision [:, :] cell_I = self._cell_mat_inverse_array
+
+        # Iterates over points
+        for i in range(len(points)):
+            # Load into pt
+            pt[0] = points[i, 0]; pt[1] = points[i, 1]; pt[2] = points[i, 2];
+
+            # Row by row, do the matrix multiplication
+            for dim in xrange(3):
+                buf[dim] = (cell_I[dim, 0]*pt[0] + cell_I[dim, 1]*pt[1] + cell_I[dim, 2]*pt[2])
+
+            # Store into points & wrap
+            points[i, 0] = fmod(buf[0], 1.0)
+            points[i, 1] = fmod(buf[1], 1.0)
+            points[i, 2] = fmod(buf[2], 1.0)
 
 
     cpdef int min_image(self, const precision [:] ref, precision [:] pt):
