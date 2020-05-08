@@ -38,6 +38,7 @@ def test_2x2_counts():
         pbcc = PBCCalculator(cell),
         d_cutoff  = 0.,
     )
+    assert density.shape == should_be.shape
     assert np.all(density == should_be)
 
 
@@ -67,6 +68,7 @@ def test_3x3_counts():
         pbcc = PBCCalculator(cell),
         d_cutoff  = 0.,
     )
+    assert density.shape == should_be.shape
     assert np.all(density == should_be)
 
 
@@ -94,6 +96,7 @@ def test_1point_smeared():
         pbcc = PBCCalculator(cell),
         d_cutoff  = 0.4,
     )
+    assert density.shape == should_be.shape
     assert np.all(density == should_be)
 
 
@@ -124,6 +127,7 @@ def test_1point():
         output_box_assignments = box_indexes,
         d_cutoff  = 0.,
     )
+    assert density.shape == should_be.shape
     assert np.all(density == should_be)
     assert np.all(box_indexes == [0])
 
@@ -169,7 +173,7 @@ def test_bad_cell():
 def test_random_uniform():
     for trial in range(10):
         n_boxes = np.random.randint(2, 25, 3)
-        should_be = np.empty(shape = tuple(n_boxes), dtype = np.int)
+        should_be = np.empty(shape = tuple(n_boxes))
         points = []
         for idex in itertools.product(*[range(n) for n in n_boxes]):
             n_points = np.random.randint(0, 100)
@@ -181,12 +185,28 @@ def test_random_uniform():
                 np.random.random_sample((n_points, 3)) + np.array(idex)
             )
 
+        points = np.concatenate(points)
+        for dim in range(3):
+            points[:, dim] /= n_boxes[dim]
+        # Points are now in "cell coordinates"
+        # Bring them into a cell
+        theta1 = 0.5 * np.pi * np.random.random_sample() + 0.25*np.pi
+        theta2 = 0.25 * np.pi * np.random.random_sample() + 0.25*np.pi
+        pbcc = PBCCalculator(np.array([
+            [n_boxes[0], 0, 0.],
+            [n_boxes[1]*np.cos(theta1), n_boxes[1]*np.sin(theta1), 0.],
+            [0., n_boxes[2]*np.cos(theta2), n_boxes[2]*np.sin(theta2)]
+        ]))
+        assert pbcc.cell_vector_lengths == approx(n_boxes)
+        pbcc.to_real_coords(points)
+
         density, box_dims_out = gridded_density_periodic(
-            np.concatenate(points)[np.newaxis, :],
+            points[np.newaxis, :],
             n_boxes_max = np.max(n_boxes),
-            pbcc = PBCCalculator(np.diag(n_boxes).astype(np.float)),
+            pbcc = pbcc,
             d_cutoff = 0,
         )
-        assert np.asarray(box_dims_out) == approx(1.)
+        assert pbcc.cell_vector_lengths == approx(n_boxes * box_dims_out)
+        assert density.shape == should_be.shape
         assert np.sum(density) == np.sum(should_be)
         assert np.all(density == should_be)

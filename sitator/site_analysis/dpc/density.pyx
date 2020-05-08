@@ -5,15 +5,19 @@ from libc.math cimport sqrt, floor, ceil
 
 import numpy as np
 
-ctypedef double precision
+from sitator.util.PBCCalculator cimport PBCCalculator, precision, cell_precision
+
+#ctypedef double precision
 
 @cython.cdivision
 cdef inline Py_ssize_t to_linear_index_3D(const Py_ssize_t* idex, const Py_ssize_t* shape) nogil:
+    """Convert a three-compoent (i, j, k) index into a row-major linear index"""
     return idex[0]*shape[1]*shape[2] + idex[1]*shape[2] + idex[2]
 
 
 @cython.cdivision
 cdef inline void from_linear_index_3D(Py_ssize_t lin_idex, const Py_ssize_t* shape, Py_ssize_t* out) nogil:
+    """Convert a row-major linear index into a three-compoent (i, j, k) index"""
     out[0] = lin_idex / (shape[1]*shape[2]) # This is C-style floor division
     lin_idex -= out[0]*shape[1]*shape[2]
     out[1] = lin_idex / shape[2]
@@ -21,24 +25,39 @@ cdef inline void from_linear_index_3D(Py_ssize_t lin_idex, const Py_ssize_t* sha
     out[2] = lin_idex
 
 
-cpdef gridded_density_periodic(points,
+cpdef gridded_density_periodic(frames,
                                int n_boxes_max,
-                               pbcc,
+                               PBCCalculator pbcc,
+                               precision d_cutoff = 0.0,
                                which_pts = None,
-                               out = None,
                                output_box_assignments = None,
-                               precision d_cutoff = 0.0):
-    """Compute the number of points in each triclinic subcell in grid covering a triclinic cell.
+                               ):
+    """Compute the number of points in a periodic grid of triclinic subcells.
 
-    The shortest crystal direction will have `n_boxes_min` gridboxes, and
-    the other dimensions will have the number of gridboxes that makes as
-    regular (same side lengths) as possible.
+    The longest crystal direction will have `n_boxes_max` gridboxes, and
+    the other dimensions will have the number of gridboxes that make the
+    grid boxes as regular (same side lengths) as possible.
 
     Params:
-     - which_pts (default None): list of indexes of the points in each frame
-        that should be considered. If None, all points considered.
-     - output_box_assignments: If present, an array in which to put the linear
-        index of the box each point is placed into.
+     - frames (ndarray): (n_frames, n_points, 3) input data.
+     - n_boxes_max (int): How many boxes, at most, to place along each
+        dimension. The size of the output grid is bounded by
+        n_boxes_max^3.
+     - pbcc (PBCCalculator): The periodic conditions under which to compute.
+     - d_cutoff (precision): The cutoff radius for a point contributing to
+        another box's density. If a box's centroid is within d_cutoff of
+        the centroid of the box into which a point is placed, that point contributes
+        +1 to the density of both boxes.
+     - which_pts (ndarray): list of indexes of the points in each frame
+        that should be considered. If None, all `n_points` points are considered.
+     - output_box_assignments (ndarray): If not None (default None), an
+        integer ndarray into which the box each input point is found to be in
+        will be placed as a linear index. (See `to_linear_index_3D`.) Must be
+        of shape `(n_frames, len(which_pts))`.
+    Returns:
+        (out, box_dims): out is the three-dimensional grid of densities;
+            box_dims is a 3-element array giving the length of the dimension
+            of the boxes along each cell vector.
     """
     # == Some variable set-ups
     cdef Py_ssize_t i, j
@@ -46,15 +65,11 @@ cpdef gridded_density_periodic(points,
 
     # == Set-up input data
     # TODO: extend to arbitrary dimensional case.
-    frames = None
-    if len(points.shape) == 3:
-        assert points.shape[2] == 3, "Data points must currently be in R^3"
-        frames = points
-    else:
-        raise ValueError("Invalid shape for `points`, it must be either 2- or 3-dimensional")
+    if not (len(frames.shape) == 3 and frames.shape[2] == 3):
+        raise ValueError("Frames must be of shape (n_frames, n_points, 3) --- only 3D data is supported.")
 
     # == Set up the cell
-    cdef precision [:] cell_vec_lengths = pbcc.cell_vector_lengths
+    cdef cell_precision [:] cell_vec_lengths = pbcc._cell_vec_lengths
 
     # == Determine number of boxes
     cdef Py_ssize_t n_boxes[3]
@@ -63,12 +78,22 @@ cpdef gridded_density_periodic(points,
     cdef Py_ssize_t longest_dim = np.argmax(cell_vec_lengths)
     cdef precision box_side_length = cell_vec_lengths[longest_dim] / n_boxes_max
     for i in range(3):
-        n_boxes[i] = <Py_ssize_t>(cell_vec_lengths[i] // box_side_length)
+        # Round n_boxes based on how close it puts the dimension of the box
+        # on that side to box_side_length --- maximize box regularity (in the
+        # regular polygon sense)
+        #
+        # Round down to start:
+        n_boxes[i] = <Py_ssize_t>floor(cell_vec_lengths[i] / box_side_length)
+        # If the error from rounding up is smaller than that of rounding down:
+        if abs((cell_vec_lengths[i] / (n_boxes[i] + 1)) - box_side_length) \
+            < abs((cell_vec_lengths[i] / n_boxes[i]) - box_side_length):
+            # Then round up
+            n_boxes[i] += 1
         box_dims[i] = cell_vec_lengths[i] / n_boxes[i]
+    assert n_boxes[longest_dim] == n_boxes_max
 
     # == Build output array
-    if out is None:
-        out = np.empty(shape = (n_boxes[0], n_boxes[1], n_boxes[2]), dtype = frames.dtype)
+    out = np.empty(shape = (n_boxes[0], n_boxes[1], n_boxes[2]), dtype = frames.dtype)
     cdef precision [:, :, :] out_c  = out
     out_c[:, :, :] = 0
 

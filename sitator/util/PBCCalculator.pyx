@@ -13,6 +13,7 @@ ctypedef double cell_precision
 cdef class PBCCalculator(object):
     """Performs calculations on collections of 3D points under PBC."""
 
+    cdef object _cell_np
     cdef cell_precision [:, :] _cell_mat_array
     cdef cell_precision [:, :] _cell_mat_inverse_array
     cdef cell_precision [:] _cell_centroid
@@ -32,6 +33,7 @@ cdef class PBCCalculator(object):
         if not cell.shape[0] == 3:
             raise ValueError("Cell must be three-dimensional")
 
+        self._cell_np = cell
         self._cell = cell
         self._cell_vec_lengths = np.linalg.norm(cell, axis = 1)
 
@@ -45,10 +47,13 @@ cdef class PBCCalculator(object):
 
     @property
     def cell_centroid(self):
-        return self._cell_centroid
+        return np.asarray(self._cell_centroid)
     @property
     def cell_vector_lengths(self):
-        return self._cell_vec_lengths
+        return np.asarray(self._cell_vec_lengths)
+    @property
+    def cell(self):
+        return self._cell_np
 
 
     cpdef pairwise_distances(self, pts, out = None):
