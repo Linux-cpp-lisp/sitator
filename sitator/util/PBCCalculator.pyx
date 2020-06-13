@@ -7,19 +7,8 @@ cimport numpy as npc
 
 from libc.math cimport sqrt, cos, M_PI, isnan, floor, INFINITY, fmod
 
-ctypedef double precision
-ctypedef double cell_precision
-
 cdef class PBCCalculator(object):
     """Performs calculations on collections of 3D points under PBC."""
-
-    cdef object _cell_np
-    cdef cell_precision [:, :] _cell_mat_array
-    cdef cell_precision [:, :] _cell_mat_inverse_array
-    cdef cell_precision [:] _cell_centroid
-    cdef cell_precision [:, :] _cell
-    cdef cell_precision [:] _cell_vec_lengths
-
 
     def __init__(self, cell):
         """
