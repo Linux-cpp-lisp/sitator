@@ -5,9 +5,9 @@ from libc.math cimport sqrt, floor, ceil
 
 import numpy as np
 
+cimport sitator.util.PBCCalculator
 from sitator.util.PBCCalculator cimport PBCCalculator, precision, cell_precision
 
-#ctypedef double precision
 
 @cython.cdivision
 cdef inline Py_ssize_t to_linear_index_3D(const Py_ssize_t* idex, const Py_ssize_t* shape) nogil:
