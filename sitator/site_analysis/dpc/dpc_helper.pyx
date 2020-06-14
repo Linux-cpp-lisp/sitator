@@ -6,10 +6,11 @@ from libc.math cimport sqrt, floor, ceil, INFINITY, NAN
 import numpy as np
 cimport numpy as npc
 
+import sitator
 from sitator.util.PBCCalculator cimport PBCCalculator, precision, cell_precision
 from .density cimport gridded_density_periodic, to_linear_index_3D, from_linear_index_3D
 
-CLUSTER_UNASSIGNED = -1
+CLUSTER_UNASSIGNED = sitator.SiteTrajectory.SITE_UNASSIGNED
 cdef int _CLUSTER_UNASSIGNED_C = CLUSTER_UNASSIGNED
 
 
