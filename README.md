@@ -45,7 +45,7 @@ pip install ".[SiteTypeAnalysis]"
 
 ## Examples and Documentation
 
-Two example Jupyter notebooks for conducting full landmark analyses of LiAlSiO<sub>4</sub> and Li<sub>12</sub>La<sub>3</sub>Zr<sub>2</sub>O<sub>12</sub> as in our paper, including data files, can be found [on Materials Cloud](https://archive.materialscloud.org/2019.0008/).
+Two example Jupyter notebooks for conducting full landmark analyses of LiAlSiO<sub>4</sub> and Li<sub>12</sub>La<sub>3</sub>Zr<sub>2</sub>O<sub>12</sub> as in our paper, including data files, can be found [on Materials Cloud](https://archive.materialscloud.org/record/102).
 
 Full API documentation can be found at [ReadTheDocs](https://sitator.readthedocs.io/en/py3/).
 
