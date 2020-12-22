@@ -15,6 +15,7 @@ cdef class PBCCalculator(object):
         :param DxD ndarray: the unit cell -- an array of cell vectors, like the
           cell of an ASE :class:Atoms object.
         """
+        cell = np.asarray(cell)
         cellmat = cell.T
 
         if not cell.shape[1] == cell.shape[0]:
@@ -37,12 +38,12 @@ cdef class PBCCalculator(object):
     @property
     def cell_centroid(self):
         out = np.asarray(self._cell_centroid)
-        out.flags.writable = False
+        out.flags.writeable = False
         return out
     @property
     def cell_vector_lengths(self):
         out = np.asarray(self._cell_vec_lengths)
-        out.flags.wriable = False
+        out.flags.writeable = False
         return out
     @property
     def cell(self):
