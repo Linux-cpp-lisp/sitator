@@ -36,7 +36,7 @@ class RemoveUnoccupiedSites(object):
 
         for frame in st.traj:
             count_buf[frame] += 1
-            np.greater_equal(count_buf[:-1], threshold, out = seen_mask)
+            np.greater(count_buf[:-1], threshold, out = seen_mask)
             if np.all(seen_mask):
                 return st
 
