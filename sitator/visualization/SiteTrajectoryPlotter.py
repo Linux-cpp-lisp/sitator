@@ -1,4 +1,4 @@
-
+import numpy as np
 import matplotlib
 from matplotlib.collections import LineCollection
 
