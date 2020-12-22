@@ -23,11 +23,6 @@ class MergeSitesByDynamics(MergeSites):
         a hard guerantee. Can be `None`; defaults to `1.5`. Can be loosely
         thought of as how "normally distributed" the merge sites need to be, with
         larger values allowing more and more oblong point clouds.
-    :param bool check_types: If True, only sites of the same type are candidates to
-        be merged; if false, type information is ignored. Merged sites will only
-        be assigned types if this is True.
-    :param int iterlimit: Maximum number of Markov Clustering iterations to run
-        before throwing an error.
     :param dict markov_parameters: Parameters for underlying Markov Clustering.
         Valid keys are ``'inflation'``, ``'expansion'``, and ``'pruning_threshold'``.
     """
@@ -35,12 +30,12 @@ class MergeSitesByDynamics(MergeSites):
                  connectivity_matrix_generator = None,
                  distance_threshold = 1.0,
                  post_check_thresh_factor = 1.5,
-                 check_types = True,
-                 markov_parameters = {}):
+                 markov_parameters = {},
+                 **kwargs):
 
         super().__init__(
             maximum_merge_distance = post_check_thresh_factor * distance_threshold,
-            check_types = check_types
+            **kwargs
         )
 
         if connectivity_matrix_generator is None:
@@ -50,8 +45,6 @@ class MergeSitesByDynamics(MergeSites):
         self.connectivity_matrix_generator = connectivity_matrix_generator
         self.distance_threshold = distance_threshold
         self.post_check_thresh_factor = post_check_thresh_factor
-        self.check_types = check_types
-        self.iterlimit = iterlimit
         self.markov_parameters = markov_parameters
 
     # Connectivity Matrix Generation Schemes:
